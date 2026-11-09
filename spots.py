@@ -288,6 +288,7 @@ def _fresh_trick(slug, idx=0):
 
 
 def choose_trick(g, idx, slug, events):
+    _heal(g, events)
     if g["phase"] != "playing":
         return "not in playing phase"
     if idx != g["current_index"]:
@@ -322,6 +323,12 @@ def advance(g, events):
             g["trick"]["step"] += 1
         else:
             return
+
+
+def _heal(g, events):
+    """Recover a trick whose pending choice was lost: resume the driver."""
+    if g.get("trick") and not g.get("pending"):
+        advance(g, events)
 
 
 def _start_roll(g, events, n):
@@ -638,6 +645,7 @@ def _end_turn(g, events):
 
 def do_place(g, idx, die_pos, target, events):
     """Place/bury one die from the current pool."""
+    _heal(g, events)
     pend = g.get("pending")
     if not pend or pend["kind"] != "place" or pend["player"] != idx:
         return "no placement pending for you"
@@ -676,6 +684,7 @@ def do_place(g, idx, die_pos, target, events):
 def do_reroll(g, idx, indices, events):
     """Spend a treat to reroll dice from the current (unplaced) roll.
     Standard tricks reroll all dice; Track rerolls a chosen subset."""
+    _heal(g, events)
     pend = g.get("pending")
     if not pend or pend["kind"] != "place" or pend["player"] != idx:
         return "no roll to reroll"
@@ -704,6 +713,7 @@ def do_reroll(g, idx, indices, events):
 
 def score_action(g, idx, events):
     """Slow-and-steady scoring instead of a trick."""
+    _heal(g, events)
     if g["phase"] != "playing":
         return "not in playing phase"
     if idx != g["current_index"]:
@@ -721,6 +731,7 @@ def score_action(g, idx, events):
 
 def apply_choice(g, idx, choice, events):
     """Apply the current pending choice. Returns error or None."""
+    _heal(g, events)
     pend = g.get("pending")
     if not pend or pend["player"] != idx:
         return "no pending choice for you"

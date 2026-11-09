@@ -1388,7 +1388,12 @@ def odin_api_move(state, chat_id, user_id, body):
     elif idx is None:
         return [], "not in this game"
     elif action == "play":
-        cards = [{"suit": c["suit"], "rank": int(c["rank"])} for c in body.get("cards", [])]
+        raw = body.get("cards", [])
+        if not isinstance(raw, list) or any(
+                not isinstance(c, dict) or c.get("suit") not in O.SUITS
+                or not str(c.get("rank", "")).isdigit() for c in raw):
+            return [], "bad cards"
+        cards = [{"suit": c["suit"], "rank": int(c["rank"])} for c in raw]
         removed, err = odin_take_cards(g, idx, cards)
         if err:
             return [], err
@@ -1402,7 +1407,9 @@ def odin_api_move(state, chat_id, user_id, body):
             return [], err
     elif action == "pickup":
         c = body.get("card") or {}
-        err = O.choose_pickup(g, idx, {"suit": c.get("suit"), "rank": int(c.get("rank", 0))}, ev)
+        if c.get("suit") not in O.SUITS or not str(c.get("rank", "")).isdigit():
+            return [], "bad card"
+        err = O.choose_pickup(g, idx, {"suit": c["suit"], "rank": int(c["rank"])}, ev)
         if err:
             return [], err
     else:

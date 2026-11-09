@@ -50,15 +50,16 @@ function odRender(){let b=OD.board; if(!b)return;
     +(isTurn?'<div class="small"><b>▶ Turn</b></div>':'')+'</div>';}).join('')+'</div>';
  document.getElementById('odBoard').innerHTML='<div class="table" style="position:relative">'+tableHtml+pendingHtml+seats+'</div>';
  // My hand (only mine, private), sorted by suit then rank for grouping sets
- let hand=[...(b.my_hand||[])].sort((x,y)=>(OD_SUIT_ORDER[x.suit]-OD_SUIT_ORDER[y.suit])||(x.rank-y.rank));
+ let hand=[...(b.my_hand||[])].sort((x,y)=>((OD_SUIT_ORDER[x.suit]??99)-(OD_SUIT_ORDER[y.suit]??99))||(x.rank-y.rank));
  OD.handSorted=hand;
  let handKeys=hand.map(c=>c.rank+c.suit), newHand=odNew(OD.prevHand,handKeys); OD.prevHand=handKeys;
+ OD.selected=OD.selected.filter(k=>handKeys.includes(k)); // prune stale picks (hand changed)
  let mh=document.getElementById('odHand');
  mh.innerHTML='<b>My hand ('+hand.length+')</b><div class="pile">'
-  + hand.map((c,i)=>odCard(c,OD.selected.includes(i),newHand.has(i)?'card-in':'')).join('') + '</div>';
+  + hand.map((c,i)=>odCard(c,OD.selected.includes(c.rank+c.suit),newHand.has(i)?'card-in':'')).join('') + '</div>';
  mh.querySelectorAll('.ocard').forEach(el=>el.addEventListener('click',()=>{
-   let i=hand.findIndex(c=>c.suit===el.dataset.suit&&c.rank===el.dataset.rank);
-   if(OD.selected.includes(i)) OD.selected=OD.selected.filter(x=>x!==i); else OD.selected.push(i); odRenderHandOnly();}));
+   let k=el.dataset.rank+el.dataset.suit;
+   if(OD.selected.includes(k)) OD.selected=OD.selected.filter(x=>x!==k); else OD.selected.push(k); odRenderHandOnly();}));
  odPreview();
  let myTurn=(b.phase==='playing'&&b.players[b.current_index]&&b.players[b.current_index].user_id===OD.user_id);
  let myPickup=(b.phase==='pickup'&&b.pickup_player!==null&&b.players[b.pickup_player]&&b.players[b.pickup_player].user_id===OD.user_id);
@@ -82,7 +83,8 @@ function odRender(){let b=OD.board; if(!b)return;
 function odPreview(){
  let b=OD.board, pv=document.getElementById('odPreview'), pb=document.getElementById('odPlay');
  if(!b||!OD.selected.length){pv.style.display='none';pv.innerHTML=''; if(pb)pb.disabled=true; return;}
- let cards=OD.selected.map(i=>OD.handSorted[i]).filter(Boolean);
+ let cards=(OD.handSorted||[]).filter(c=>OD.selected.includes(c.rank+c.suit));
+ if(!cards.length){pv.style.display='none';pv.innerHTML=''; if(pb)pb.disabled=true; return;}
  let hand=OD.handSorted||[], val=odSetValue(cards), lines=[], ok=true;
  if(!b.table||!b.table.length){
    if(cards.length===1) lines.push('🃏 Lead with '+val);
@@ -103,11 +105,11 @@ function odPreview(){
  pv.style.display='block';
  if(pb)pb.disabled=!ok;}
 function odRenderHandOnly(){
- document.querySelectorAll('#odHand .ocard').forEach((el,i)=>el.classList.toggle('sel',OD.selected.includes(i)));
+ document.querySelectorAll('#odHand .ocard').forEach(el=>el.classList.toggle('sel',OD.selected.includes(el.dataset.rank+el.dataset.suit)));
  odPreview();}
 document.getElementById('odPlay').addEventListener('click',()=>{
- if(!OD.selected.length){odLog('Select a card first');return;}
- let cards=OD.selected.map(i=>OD.handSorted[i]);
+ let cards=(OD.handSorted||[]).filter(c=>OD.selected.includes(c.rank+c.suit));
+ if(!cards.length){odLog('Select a card first');return;}
  odMove('play',{cards:cards});});
 document.getElementById('odPass').addEventListener('click',()=>odMove('pass'));
 document.getElementById('odStart').addEventListener('click',()=>odMove('start'));

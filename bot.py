@@ -2482,6 +2482,11 @@ def start_web_server(state):
             if u.path == "/spots-dice.png":
                 p = os.path.join(os.path.dirname(JS_PATH), "spots-dice.png")
                 return self._send(200, open(p, "rb").read(), "image/png", cache="public, max-age=86400")
+            if u.path.startswith("/spots-dice/") and u.path.endswith(".png"):
+                p = os.path.join(os.path.dirname(JS_PATH), "spots_dice", os.path.basename(u.path))
+                if os.path.exists(p):
+                    return self._send(200, open(p, "rb").read(), "image/png", cache="public, max-age=86400")
+                return self._send(404, {"ok": False})
             if u.path == "/spots-yards.webp":
                 p = os.path.join(os.path.dirname(JS_PATH), "spots-yards.webp")
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")

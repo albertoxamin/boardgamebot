@@ -43,7 +43,7 @@ function spRender(){let b=SP.board; if(!b)return;
  let seats=b.players.map((p,i)=>{
    let isTurn=b.current_index===i&&b.phase==='playing';
    return '<div class="lsdseat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score">'+p.scored.length+'🏅 · '+p.treats+'🦴</span></div>'
-    +'<div style="display:flex;gap:8px;align-items:flex-start"><div class="tyard" data-yard="'+i+'" style="background-position:-'+(i*84)+'px 0" title="yard (buried dice)"></div><div><div>'+(p.yard.length?p.yard.map(v=>'<span class="sdice" title="buried die '+v+'" style="background-position:-'+((v-1)*40)+'px 0;width:28px;height:28px;background-size:168px 28px"></span>').join(''):'<span class="small">no buried dice</span>')+'</div><div class="small">Yard total: '+p.yard.reduce((a,c)=>a+c,0)+' / bust at 8+</div></div></div>'
+    +'<div style="display:flex;gap:8px;align-items:flex-start"><div class="tyard" data-yard="'+i+'" style="background-position:-'+(i*84)+'px 0" title="yard (buried dice)"></div><div><div>'+(p.yard.length?p.yard.map(v=>'<img class="sdice" src="spots-dice/'+v+'.png" alt="buried die '+v+'" title="buried die '+v+'" style="width:28px;height:30px">').join(''):'<span class="small">no buried dice</span>')+'</div><div class="small">Yard total: '+p.yard.reduce((a,c)=>a+c,0)+' / bust at 8+</div></div></div>'
     + p.dogs.map(d=>'<div style="margin:4px 0">'+spDogImg(d,false)
       +'<div>'+d.spots.map((s,si)=>{let filled=(d.placed||{})[si]!==undefined;
         return '<span class="spotbox'+(filled?' filled':'')+'" data-dog="'+d.iid+'" data-spot="'+si+'">'+(filled?d.placed[si]:s)+'</span>';}).join('')+'</div></div>').join('')
@@ -54,7 +54,7 @@ function spRender(){let b=SP.board; if(!b)return;
  if(pend&&pend.kind==='place'&&me&&b.current_index===b.players.indexOf(me)){
    let dice=(b.trick?b.trick.dice:[]);
    poolHtml='<div class="card" style="border-color:#f59e0b"><div class="small"><b>🎲 Dice to place:</b> tap a die, then tap a matching spot on a dog or your yard'+(b.trick&&b.trick.tile==='search'?' — place dice totalling exactly 8, then Done':'')+'</div><div>'
-    + dice.map((v,i)=>'<span class="sdice'+(SP.dieSel===i?' sel':'')+'" data-i="'+i+'" title="die showing '+v+'" style="background-position:-'+((v-1)*40)+'px 0"></span>').join('')+'</div>'
+    + dice.map((v,i)=>'<img class="sdice'+(SP.dieSel===i?' sel':'')+'" data-i="'+i+'" src="spots-dice/'+v+'.png" alt="die '+v+'" title="die showing '+v+'">').join('')+'</div>'
     + (SP.dieSel!==null&&dice[SP.dieSel]!==undefined&&me.yard.reduce((a,c)=>a+c,0)+dice[SP.dieSel]>7
        ?'<div class="small" style="color:#fca5a5">⚠️ Burying this die busts you (yard '+me.yard.reduce((a,c)=>a+c,0)+' + '+dice[SP.dieSel]+' = '+(me.yard.reduce((a,c)=>a+c,0)+dice[SP.dieSel])+')</div>':'')
     + '<button class="lsdchoice" id="spBury">⛏ Bury selected die in yard</button>'

@@ -123,6 +123,7 @@ def start_game(g, events):
         for _ in range(2):
             d = g["dog_deck"].pop()
             d["placed"] = {}
+            d["pack"] = _next_pack(p)
             p["dogs"].append(d)
         p["scored"] = []
         p["yard"] = [random.randint(1, 6)]     # opening roll, buried
@@ -137,6 +138,11 @@ def start_game(g, events):
 
 def yard_total(p):
     return sum(p["yard"])
+
+
+def _next_pack(p):
+    seen = [d.get("pack", 0) for d in p["dogs"] + p["scored"]]
+    return max(seen) + 1 if seen else 0
 
 
 def dog_complete(dog):
@@ -203,6 +209,7 @@ def _score_dogs(g, idx, events, instant=False):
             break
         d = g["dog_deck"].pop()
         d["placed"] = {}
+        d["pack"] = _next_pack(p)
         p["dogs"].append(d)
         events.append(f"🃏 Draws {d['name']}.")
     if len(p["scored"]) >= WIN_SCORED:
@@ -445,6 +452,7 @@ def _step_howl(g, events):
         if len(p["dogs"]) + len(p["scored"]) < MAX_DOGS and g["dog_deck"]:
             d = g["dog_deck"].pop()
             d["placed"] = {}
+            d["pack"] = _next_pack(p)
             p["dogs"].append(d)
             events.append(f"🐶 Draws {d['name']} (Howl).")
     return _step_optional_roll(g, events)

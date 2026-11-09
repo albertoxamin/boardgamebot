@@ -42,13 +42,14 @@ function spRender(){let b=SP.board; if(!b)return;
   + b.tiles.map(t=>'<span class="tiley'+(t.faceup?'':' tilety')+'" data-slug="'+t.slug+'" title="'+escapeHtml(t.slug)+'"><img src="spots-tiles/'+t.slug+'.jpg?v=2" alt="'+escapeHtml(t.slug)+'">'+(t.treat_on?'<div class="tiletreats">'+Array.from({length:t.treat_on},()=>'<img class="treatic" src="treat.png" alt="treat">').join('')+'</div>':'')+'</span>').join('') + '</div>';
  let seats=b.players.map((p,i)=>{
    let isTurn=b.current_index===i&&b.phase==='playing';
-   return '<div class="lsdseat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score">'+p.scored.length+'🏅 · '+p.treats+'🦴</span></div>'
+   return '<div class="lsdseat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score">'+p.scored.length+'/6🏅 · '+p.treats+'🦴</span></div>'
     +'<div style="display:flex;gap:8px;align-items:flex-start"><div class="tyard" data-yard="'+i+'" style="background-position:-'+(i*84)+'px 0" title="yard (buried dice)"><div class="yardice">'+(p.yard.length?p.yard.map(v=>'<img class="sdice" src="spots-dice/'+v+'.png" alt="buried die '+v+'" title="buried die '+v+'" style="width:22px;height:23px">').join(''):'<span class="small" style="color:#fff">empty</span>')+'</div></div><div class="small">Yard total: '+p.yard.reduce((a,c)=>a+c,0)+' / bust at 8+</div></div>'
     +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">'
-    + p.dogs.map(d=>'<div style="flex:0 0 100px">'+spDogImg(d,false)
-      +'<div>'+d.spots.map((s,si)=>{let filled=(d.placed||{})[si]!==undefined;
-        return '<span class="spotbox'+(filled?' filled':'')+'" data-dog="'+d.iid+'" data-spot="'+si+'">'+(filled?'<img src="spots-dice/'+d.placed[si]+'.png" alt="die '+d.placed[si]+'" style="width:24px;height:24px">':s)+'</span>';}).join('')+'</div></div>').join('')+'</div>'
-    + p.scored.map(d=>'<div title="scored" style="opacity:.6">'+spDogImg(d,true)+'</div>').join('')
+    + [...p.dogs, ...p.scored].sort((a,b)=>(a.pack??99)-(b.pack??99)).map(d=>{
+        let isScored=p.scored.includes(d);
+        return '<div style="flex:0 0 100px;'+(isScored?'opacity:.65':'')+'" title="'+escapeHtml(d.name)+(isScored?' (scored)':'')+'">'+spDogImg(d,isScored)
+        +(isScored?'':'<div>'+d.spots.map((s,si)=>{let filled=(d.placed||{})[si]!==undefined;
+          return '<span class="spotbox'+(filled?' filled':'')+'" data-dog="'+d.iid+'" data-spot="'+si+'">'+(filled?'<img src="spots-dice/'+d.placed[si]+'.png" alt="die '+d.placed[si]+'" style="width:24px;height:24px">':s)+'</span>';}).join('')+'</div>')+'</div>';}).join('')+'</div>'
     +(isTurn?'<div class="small"><b>▶ Turn</b></div>':'')+'</div>';}).join('');
  let pend=b.pending;
  let poolHtml='';

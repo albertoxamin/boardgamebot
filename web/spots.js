@@ -43,32 +43,34 @@ function spRender(){let b=SP.board; if(!b)return;
  let seats=b.players.map((p,i)=>{
    let isTurn=b.current_index===i&&b.phase==='playing';
    return '<div class="lsdseat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score">'+p.scored.length+'🏅 · '+p.treats+'🦴</span></div>'
-    +'<div style="display:flex;gap:8px;align-items:flex-start"><div class="tyard" data-yard="'+i+'" style="background-position:-'+(i*84)+'px 0" title="yard (buried dice)"></div><div class="small">Yard: '+(p.yard.length?p.yard.join(' '):'—')+' = '+p.yard.reduce((a,c)=>a+c,0)+'</div></div>'
+    +'<div style="display:flex;gap:8px;align-items:flex-start"><div class="tyard" data-yard="'+i+'" style="background-position:-'+(i*84)+'px 0" title="yard (buried dice)"></div><div><div>'+(p.yard.length?p.yard.map(v=>'<span class="sdice" title="buried die '+v+'" style="background-position:-'+((v-1)*40)+'px 0;width:28px;height:28px;background-size:168px 28px"></span>').join(''):'<span class="small">no buried dice</span>')+'</div><div class="small">Yard total: '+p.yard.reduce((a,c)=>a+c,0)+' / bust at 8+</div></div></div>'
     + p.dogs.map(d=>'<div style="margin:4px 0">'+spDogImg(d,false)
       +'<div>'+d.spots.map((s,si)=>{let filled=(d.placed||{})[si]!==undefined;
         return '<span class="spotbox'+(filled?' filled':'')+'" data-dog="'+d.iid+'" data-spot="'+si+'">'+(filled?d.placed[si]:s)+'</span>';}).join('')+'</div></div>').join('')
     + p.scored.map(d=>'<div title="scored" style="opacity:.6">'+spDogImg(d,true)+'</div>').join('')
     +(isTurn?'<div class="small"><b>▶ Turn</b></div>':'')+'</div>';}).join('');
+ let pend=b.pending;
+ let poolHtml='';
+ if(pend&&pend.kind==='place'&&me&&b.current_index===b.players.indexOf(me)){
+   let dice=(b.trick?b.trick.dice:[]);
+   poolHtml='<div class="card" style="border-color:#f59e0b"><div class="small"><b>🎲 Dice to place:</b> tap a die, then tap a matching spot on a dog or your yard'+(b.trick&&b.trick.tile==='search'?' — place dice totalling exactly 8, then Done':'')+'</div><div>'
+    + dice.map((v,i)=>'<span class="sdice'+(SP.dieSel===i?' sel':'')+'" data-i="'+i+'" title="die showing '+v+'" style="background-position:-'+((v-1)*40)+'px 0"></span>').join('')+'</div>'
+    + '<button class="lsdchoice" id="spBury">⛏ Bury selected die in yard</button>'
+    + (me.treats>0?'<button class="lsdchoice" id="spReroll">🎲 Reroll'+(b.trick&&b.trick.tile==='track'?' selected':' all')+' (1 treat)</button>':'')
+    + (b.trick&&b.trick.tile==='search'?'<button class="lsdchoice" id="spDone">✅ Done (discard rest)</button>':'')+'</div>';
+ }
  document.getElementById('spotsBoard').innerHTML='<div class="table" style="position:relative">'
   +(SP.spectating?'<div class="lobby-note">👁 Spectating — view only (join in Telegram to play)</div>':'')
-  +tiles+seats+'</div>';
+  +poolHtml+tiles+seats+'</div>';
  // Trick tiles tap (choose a trick)
  if(myTurn && !b.trick){
    document.querySelectorAll('#spotsBoard .tiley').forEach(el=>{
      if(!el.classList.contains('tilety')) el.addEventListener('click',()=>spMove('trick',{tile:el.dataset.slug}));
    });
  }
- // Dice pool (placement pending)
- let pool=document.getElementById('spotsPool'); pool.innerHTML='';
- let pend=b.pending;
+ // Dice pool handlers (pool tray is inside the board, at the top)
  if(pend&&pend.kind==='place'&&me&&b.current_index===b.players.indexOf(me)){
-   let dice=(b.trick?b.trick.dice:[]);
-    pool.innerHTML='<div class="small"><b>Dice to place:</b> tap a die, then tap a matching spot or your yard'+(b.trick&&b.trick.tile==='search'?' — place dice totalling exactly 8, then use Done below':'')+'</div><div>'
-     + dice.map((v,i)=>'<span class="sdice'+(SP.dieSel===i?' sel':'')+'" data-i="'+i+'" title="die showing '+v+'" style="background-position:-'+((v-1)*40)+'px 0"></span>').join('')+'</div>'
-     + '<button class="lsdchoice" id="spBury">⛏ Bury selected die in yard</button>'
-     + (me.treats>0?'<button class="lsdchoice" id="spReroll">🎲 Reroll'+(b.trick&&b.trick.tile==='track'?' selected':' all')+' (1 treat)</button>':'')
-     + (b.trick&&b.trick.tile==='search'?'<button class="lsdchoice" id="spDone">✅ Done (discard rest)</button>':'');
-   pool.querySelectorAll('.sdice').forEach(el=>el.addEventListener('click',()=>{
+   document.querySelectorAll('.card .sdice').forEach(el=>el.addEventListener('click',()=>{
      let i=parseInt(el.dataset.i);
      if(b.trick&&b.trick.tile==='track'){SP.rerollSel.has(i)?SP.rerollSel.delete(i):SP.rerollSel.add(i); el.classList.toggle('sel');}
      else {SP.dieSel=SP.dieSel===i?null:i; spRender();}

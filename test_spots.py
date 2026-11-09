@@ -220,3 +220,36 @@ def test_auto_place():
     g["trick"]["dice"] = [3]
     g["pending"]["hunt_limit"] = 2
     assert S.auto_place(g, idx, []) == "auto-place is not available for this trick's dice"
+
+
+def test_autobury_single_die_only():
+    g = mk(2)
+    idx = g["current_index"]
+    p = g["players"][idx]
+    p["treats"] = 0
+    peb = next(d for d in g["dog_deck"] if d["slug"] == "pebble")
+    g["dog_deck"].remove(peb)
+    p["dogs"] = [peb]
+    assert S.choose_trick(g, idx, "walk", []) is None
+    g["trick"]["dice"] = [6, 5]  # pebble spots are [1,3,4]: both unplaceable
+    g["pending"] = {"kind": "place", "player": idx, "only_num": None,
+                    "hunt_limit": None, "search": False, "placed_sum": 0}
+    # multi-die pool: nothing auto-buries, both dice stay for manual play
+    assert S.do_place(g, idx, 0, ("yard",), []) is None
+    assert g["trick"]["dice"] == [5] and p["yard"][-1] == 6
+    # last die unplaceable with no treats: next placement attempt is moot,
+    # it auto-buries instead (pool empties, trick advances)
+    g["players"][idx]["treats"] = 0
+    # simulate by calling autobury through a fresh single-die situation:
+    g2 = mk(2)
+    i2 = g2["current_index"]
+    i2p = g2["players"][i2]
+    i2p["treats"] = 0
+    peb2 = next(d for d in g2["dog_deck"] if d["slug"] == "pebble")
+    g2["dog_deck"].remove(peb2)
+    i2p["dogs"] = [peb2]
+    assert S.choose_trick(g2, i2, "walk", []) is None
+    g2["trick"]["dice"] = [6]
+    g2["trick"]["placed_roll"] = 1
+    assert S._autobury(g2, []) is True
+    assert g2["trick"]["dice"] == [] and 6 in i2p["yard"]

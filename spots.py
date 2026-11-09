@@ -354,8 +354,8 @@ def _autobury(g, events):
     Returns False if a bust ended the trick."""
     t = g["trick"]
     idx = t["idx"]
-    if t["tile"] in ("hunt", "search"):
-        return True
+    if t["tile"] in ("hunt", "search") or len(t["dice"]) != 1:
+        return True  # only the final remaining die auto-buries
     p = g["players"][idx]
     while t["dice"]:
         if p["treats"] > 0 and t["placed_roll"] == 0:

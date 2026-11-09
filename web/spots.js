@@ -44,9 +44,10 @@ function spRender(){let b=SP.board; if(!b)return;
    let isTurn=b.current_index===i&&b.phase==='playing';
    return '<div class="lsdseat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score">'+p.scored.length+'🏅 · '+p.treats+'🦴</span></div>'
     +'<div style="display:flex;gap:8px;align-items:flex-start"><div class="tyard" data-yard="'+i+'" style="background-position:-'+(i*84)+'px 0" title="yard (buried dice)"></div><div><div>'+(p.yard.length?p.yard.map(v=>'<img class="sdice" src="spots-dice/'+v+'.png" alt="buried die '+v+'" title="buried die '+v+'" style="width:28px;height:30px">').join(''):'<span class="small">no buried dice</span>')+'</div><div class="small">Yard total: '+p.yard.reduce((a,c)=>a+c,0)+' / bust at 8+</div></div></div>'
-    + p.dogs.map(d=>'<div style="margin:4px 0">'+spDogImg(d,false)
+    +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">'
+    + p.dogs.map(d=>'<div style="flex:0 0 100px">'+spDogImg(d,false)
       +'<div>'+d.spots.map((s,si)=>{let filled=(d.placed||{})[si]!==undefined;
-        return '<span class="spotbox'+(filled?' filled':'')+'" data-dog="'+d.iid+'" data-spot="'+si+'">'+(filled?d.placed[si]:s)+'</span>';}).join('')+'</div></div>').join('')
+        return '<span class="spotbox'+(filled?' filled':'')+'" data-dog="'+d.iid+'" data-spot="'+si+'">'+(filled?d.placed[si]:s)+'</span>';}).join('')+'</div></div>').join('')+'</div>'
     + p.scored.map(d=>'<div title="scored" style="opacity:.6">'+spDogImg(d,true)+'</div>').join('')
     +(isTurn?'<div class="small"><b>▶ Turn</b></div>':'')+'</div>';}).join('');
  let pend=b.pending;
@@ -103,7 +104,10 @@ function spRender(){let b=SP.board; if(!b)return;
    let pendPlayer=b.players[pend.player];
    let box=document.createElement('div'); box.className='card';
    box.innerHTML='<b>⏳ '+(pendPlayer?escapeHtml(pendPlayer.name):'')+' to choose:</b>';
-   (pend.options_detail||[]).forEach(o=>{let btn=document.createElement('button'); btn.className='lsdchoice'; btn.textContent=o.label;
+   (pend.options_detail||[]).forEach(o=>{let btn=document.createElement('button'); btn.className='lsdchoice';
+     if(pend.kind==='choose_number'&&Number.isInteger(o.choice)&&o.choice>=1&&o.choice<=6){
+       btn.innerHTML='<img class="sdice" src="spots-dice/'+o.choice+'.png" alt="die '+o.choice+'" style="width:34px;height:36px;vertical-align:middle"> '+o.label;
+     } else btn.textContent=o.label;
      btn.addEventListener('click',()=>spMove('choice',{choice:o.choice})); box.appendChild(btn);});
    ch.appendChild(box);
  }

@@ -320,6 +320,8 @@ def advance(g, events):
             _end_turn(g, events)
             return
         if steps[g["trick"]["step"]](g, events):
+            if g["trick"] is None:
+                return
             g["trick"]["step"] += 1
         else:
             return
@@ -329,6 +331,38 @@ def _heal(g, events):
     """Recover a trick whose pending choice was lost: resume the driver."""
     if g.get("trick") and not g.get("pending"):
         advance(g, events)
+
+
+def _has_legal_spot(g, idx, v):
+    return any(s == v and i not in d.get("placed", {})
+               for d in g["players"][idx]["dogs"] for i, s in enumerate(d["spots"]))
+
+
+def _autobury(g, events):
+    """Buried-by-force: dice with no legal dog spot bury themselves (the
+    rules require it), including busting. Skipped during the reroll
+    window (treats held, nothing placed yet) and inside Hunt/Search,
+    where leftover dice are discarded instead of buried.
+    Returns False if a bust ended the trick."""
+    t = g["trick"]
+    idx = t["idx"]
+    if t["tile"] in ("hunt", "search"):
+        return True
+    p = g["players"][idx]
+    while t["dice"]:
+        if p["treats"] > 0 and t["placed_roll"] == 0:
+            return True  # player may still reroll these dice
+        unplaceable = [i for i, v in enumerate(t["dice"]) if not _has_legal_spot(g, idx, v)]
+        if not unplaceable:
+            return True
+        i = unplaceable[0]
+        v = t["dice"].pop(i)
+        p["yard"].append(v)
+        events.append(f"⛏ {p['name']} buries a {v} (no matching free spot). "
+                      f"(yard total {yard_total(p)})")
+        if _check_bust(g, idx, events):
+            return False
+    return True
 
 
 def _start_roll(g, events, n):
@@ -347,6 +381,10 @@ def _start_roll(g, events, n):
     events.append(f"🎲 Rolled {len(g['trick']['dice'])}: "
                   f"{', '.join(map(str, g['trick']['dice']))}.")
     t = g["trick"]
+    if not _autobury(g, events):
+        return True
+    if not t["dice"]:
+        return True  # everything auto-buried; step complete
     g["pending"] = {"kind": "place", "player": g["current_index"],
                     "only_num": t.get("only_num"), "hunt_limit": t.get("hunt_limit"),
                     "search": bool(t.get("search")), "placed_sum": 0}
@@ -423,6 +461,10 @@ def _step_rollover(g, events):
     t["placed_roll"] = 0
     g["last_roll"] = list(t["dice"])
     events.append(f"🎲 Roll Over: re-rolls {len(buried)} buried dice.")
+    if not _autobury(g, events):
+        return True
+    if not t["dice"]:
+        return True
     g["pending"] = {"kind": "place", "player": t["idx"], "only_num": None,
                     "hunt_limit": None, "search": False, "placed_sum": 0}
     return False
@@ -454,6 +496,10 @@ def _step_guard(g, events):
                       f"({', '.join(map(str, t['guard_rolled']))} -> keep {kept}).")
         t["dice"] = kept
         t["placed_roll"] = 0
+        if not _autobury(g, events):
+            return True
+        if not t["dice"]:
+            return True
         g["pending"] = {"kind": "place", "player": t["idx"], "only_num": None,
                         "hunt_limit": None, "search": False, "placed_sum": 0}
         return False
@@ -508,6 +554,10 @@ def _step_retrieve(g, events):
         t["ret_die"] = True
         t["dice"] = [t["ret_num"]]
         t["placed_roll"] = 0
+        if not _autobury(g, events):
+            return True
+        if not t["dice"]:
+            return True
         g["pending"] = {"kind": "place", "player": t["idx"], "only_num": None,
                         "hunt_limit": None, "search": False, "placed_sum": 0}
         return False
@@ -673,6 +723,8 @@ def do_place(g, idx, die_pos, target, events):
     _maybe_auto_score(g, idx, events)
     if g["phase"] == "game_end":
         return None
+    if not _autobury(g, events):
+        return None
     if pend.get("hunt_limit") is not None and t["placed_roll"] >= pend["hunt_limit"]:
         _place_done(g, events)
         advance(g, events)
@@ -781,8 +833,13 @@ def apply_choice(g, idx, choice, events):
                           f"({', '.join(map(str, kept))}); the rest are discarded.")
             t["dice"] = kept
             t["placed_roll"] = 0
-            g["pending"] = {"kind": "place", "player": idx, "only_num": None,
-                            "hunt_limit": None, "search": False, "placed_sum": 0}
+            if not _autobury(g, events):
+                return None
+            if t["dice"]:
+                g["pending"] = {"kind": "place", "player": idx, "only_num": None,
+                                "hunt_limit": None, "search": False, "placed_sum": 0}
+            else:
+                advance(g, events)
         elif tile == "guard":
             t["guard_num"] = choice
             advance(g, events)
@@ -795,8 +852,13 @@ def apply_choice(g, idx, choice, events):
             g["pending"] = None
             t["scav_done"] = True
             t["placed_roll"] = 0
-            g["pending"] = {"kind": "place", "player": idx, "only_num": None,
-                            "hunt_limit": None, "search": False, "placed_sum": 0}
+            if not _autobury(g, events):
+                return None
+            if t["dice"]:
+                g["pending"] = {"kind": "place", "player": idx, "only_num": None,
+                                "hunt_limit": None, "search": False, "placed_sum": 0}
+            else:
+                advance(g, events)
             return None
         i = choice
         if not (0 <= i < len(t["dice"])):
@@ -876,8 +938,13 @@ def apply_choice(g, idx, choice, events):
         g["last_roll"] = list(t["dice"])
         events.append(f"🎲 Dogpile rolls 3 (incl. the taken die): "
                       f"{', '.join(map(str, t['dice']))}.")
-        g["pending"] = {"kind": "place", "player": idx, "only_num": None,
-                        "hunt_limit": None, "search": False, "placed_sum": 0}
+        if not _autobury(g, events):
+            return None
+        if t["dice"]:
+            g["pending"] = {"kind": "place", "player": idx, "only_num": None,
+                            "hunt_limit": None, "search": False, "placed_sum": 0}
+        else:
+            advance(g, events)
         return None
     return "unknown choice"
 

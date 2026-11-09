@@ -83,6 +83,8 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 .sdog{width:96px;height:68px;border-radius:8px;background-image:url(spots-dogs.webp);background-size:768px 272px;box-shadow:1px 2px 3px #0008;flex:none}
 .sdog.scored{background-image:url(spots-dogs-scored.webp)}
 .tyard{width:84px;height:117px;border-radius:8px;background-image:url(spots-yards.webp);background-size:336px 117px;box-shadow:1px 2px 3px #0008;flex:none}
+.yardwrap{position:relative;flex:none}
+.yardice{position:absolute;left:6px;right:6px;bottom:6px;display:flex;flex-wrap:wrap;gap:2px;justify-content:center;pointer-events:none}
 .spotbox{display:inline-flex;width:28px;height:28px;align-items:center;justify-content:center;margin:1px;opacity:.5}
 .spotbox.filled{opacity:1}
 .spotbox img{width:26px;height:26px}
@@ -131,8 +133,8 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <div class="log" id="lsdLog"></div>
 </div>
 <div id="spots" class="hidden">
+<div id="spotsTurn" style="font-size:19px;font-weight:800;background:#1e293b;border-radius:10px;padding:8px 10px;margin-bottom:8px"></div>
 <div id="spotsBoard"></div>
-<div id="spotsTurn" style="font-size:18px;font-weight:700"></div>
 <div id="spotsChoice"></div>
 <div id="spotsPool"></div>
 <button class="hit hidden" id="spotsScore">🏅 Score dogs</button>
@@ -152,5 +154,5 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <script data-cfasync="false" src="regicide.js?v=16"></script>
 <script data-cfasync="false" src="odin.js?v=8"></script>
 <script data-cfasync="false" src="lsd.js?v=3"></script>
-<script data-cfasync="false" src="spots.js?v=10"></script>
+<script data-cfasync="false" src="spots.js?v=11"></script>
 </body></html>

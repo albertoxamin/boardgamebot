@@ -43,7 +43,7 @@ function spRender(){let b=SP.board; if(!b)return;
  let seats=b.players.map((p,i)=>{
    let isTurn=b.current_index===i&&b.phase==='playing';
    return '<div class="lsdseat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score">'+p.scored.length+'🏅 · '+p.treats+'🦴</span></div>'
-    +'<div style="display:flex;gap:8px;align-items:flex-start"><div class="tyard" data-yard="'+i+'" style="background-position:-'+(i*84)+'px 0" title="yard (buried dice)"></div><div><div>'+(p.yard.length?p.yard.map(v=>'<img class="sdice" src="spots-dice/'+v+'.png" alt="buried die '+v+'" title="buried die '+v+'" style="width:28px;height:30px">').join(''):'<span class="small">no buried dice</span>')+'</div><div class="small">Yard total: '+p.yard.reduce((a,c)=>a+c,0)+' / bust at 8+</div></div></div>'
+    +'<div style="display:flex;gap:8px;align-items:flex-start"><div class="tyardwrap"><div class="tyard" data-yard="'+i+'" style="background-position:-'+(i*84)+'px 0" title="yard (buried dice)"></div><div class="yardice">'+(p.yard.length?p.yard.map(v=>'<img class="sdice" src="spots-dice/'+v+'.png" alt="buried die '+v+'" title="buried die '+v+'" style="width:22px;height:23px">').join(''):'<span class="small" style="color:#fff">empty</span>')+'</div></div><div class="small">Yard total: '+p.yard.reduce((a,c)=>a+c,0)+' / bust at 8+</div></div>'
     +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">'
     + p.dogs.map(d=>'<div style="flex:0 0 100px">'+spDogImg(d,false)
       +'<div>'+d.spots.map((s,si)=>{let filled=(d.placed||{})[si]!==undefined;

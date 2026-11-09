@@ -3,7 +3,7 @@
 
 Run:  TELEGRAM_BOT_TOKEN=<token from @BotFather> python3 bot.py
 Add the bot to a group, make it admin (or disable privacy via @BotFather
-/setprivacy) so it reads commands, then: /games, /web.
+/setprivacy) so it reads commands, then: /games.
 State file: state.json next to this script (override with FLIP7_STATE).
 """
 import hashlib, hmac, html, json, os, sys, threading, time, urllib.parse, urllib.request, urllib.error
@@ -35,7 +35,6 @@ STATE_LOCK = threading.Lock()  # polling loop + HTTP API share one state
 _STATE = {"state": None}
 
 HELP = """🎴 <b>Boardgame bot</b>
-/web - open the Mini App (create/join/start any game there; Mini App buttons play Flip 7 too)
 /games - list the games you can start (and what's running here)
 /rules - how to play (reply to a board for that game's rules)   /cancel - reply to a board to cancel that game
 /regicide - co-op Regicide (also /regicide_join /regicide_start /regicide_play /regicide_yield /regicide_discard /regicide_rules /regicide_cancel)
@@ -1547,7 +1546,7 @@ def handle_command(state, msg):
 
     if cmd == "/games":
         _catalog = (
-            ("games", "🎴 Flip 7", "/web", "join via the Mini App", "press-your-luck dice, first to 200"),
+            ("games", "🎴 Flip 7", "/games (Mini App button)", "join via the Mini App", "press-your-luck dice, first to 200"),
             ("regicide", "⚔️ Regicide", "/regicide", "/regicide_join", "co-op vs 12 royals, private hands"),
             ("odin", "🛡️ Odin", "/odin", "/odin_join", "card shedding, fewest points wins"),
             ("lsd", "😈 Let's Summon Demons", "/lsd", "/lsd_join", "dice activations, 3 demons + 10 souls"),
@@ -1614,20 +1613,8 @@ def handle_command(state, msg):
         _present = [_rules for _key, _rules in _by_key if state.get(_key, {}).get(str(chat_id))]
         send(chat_id, "\n\n".join(_present) if _present else RULES)
         return
-    if cmd in ("/web", "/html"):
-        if WEB_URL:
-            send(chat_id, "🎮 Tap below to play Flip 7 (HTML):",
-                 web_keyboard(msg.get("chat", {}).get("type", "private"), chat_id))
-        elif os.path.exists(HTML_PATH):
-            r = send_document(chat_id, HTML_PATH,
-                              "🎴 Flip 7 HTML5 game - open in a browser (hot-seat, 2+ players, first to 200).")
-            if not r.get("ok"):
-                send(chat_id, "Couldn't send the HTML file - ask the host to serve web/flip7.html.")
-        else:
-            send(chat_id, "HTML game not found on server (web/flip7.html missing).")
-        return
     if not g:
-        send(chat_id, "No Flip 7 game here yet - open the Mini App (/web) to create one. /rules for how to play.")
+        send(chat_id, "No Flip 7 game here yet - open the Mini App via the /games list or a game board button. /rules for how to play.")
         return
     if cmd in ("/join_npc", "/npc_join"):
         if g["phase"] != "lobby":

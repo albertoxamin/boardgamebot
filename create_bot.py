@@ -80,7 +80,6 @@ def configure_via_bot_api(token, name="Boardgame Bot"):
     return bool(got.get("ok") and got["result"])
 COMMANDS = (
     "games - List the games you can start\n"
-    "web - Open the Mini App (all games)\n"
     "regicide - Co-op Regicide game\n"
     "odin - Card-shedding Odin game\n"
     "lsd - Let's Summon Demons dice game\n"

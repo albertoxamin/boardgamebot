@@ -87,7 +87,6 @@ Add the bot to the group and make it **admin** (or @BotFather →
 
 ```
 /games              list the games you can start (with live chat status)
-/web               open the Mini App (create/join/start/play any game there)
 /rules             how to play (reply to a board for that game's rules)
 /cancel            reply to a game's board message to cancel that game
 Flip 7 itself is played via Mini App buttons (Hit/Stay/Score/Rematch) and
@@ -98,7 +97,7 @@ Buttons enforce whose turn it is; action cards show target buttons to the
 player who flipped them. A single board message is edited in place;
 flip results are posted as event messages.
 
-## HTML5 game option (`/web`, `/play`)
+## HTML5 game option (`/web` Mini App button)
 
 `web/flip7.html` + `web/flip7.js` is a dependency-free Flip 7 game with two modes:
 **Synced (default)** — the bot process itself serves the page + JSON API on

@@ -73,6 +73,7 @@ function odRender(){let b=OD.board; if(!b)return;
  document.getElementById('odPass').classList.toggle('hidden',!(myTurn&&b.table&&b.table.length));
  document.getElementById('odPickup').classList.toggle('hidden',!myPickup);
  document.getElementById('odStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.players.some(p=>p.user_id===OD.user_id)));
+ document.getElementById('odRematch').classList.toggle('hidden',!(b.phase==='game_end'&&b.is_player));
  // Pickup selection: table set cards are tappable only for the picker
  let tb=document.getElementById('odBoard');
  tb.querySelectorAll('.odtable .ocard').forEach(el=>el.addEventListener('click',()=>{
@@ -119,6 +120,7 @@ document.getElementById('odPlay').addEventListener('click',()=>{
  odMove('play',{cards:cards});});
 document.getElementById('odPass').addEventListener('click',()=>odMove('pass'));
 document.getElementById('odStart').addEventListener('click',()=>odMove('start'));
+document.getElementById('odRematch').addEventListener('click',()=>odMove('rematch'));
 document.getElementById('odPickup').addEventListener('click',()=>{
  if(!OD.pickupSel){odLog('Tap 1 card from the previous set first');return;}
  odMove('pickup',{card:OD.pickupSel});});

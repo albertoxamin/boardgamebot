@@ -198,6 +198,7 @@ function renderSync(){let b=SYNC.board; if(!b)return;
  document.getElementById('syncHit').classList.toggle('hidden',!myTurn);
  document.getElementById('syncStay').classList.toggle('hidden',!myTurn);
  document.getElementById('syncStart').classList.toggle('hidden',!(b.phase==='lobby'&&me));
+ document.getElementById('syncRematch').classList.toggle('hidden',!(b.phase==='game_end'&&b.is_player));
  let t=document.getElementById('syncTurn'),ab=document.getElementById('syncActions'); ab.innerHTML='';
  if(b.flip3){let tgt=b.players[b.flip3.target_index];
   t.textContent='🎲 '+tgt.name+' is flipping three ('+b.flip3.remaining+' left)';}
@@ -218,6 +219,7 @@ async function move(action,target){ if(!SYNC.chat_id)return;
 document.getElementById('syncHit').addEventListener('click',()=>move('hit'));
 document.getElementById('syncStay').addEventListener('click',()=>move('stay'));
 document.getElementById('syncStart').addEventListener('click',()=>move('start'));
+document.getElementById('syncRematch').addEventListener('click',()=>move('rematch'));
 (function autoSync(){let tg=tgInit(); if(!tg.id)return;
  // Regicide/Odin/LSD/Spots modes are started by their own scripts (loaded after this file).
  if(document.getElementById('regicide').classList.contains('hidden')&&document.getElementById('odin').classList.contains('hidden')&&document.getElementById('lsd').classList.contains('hidden')&&document.getElementById('spots').classList.contains('hidden')) loadGames();})();

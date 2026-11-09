@@ -84,6 +84,7 @@ function sdRender(){let b=SD.board; if(!b)return;
  document.getElementById('lsdSummon').textContent=SD.summonMode?'✖ Cancel summon':'😈 Summon (select cards)';
  document.getElementById('lsdEnd').classList.toggle('hidden',!(myTurn&&b.turn&&b.turn.rolled));
  document.getElementById('lsdStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.players.some(p=>p.user_id===SD.user_id)));
+ document.getElementById('lsdRematch').classList.toggle('hidden',!(b.phase==='game_end'&&b.is_player));
  // Summon confirm (in Actions, appended after demon hand)
  if(SD.summonMode && myTurn){
    let ok=SD.sacSel.length===cost&&SD.demonSel!==null;
@@ -132,6 +133,7 @@ function nameOf(b,uid){let p=b.players.find(p=>p.user_id===uid);return p?p.name:
 document.getElementById('lsdRoll').addEventListener('click',()=>sdMove('roll'));
 document.getElementById('lsdEnd').addEventListener('click',()=>sdMove('end'));
 document.getElementById('lsdStart').addEventListener('click',()=>sdMove('start'));
+document.getElementById('lsdRematch').addEventListener('click',()=>sdMove('rematch'));
 document.getElementById('lsdSummon').addEventListener('click',()=>{SD.summonMode=!SD.summonMode; SD.sacSel=[]; SD.demonSel=null; sdRender();});
 // Self-start when router (flip7.js) selected LSD mode.
 if(!document.getElementById('lsd').classList.contains('hidden')) sdLoad();

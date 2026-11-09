@@ -123,6 +123,7 @@ function spRender(){let b=SP.board; if(!b)return;
  }
  document.getElementById('spotsScore').classList.add('hidden'); // score action lives in the top strip now
  document.getElementById('spotsStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.players.some(p=>p.user_id===SP.user_id)));
+ document.getElementById('spotsRematch').classList.toggle('hidden',!(b.phase==='game_end'&&b.is_player));
  let t=document.getElementById('spotsTurn');
  if(b.phase==='playing') t.textContent=pend? '👉 '+nameOf(b,pend.player)+' to choose' : (myTurn?'👉 Your turn - choose a trick or Score':'👉 '+b.players[b.current_index].name+"'s turn");
  else if(b.phase==='lobby') t.textContent='🪑 Lobby - anyone taps Start';
@@ -132,5 +133,6 @@ function spRender(){let b=SP.board; if(!b)return;
 function nameOf(b,uid){let p=b.players.find(p=>p.user_id===uid);return p?p.name:'?';}
 document.getElementById('spotsScore').addEventListener('click',()=>spMove('score'));
 document.getElementById('spotsStart').addEventListener('click',()=>spMove('start'));
+document.getElementById('spotsRematch').addEventListener('click',()=>spMove('rematch'));
 // Self-start when router (flip7.js) selected Spots mode.
 if(!document.getElementById('spots').classList.contains('hidden')) spLoad();

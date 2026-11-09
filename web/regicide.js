@@ -74,6 +74,7 @@ function rgRender(){let b=RG.board; if(!b)return;
  document.getElementById('rgYield').classList.toggle('hidden',!myTurn);
  document.getElementById('rgDiscard').classList.toggle('hidden',!myDiscard);
  document.getElementById('rgStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.players.some(p=>p.user_id===RG.user_id)));
+ document.getElementById('rgRematch').classList.toggle('hidden',!((b.phase==='won'||b.phase==='lost')&&b.is_player));
  let t=document.getElementById('rgTurn'),ab=document.getElementById('rgActions'); ab.innerHTML='';
  if(b.phase==='playing') t.textContent=myTurn?'👉 Your turn - select card(s) and Play, or Yield':'👉 '+b.players[b.current_index].name+"'s turn";
  else if(b.phase==='discard') t.textContent=myDiscard? '💥 Discard ≥'+b.discard_needed+' (done '+b.discard_total+') - select card(s), then Discard' : '💥 '+b.players[b.current_index].name+' is discarding';
@@ -116,6 +117,7 @@ document.getElementById('rgPlay').addEventListener('click',()=>{
  rgMove('play',{cards:cards});});
 document.getElementById('rgYield').addEventListener('click',()=>rgMove('yield'));
 document.getElementById('rgStart').addEventListener('click',()=>rgMove('start'));
+document.getElementById('rgRematch').addEventListener('click',()=>rgMove('rematch'));
 document.getElementById('rgDiscard').addEventListener('click',()=>{
  if(!RG.selected.length){rgLog('Select card(s) to discard');return;}
  let cards=RG.selected.map(i=>RG.board.my_hand[i]);

@@ -487,6 +487,8 @@ def rg_board_text(g):
 
 
 def rg_keyboard(g):
+    if g["phase"] in ("won", "lost"):
+        return [[{"text": "🔄 Rematch!", "callback_data": "rg:rematch"}]]
     ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
     wk = web_keyboard(ct, g["chat_id"], game="regicide")
     if g["phase"] == "lobby":
@@ -711,6 +713,8 @@ def odin_board_text(g):
 
 
 def odin_keyboard(g):
+    if g["phase"] == "game_end":
+        return [[{"text": "🔄 Rematch!", "callback_data": "od:rematch"}]]
     ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
     wk = web_keyboard(ct, g["chat_id"], game="odin")
     if g["phase"] == "lobby":
@@ -989,6 +993,8 @@ def lsd_pending_options(g):
 
 
 def lsd_keyboard(g):
+    if g["phase"] == "game_end":
+        return [[{"text": "🔄 Rematch!", "callback_data": "lsd:rematch"}]]
     ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
     wk = web_keyboard(ct, g["chat_id"], game="lsd")
     if g["phase"] == "lobby":
@@ -1269,6 +1275,8 @@ def spots_pending_options(g):
 
 
 def spots_keyboard(g):
+    if g["phase"] == "game_end":
+        return [[{"text": "🔄 Rematch!", "callback_data": "spots:rematch"}]]
     ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
     wk = web_keyboard(ct, g["chat_id"], game="spots")
     if g["phase"] == "lobby":
@@ -1463,6 +1471,50 @@ def handle_spots(state, msg, cmd, text, uid, name):
             spots_render(g, ev)
         return True
     return False
+
+
+REMATCH_END_PHASES = {"games": ("game_end",), "regicide": ("won", "lost"),
+                    "odin": ("game_end",), "lsd": ("game_end",), "spots": ("game_end",)}
+
+
+def rematch_game(state, key, chat_id, uid):
+    """Reset a finished game to the lobby with the same players.
+    Any player of the finished game may trigger it."""
+    g = state.get(key, {}).get(str(chat_id))
+    if not g:
+        return [], "no game in that chat"
+    if g["phase"] not in REMATCH_END_PHASES[key]:
+        return [], "game is not over yet"
+    if not any(p["user_id"] == uid for p in g["players"]):
+        return [], "only players of this game can rematch"
+    keep = [(p["user_id"], p["name"], bool(p.get("npc"))) for p in g["players"]]
+    creator = next((k for k in keep if k[0] != NPC_ID), keep[0])
+    makers = {
+        "games": lambda u, n: G.new_player(u, n),
+        "regicide": lambda u, n: {"user_id": u, "name": n, "hand": []},
+        "odin": lambda u, n: {"user_id": u, "name": n, "hand": [], "score": 0},
+        "lsd": lambda u, n: {"user_id": u, "name": n, "souls": 5, "candle": None,
+                             "in_play": [], "demons": [], "demon_hand": []},
+        "spots": lambda u, n: {"user_id": u, "name": n, "dogs": [], "scored": [],
+                               "yard": [], "treats": 1},
+    }
+    news = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
+            "lsd": D.new_game, "spots": SP.new_game}
+    chat_type = g.get("chat_type", "private")
+    board_id = g.get("board_message_id")
+    g.clear()
+    g.update(news[key](chat_id, creator[0], creator[1]))
+    g["chat_type"] = chat_type
+    g["board_message_id"] = board_id
+    g["players"] = []
+    for u, n, npc_ in keep:
+        pm = makers[key](u, n)
+        pm["npc"] = npc_
+        g["players"].append(pm)
+    ev = [f"🔄 Rematch! {len(keep)} player(s) - anyone taps Start."]
+    {"games": render, "regicide": rg_render, "odin": odin_render,
+     "lsd": lsd_render, "spots": spots_render}[key](g, ev)
+    return ev, None
 
 
 # ---------- Handlers ----------
@@ -1769,6 +1821,21 @@ def handle_callback(state, cb):
             answer_cb(cb["id"], err or "Done")
             if not err:
                 spots_render(sp, ev)
+        elif parts == ["od", "rematch"]:
+            ev, err = rematch_game(state, "odin", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
+        elif parts == ["lsd", "rematch"]:
+            ev, err = rematch_game(state, "lsd", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
+        elif parts == ["spots", "rematch"]:
+            ev, err = rematch_game(state, "spots", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
         else:
             answer_cb(cb["id"], "Unknown button.")
         return
@@ -1955,6 +2022,11 @@ def handle_callback(state, cb):
             rg["players"].append({"user_id": uid, "name": cb["from"].get("first_name") or "Player", "hand": []})
             answer_cb(cb["id"], "Joined!")
             rg_render(rg, [f"🙋 {cb['from'].get('first_name')} joined Regicide."])
+        elif parts == ["rg", "rematch"]:
+            ev, err = rematch_game(state, "regicide", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
         else:
             answer_cb(cb["id"], "Unknown button.")
         return
@@ -2121,6 +2193,9 @@ def api_move(state, chat_id, user_id, action, target_index=None, name=""):
         if target_index not in G.eligible_targets(g, g["pending_action"]["action"]):
             return [], "invalid target"
         do_action_choice(g, int(target_index), events)
+    elif action == "rematch":
+        ev, err = rematch_game(state, "games", chat_id, user_id)
+        return ev, err
     elif action == "start":
         if g["phase"] != "lobby":
             return [], "already started"
@@ -2228,6 +2303,9 @@ def rg_api_move(state, chat_id, user_id, body):
         err = R.jester_next(g, int(body.get("target_index")), ev)
         if err:
             return [], err
+    elif action == "rematch":
+        ev, err = rematch_game(state, "regicide", chat_id, user_id)
+        return ev, err
     else:
         return [], "unknown action"
     rg_render(g, ev)
@@ -2307,6 +2385,9 @@ def odin_api_move(state, chat_id, user_id, body):
         err = O.choose_pickup(g, idx, {"suit": c["suit"], "rank": int(c["rank"])}, ev)
         if err:
             return [], err
+    elif action == "rematch":
+        ev, err = rematch_game(state, "odin", chat_id, user_id)
+        return ev, err
     else:
         return [], "unknown action"
     odin_render(g, ev)
@@ -2390,6 +2471,9 @@ def lsd_api_move(state, chat_id, user_id, body):
         err = D.apply_choice(g, idx, body.get("choice"), ev)
         if err:
             return [], err
+    elif action == "rematch":
+        ev, err = rematch_game(state, "lsd", chat_id, user_id)
+        return ev, err
     else:
         return [], "unknown action"
     lsd_render(g, ev)
@@ -2484,6 +2568,9 @@ def spots_api_move(state, chat_id, user_id, body):
         err = SP.apply_choice(g, idx, body.get("choice"), ev)
         if err:
             return [], err
+    elif action == "rematch":
+        ev, err = rematch_game(state, "spots", chat_id, user_id)
+        return ev, err
     else:
         return [], "unknown action"
     spots_render(g, ev)

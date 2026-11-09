@@ -47,7 +47,7 @@ function spRender(){let b=SP.board; if(!b)return;
     +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">'
     + p.dogs.map(d=>'<div style="flex:0 0 100px">'+spDogImg(d,false)
       +'<div>'+d.spots.map((s,si)=>{let filled=(d.placed||{})[si]!==undefined;
-        return '<span class="spotbox'+(filled?' filled':'')+'" data-dog="'+d.iid+'" data-spot="'+si+'">'+(filled?d.placed[si]:s)+'</span>';}).join('')+'</div></div>').join('')+'</div>'
+        return '<span class="spotbox'+(filled?' filled':'')+'" data-dog="'+d.iid+'" data-spot="'+si+'">'+(filled?'<img src="spots-dice/'+d.placed[si]+'.png" alt="die '+d.placed[si]+'" style="width:24px;height:24px">':s)+'</span>';}).join('')+'</div></div>').join('')+'</div>'
     + p.scored.map(d=>'<div title="scored" style="opacity:.6">'+spDogImg(d,true)+'</div>').join('')
     +(isTurn?'<div class="small"><b>▶ Turn</b></div>':'')+'</div>';}).join('');
  let pend=b.pending;
@@ -62,9 +62,14 @@ function spRender(){let b=SP.board; if(!b)return;
     + (me.treats>0?'<button class="lsdchoice" id="spReroll">🎲 Reroll'+(b.trick&&b.trick.tile==='track'?' selected':' all')+' (1 treat)</button>':'')
     + (b.trick&&b.trick.tile==='search'?'<button class="lsdchoice" id="spDone">✅ Done (discard rest)</button>':'')+'</div>';
  }
+ let lastRollHtml=b.last_roll?'<div class="small"><b>Last roll:</b> '+b.last_roll.map(v=>'<img class="sdice" src="spots-dice/'+v+'.png" alt="die '+v+'" style="width:30px;height:32px">').join('')+'</div>':'';
+ let scoreBtn=(myTurn&&!b.trick&&(me?me.dogs.some(d=>Object.keys(d.placed||{}).length===d.spots.length):false))
+   ?'<button class="hit" id="spScoreDyn" style="margin:6px 0">🏅 Score dogs</button>':'';
  document.getElementById('spotsBoard').innerHTML='<div class="table" style="position:relative">'
   +(SP.spectating?'<div class="lobby-note">👁 Spectating — view only (join in Telegram to play)</div>':'')
-  +poolHtml+tiles+seats+'</div>';
+  +poolHtml+lastRollHtml+scoreBtn+tiles+seats+'</div>';
+ let sdBtn=document.getElementById('spScoreDyn');
+ if(sdBtn)sdBtn.addEventListener('click',()=>spMove('score'));
  // Trick tiles tap (choose a trick)
  if(myTurn && !b.trick){
    document.querySelectorAll('#spotsBoard .tiley').forEach(el=>{
@@ -96,10 +101,10 @@ function spRender(){let b=SP.board; if(!b)return;
      spMove('place',{die_pos:SP.dieSel,target:['dog',parseInt(el.dataset.dog),parseInt(el.dataset.spot)]});
    }));
  }
- document.getElementById('spotsScore').classList.toggle('hidden',!(myTurn&&!b.trick&&(me?me.dogs.some(d=>Object.keys(d.placed||{}).length===d.spots.length):false)));
+ document.getElementById('spotsScore').classList.add('hidden'); // score action lives in the top strip now
  document.getElementById('spotsStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.players.some(p=>p.user_id===SP.user_id)));
  // Pending choices (non-place)
- let ch=document.getElementById('spotsChoice'); ch.innerHTML='';
+ let ch=document.getElementById('spotsChoice'); ch.innerHTML=''; ch.style.display='none';
  if(pend&&pend.kind!=='place'){
    let pendPlayer=b.players[pend.player];
    let box=document.createElement('div'); box.className='card';
@@ -110,6 +115,8 @@ function spRender(){let b=SP.board; if(!b)return;
      } else btn.textContent=o.label;
      btn.addEventListener('click',()=>spMove('choice',{choice:o.choice})); box.appendChild(btn);});
    ch.appendChild(box);
+   let boardEl2=document.getElementById('spotsBoard');
+   boardEl2.querySelector('.table').prepend(box);
  }
  let t=document.getElementById('spotsTurn');
  if(b.phase==='playing') t.textContent=pend? '👉 '+nameOf(b,pend.player)+' to choose' : (myTurn?'👉 Your turn - choose a trick or Score':'👉 '+b.players[b.current_index].name+"'s turn");

@@ -93,7 +93,7 @@ def new_game(chat_id, creator_id, creator_name):
         "tiles": [],  # {slug, faceup, treat_on}
         "current_index": 0, "winner": None,
         "trick": None,   # active trick state (see below)
-        "pending": None, "board_message_id": None,
+        "pending": None, "board_message_id": None, "last_roll": None,
     }
 
 
@@ -343,6 +343,7 @@ def _start_roll(g, events, n):
         events.append("🎲 No dice in supply - all dice in play are reset!")
     g["trick"]["dice"] = _take_dice(g, n)
     g["trick"]["placed_roll"] = 0
+    g["last_roll"] = list(g["trick"]["dice"])
     events.append(f"🎲 Rolled {len(g['trick']['dice'])}: "
                   f"{', '.join(map(str, g['trick']['dice']))}.")
     t = g["trick"]
@@ -420,6 +421,7 @@ def _step_rollover(g, events):
     p["yard"] = []
     t["dice"] = [random.randint(1, 6) for _ in buried]
     t["placed_roll"] = 0
+    g["last_roll"] = list(t["dice"])
     events.append(f"🎲 Roll Over: re-rolls {len(buried)} buried dice.")
     g["pending"] = {"kind": "place", "player": t["idx"], "only_num": None,
                     "hunt_limit": None, "search": False, "placed_sum": 0}
@@ -704,6 +706,7 @@ def do_reroll(g, idx, indices, events):
     _spend_treats(g, idx, 1)
     for i in idxs:
         t["dice"][i] = random.randint(1, 6)
+    g["last_roll"] = list(t["dice"])
     events.append(f"🔁 {g['players'][idx]['name']} rerolls "
                   f"{'some' if t['tile'] == 'track' else 'all'} dice for a treat: "
                   f"{', '.join(map(str, t['dice']))}.")
@@ -870,6 +873,7 @@ def apply_choice(g, idx, choice, events):
         t["dp_stage"] = "rolled"
         t["dice"] = [random.randint(1, 6) for _ in range(3)]
         t["placed_roll"] = 0
+        g["last_roll"] = list(t["dice"])
         events.append(f"🎲 Dogpile rolls 3 (incl. the taken die): "
                       f"{', '.join(map(str, t['dice']))}.")
         g["pending"] = {"kind": "place", "player": idx, "only_num": None,

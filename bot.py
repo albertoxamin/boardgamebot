@@ -1196,6 +1196,8 @@ def spots_board_text(g):
     lines = ["🐶 <b>Spots</b> · Tricks: " + " ".join(
         f"{SP.TILE_NAMES[t['slug']]}{'🦴' if t['treat_on'] else ''}" if t["faceup"] else f"[{SP.TILE_NAMES[t['slug']]}↓]"
         for t in g["tiles"])]
+    if g.get("last_roll"):
+        lines.append(f"🎲 Last roll: {', '.join(map(str, g['last_roll']))}")
     if g.get("trick"):
         t = g["trick"]
         lines.append(f"🎪 Trick: {SP.TILE_NAMES[t['tile']]} · Dice to place: "
@@ -2361,6 +2363,7 @@ def spots_board_json(g, viewer_id=None):
         "is_player": me is not None,
         "tiles": g["tiles"], "dice_supply": g["dice_supply"],
         "treat_supply": g["treat_supply"], "trick": trick,
+        "last_roll": g.get("last_roll"),
         "pending": pend_out, "winner": g.get("winner"),
         "players": [{"user_id": p["user_id"], "name": p["name"], "npc": bool(p.get("npc")), "treats": p["treats"],
                      "yard": p["yard"], "dogs": p["dogs"], "scored": p["scored"]}

@@ -4,7 +4,7 @@ const OD={user_id:0,chat_id:null,board:null,timer:null,init:'',selected:[],picku
 const OD_SUIT_ORDER={blue:0,red:1,pink:2,green:3,black:4,orange:5};
 function odLog(s){let e=document.getElementById('odLog');if(e)e.textContent+=s+'\n';}
 function odCard(c,selected,extra,big){
- let col=c.rank-1, row=OD_SUIT_ORDER[c.suit]||0, w=big?54:44, h=big?101:83;
+ let col=c.rank-1, row=OD_SUIT_ORDER[c.suit]||0, w=big?72:58, h=big?135:109;
  return '<div class="ocard'+(big?' big':'')+(selected?' sel':'')+(extra?' '+extra:'')
   +'" data-suit="'+c.suit+'" data-rank="'+c.rank+'" title="'+c.rank+' '+c.suit+'" style="background-position:-'+(col*w)+'px -'+(row*h)+'px"></div>';}
 function odNew(prev,keys){let pool=[...prev],out=new Set();keys.forEach((k,i)=>{let j=pool.indexOf(k);if(j>=0)pool.splice(j,1);else out.add(i);});return out;}

@@ -3,7 +3,7 @@
 
 Run:  TELEGRAM_BOT_TOKEN=<token from @BotFather> python3 bot.py
 Add the bot to a group, make it admin (or disable privacy via @BotFather
-/setprivacy) so it reads commands, then: /newgame, /join, /startgame.
+/setprivacy) so it reads commands, then: /games, /web.
 State file: state.json next to this script (override with FLIP7_STATE).
 """
 import hashlib, hmac, html, json, os, sys, threading, time, urllib.parse, urllib.request, urllib.error
@@ -35,14 +35,9 @@ STATE_LOCK = threading.Lock()  # polling loop + HTTP API share one state
 _STATE = {"state": None}
 
 HELP = """🎴 <b>Boardgame bot</b>
-/newgame - create a game (you join automatically)
-/join - join the lobby   /leave - leave lobby
-/startgame - anyone starts (needs 2+; official game is 3+ players)
-/hit /stay - same as the buttons, only on your turn
-/next - next round (when round is over)
-/web - play the HTML5 version (Mini App if FLIP7_WEB_URL set, else file)
-/play - play via Telegram HTML5 Game (sendGame) or the HTML file
-/score - show board &amp; scores   /rules - how to play   /cancel - creator cancels
+/web - open the Mini App (create/join/start any game there; Mini App buttons play Flip 7 too)
+/games - list the games you can start (and what's running here)
+/rules - how to play (reply to a board for that game's rules)   /cancel - reply to a board to cancel that game
 /regicide - co-op Regicide (also /regicide_join /regicide_start /regicide_play /regicide_yield /regicide_discard /regicide_rules /regicide_cancel)
 /odin - card-shedding Odin (also /odin_join /odin_start /odin_play /odin_pass /odin_pickup /odin_score /odin_cancel /odin_rules)
 /spots - push-your-luck dog dice (also /spots_join /spots_start /spots_trick /spots_place /spots_reroll /spots_score /spots_cancel /spots_rules)
@@ -395,7 +390,7 @@ def keyboard(g):
 def prompt_text(g):
     if g["phase"] == "lobby":
         return (f"🎴 <b>Flip 7 lobby</b> - {len(g['players'])} player(s). "
-                f"Tap Join, then anyone sends /startgame. "
+                f"Join via the Mini App button, then anyone taps Start there. "
                 f"(Official game: 3+ players, first to 200.)")
     if g["pending_action"]:
         return f"{G.board_lines(g)}\n\n{turn_ping(g)}"
@@ -1552,7 +1547,7 @@ def handle_command(state, msg):
 
     if cmd == "/games":
         _catalog = (
-            ("games", "🎴 Flip 7", "/newgame", "/join", "press-your-luck dice, first to 200"),
+            ("games", "🎴 Flip 7", "/web", "join via the Mini App", "press-your-luck dice, first to 200"),
             ("regicide", "⚔️ Regicide", "/regicide", "/regicide_join", "co-op vs 12 royals, private hands"),
             ("odin", "🛡️ Odin", "/odin", "/odin_join", "card shedding, fewest points wins"),
             ("lsd", "😈 Let's Summon Demons", "/lsd", "/lsd_join", "dice activations, 3 demons + 10 souls"),
@@ -1631,32 +1626,8 @@ def handle_command(state, msg):
         else:
             send(chat_id, "HTML game not found on server (web/flip7.html missing).")
         return
-    if cmd == "/play":
-        if GAME_SHORT_NAME and GAME_URL:
-            r = api("sendGame", chat_id=chat_id, game_short_name=GAME_SHORT_NAME)
-            if not r.get("ok"):
-                send(chat_id, "sendGame failed - is the game registered in @BotFather (/newgame) and FLIP7_GAME_URL set?")
-        elif WEB_URL:
-            send(chat_id, "🎮 Tap below to play Flip 7 (HTML):",
-                 web_keyboard(msg.get("chat", {}).get("type", "private"), chat_id))
-        elif os.path.exists(HTML_PATH):
-            send_document(chat_id, HTML_PATH,
-                          "🎴 Flip 7 HTML5 game - open in a browser to play.")
-        else:
-            send(chat_id, "No HTML game configured - set FLIP7_WEB_URL or FLIP7_GAME_URL/FLIP7_GAME_SHORT_NAME.")
-        return
-    if cmd in ("/newgame", "/flip7", "/new"):
-        if g and g["phase"] != "game_end":
-            send(chat_id, "⚠️ Game already in progress here - /score to see it, /cancel (creator) to abort.")
-            return
-        g = G.new_game(chat_id, uid, user.get("first_name") or "Player")
-        g["chat_type"] = msg.get("chat", {}).get("type", "private")
-        state["games"][str(chat_id)] = g
-        send(chat_id, f"🎴 Flip 7 game created by <b>{name}</b>! Tap Join or send /join.")
-        render(g)
-        return
     if not g:
-        send(chat_id, "No game here yet - send /newgame to create one. /rules for how to play.")
+        send(chat_id, "No Flip 7 game here yet - open the Mini App (/web) to create one. /rules for how to play.")
         return
     if cmd in ("/join_npc", "/npc_join"):
         if g["phase"] != "lobby":
@@ -1672,77 +1643,7 @@ def handle_command(state, msg):
             send(chat_id, "🤖 NPC joined - anyone can play for it!")
             render(g)
         return
-    if cmd == "/join":
-        if g["phase"] != "lobby":
-            send(chat_id, "⛔ Game already started.")
-        elif any(p["user_id"] == uid for p in g["players"]):
-            send(chat_id, "You're already in!")
-        else:
-            g["players"].append(G.new_player(uid, user.get("first_name") or "Player"))
-            send(chat_id, f"🙋 <b>{name}</b> joined ({len(g['players'])} players).")
-            render(g)
-        return
-    if cmd == "/leave":
-        if g["phase"] != "lobby":
-            send(chat_id, "⛔ Can't leave mid-game - Stay/bust out of the round instead.")
-        else:
-            g["players"] = [p for p in g["players"] if p["user_id"] != uid]
-            if not g["players"]:
-                del state["games"][str(chat_id)]
-                send(chat_id, "Lobby empty - game deleted.")
-            else:
-                send(chat_id, f"👋 {name} left.")
-                render(g)
-        return
-    if cmd == "/cancel":
-        if uid != g["created_by"]:
-            send(chat_id, "⛔ Only the creator can cancel.")
-        else:
-            del state["games"][str(chat_id)]
-            send(chat_id, "🗑 Game cancelled.")
-        return
-    if cmd == "/startgame":
-        if g["phase"] != "lobby":
-            send(chat_id, "Already started.")
-        elif len(g["players"]) < 2:
-            send(chat_id, "⛔ Need at least 2 players (official: 3+). Friends tap Join!")
-        else:
-            events = [f"🎮 Game started with {len(g['players'])} players! First to {G.WIN_SCORE}."]
-            order = [(g["dealer_index"] + k) % len(g["players"]) for k in range(len(g["players"]))]
-            g["deal_queue"] = list(order)
-            g["phase"] = "dealing"
-            advance(g, events)
-            render(g, events)
-        return
-    if cmd == "/score":
-        render(g)
-        return
-    if cmd == "/next":
-        if g["phase"] != "round_end":
-            send(chat_id, "Round not over yet.")
-        else:
-            events = []
-            G.start_next_round(g, events)
-            advance(g, events)
-            render(g, events)
-        return
-    if cmd in ("/hit", "/stay"):
-        events = []
-        if g["phase"] != "playing" or g["pending_action"]:
-            send(chat_id, "Not your turn / waiting on an action choice.")
-        elif g["players"][g["current_index"]]["user_id"] != uid and not g["players"][g["current_index"]].get("npc"):
-            send(chat_id, f"⛔ It's {g['players'][g['current_index']]['name']}'s turn.")
-        elif cmd == "/hit":
-            do_hit(g, g["current_index"], events)
-            advance(g, events)
-            render(g, events)
-        else:
-            if do_stay(g, g["current_index"], events):
-                render(g, events)
-            else:
-                send(chat_id, events[0] if events else "Must Hit.")
-        return
-    send(chat_id, "Commands: /newgame /join /startgame /hit /stay /web /play /score /rules /cancel")
+    send(chat_id, "Commands: /web /games /rules /cancel (reply to a board) - or tap the in-game buttons.")
 
 
 def handle_callback(state, cb):
@@ -2080,7 +1981,7 @@ def handle_callback(state, cb):
         keep = g["players"]
         g.clear()
         g.update(G.new_game(chat_id, keep[0]["user_id"], keep[0]["name"]))
-        events.append("🔄 New game - same players! Anyone sends /startgame.")
+        events.append("🔄 New game - same players! Anyone taps Start in the Mini App.")
     else:
         return deny("Unknown button.")
     render(g, events)

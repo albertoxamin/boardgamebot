@@ -83,14 +83,15 @@ written atomically after every update; restart-safe.
 ## 3. Play in a group
 
 Add the bot to the group and make it **admin** (or @BotFather →
-`/setprivacy` → Disable) so it can read `/join` etc.
+`/setprivacy` → Disable) so it can read commands etc.
 
 ```
-/newgame            create (creator auto-joins)
-/join               friends join the lobby (or tap the Join button)
-/startgame          anyone starts (2+ players, first to 200)
-/hit  /stay         on your turn only — or tap the Hit/Stay buttons
-/score  /rules  /cancel (creator)  /help
+/games              list the games you can start (with live chat status)
+/web               open the Mini App (create/join/start/play any game there)
+/rules             how to play (reply to a board for that game's rules)
+/cancel            reply to a game's board message to cancel that game
+Flip 7 itself is played via Mini App buttons (Hit/Stay/Score/Rematch) and
+in-game Telegram buttons; /flip7 text commands were removed (Mini App only).
 ```
 
 Buttons enforce whose turn it is; action cards show target buttons to the

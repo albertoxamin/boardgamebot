@@ -69,7 +69,7 @@ def configure_via_bot_api(token, name="Boardgame Bot"):
     with the bot's own token. Returns True if commands verified."""
     print(bot_api(token, "setMyName", name=name))
     print(bot_api(token, "setMyDescription",
-                  description="Flip 7 card game for groups: /newgame, /join, /startgame, /hit, /stay."))
+                  description="Multi-game card bot for groups: /games lists startable games."))
     print(bot_api(token, "setMyShortDescription",
                   short_description="Flip 7 group card game - first to 200 wins."))
     cmds = [{"command": c.split(" - ")[0], "description": c.split(" - ", 1)[1]}
@@ -79,13 +79,8 @@ def configure_via_bot_api(token, name="Boardgame Bot"):
     print("getMyCommands:", got.get("result"))
     return bool(got.get("ok") and got["result"])
 COMMANDS = (
-    "newgame - Create a Flip 7 game\n"
-    "join - Join the lobby\n"
-    "startgame - Creator starts the game\n"
-    "hit - Flip another card\n"
-    "stay - Bank your cards\n"
-    "web - Play the HTML5 version\n"
-    "play - Play Flip 7 (HTML game)\n"
+    "games - List the games you can start\n"
+    "web - Open the Mini App (all games)\n"
     "regicide - Co-op Regicide game\n"
     "odin - Card-shedding Odin game\n"
     "lsd - Let's Summon Demons dice game\n"
@@ -183,7 +178,7 @@ async def configure_botfather(client, username):
         return False
 
     for cmd, payload in (("/setdescription",
-                          "Flip 7 card game for groups: /newgame, /join, /startgame, /hit, /stay."),
+                          "Multi-game card bot for groups: /games lists startable games."),
                          ("/setabouttext", "Flip 7 group card game - first to 200 wins."),
                          ("/setcommands", COMMANDS)):
         try:

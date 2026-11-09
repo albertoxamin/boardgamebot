@@ -198,6 +198,7 @@ function renderSync(){let b=SYNC.board; if(!b)return;
  document.getElementById('syncHit').classList.toggle('hidden',!myTurn);
  document.getElementById('syncStay').classList.toggle('hidden',!myTurn);
  document.getElementById('syncStart').classList.toggle('hidden',!(b.phase==='lobby'&&me));
+ document.getElementById('syncJoin').classList.toggle('hidden',!(b.phase==='lobby'&&me&&!b.is_player));
  document.getElementById('syncRematch').classList.toggle('hidden',!(b.phase==='game_end'&&b.is_player));
  let t=document.getElementById('syncTurn'),ab=document.getElementById('syncActions'); ab.innerHTML='';
  if(b.flip3){let tgt=b.players[b.flip3.target_index];
@@ -206,7 +207,7 @@ function renderSync(){let b=SYNC.board; if(!b)return;
   t.textContent=iAmChooser? '❓ You choose who gets '+b.pending_action.action : '⏳ Waiting for action choice ('+b.pending_action.action+')';
   if(iAmChooser) b.pending_action.targets.forEach(i=>{let btn=document.createElement('button');btn.className='targetbtn';btn.textContent=(b.pending_action.action==='Flip Three'?'🎲 ':'➡️ ')+b.players[i].name;btn.addEventListener('click',()=>move('action',i));ab.appendChild(btn);});}
  else if(b.phase==='playing') t.textContent=myTurn? '👉 Your turn - Hit or Stay?' : '👉 '+b.players[b.current_index].name+"'s turn";
- else if(b.phase==='lobby') t.textContent='🪑 Lobby - tap Start, or /startgame in Telegram';
+ else if(b.phase==='lobby') t.textContent='🪑 Lobby - tap Start';
  else if(b.phase==='round_end') t.textContent='Round scored!';
  else if(b.phase==='game_end') t.textContent='🏆 Game over!';
 }
@@ -218,6 +219,7 @@ async function move(action,target){ if(!SYNC.chat_id)return;
  if(r.game) SYNC.board=r.game; renderSync();}
 document.getElementById('syncHit').addEventListener('click',()=>move('hit'));
 document.getElementById('syncStay').addEventListener('click',()=>move('stay'));
+document.getElementById('syncJoin').addEventListener('click',()=>move('join'));
 document.getElementById('syncStart').addEventListener('click',()=>move('start'));
 document.getElementById('syncRematch').addEventListener('click',()=>move('rematch'));
 (function autoSync(){let tg=tgInit(); if(!tg.id)return;

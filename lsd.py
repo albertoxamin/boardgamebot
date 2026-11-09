@@ -356,3 +356,727 @@ def end_turn(g, events):
     g["dice"] = None
     g["last_total"] = None
     g["activated"] = []
+
+
+# ---------------- Turn actions ----------------
+
+def roll_dice(g, idx, events):
+    """Roll 2d6 (mandatory action). May pause for a Re-Rollucifer choice."""
+    if g["phase"] != "playing":
+        return "not in playing phase"
+    if idx != g["current_index"]:
+        return "not your turn"
+    if g["pending"]:
+        return "resolve the pending choice first"
+    if g["turn"]["rolled"]:
+        return "you already rolled this turn"
+    g["dice"] = [random.randint(1, 6), random.randint(1, 6)]
+    g["rerolled"] = False
+    total = sum(g["dice"])
+    events.append(f"🎲 {g['players'][idx]['name']} rolls {g['dice'][0]}+{g['dice'][1]}={total}.")
+    if has_demon(g, idx, "rerollucifer"):
+        g["pending"] = {"kind": "reroll", "player": idx}
+        return None
+    _finalize_roll(g, idx, events)
+    return None
+
+
+def _finalize_roll(g, idx, events):
+    total = sum(g["dice"])
+    g["last_total"] = total
+    g["turn"]["rolled"] = True
+    g["roll_ctx"] = {"roller": idx, "total": total, "dice": list(g["dice"])}
+    # Dice-Zuzzu: own doubles gain the face value.
+    if has_demon(g, idx, "dice_zuzzu") and g["dice"][0] == g["dice"][1]:
+        events.append("🎲 Dice-Zuzzu: doubles!")
+        gain_souls(g, idx, g["dice"][0], events)
+    # Build the activation queue: roller first, then clockwise.
+    g["activated"] = []
+    queue = []
+    n = len(g["players"])
+    for k in range(n):
+        j = (idx + k) % n
+        if g["turn"]["only_mine"] and j != idx:
+            continue
+        p = g["players"][j]
+        cards = ([p["candle"]] if p["candle"] else []) + p["in_play"] + p["demons"]
+        for c in cards:
+            if c["kind"] == "candle":
+                if total in c["nums"]:
+                    queue.append([j, c["iid"]])
+            elif c["kind"] == "demon":
+                if j == idx and c["num"] is not None and c["num"] == total:
+                    queue.append([j, c["iid"]])
+            elif c["num"] == total:
+                queue.append([j, c["iid"]])
+    g["act_queue"] = queue
+    drain(g, events)
+
+
+def buy_card(g, idx, market_iid, events):
+    if g["phase"] != "playing":
+        return "not in playing phase"
+    if idx != g["current_index"]:
+        return "not your turn"
+    if g["pending"]:
+        return "resolve the pending choice first"
+    if g["turn"]["bought"]:
+        return "you already bought this turn"
+    card = next((c for c in g["market"] if c["iid"] == market_iid), None)
+    if card is None:
+        return "that card is not on THE BLOCK"
+    if g["players"][idx]["souls"] < BUY_COST:
+        return "need 3 Souls to buy"
+    g["players"][idx]["souls"] -= BUY_COST
+    g["supply"] += BUY_COST
+    g["market"].remove(card)
+    g["turn"]["bought"] = True
+    events.append(f"🛒 {g['players'][idx]['name']} buys {card['name']} for 3 Souls.")
+    gain_card(g, idx, card, events)
+    check_win(g, events)
+    return None
+
+
+def summon(g, idx, sacrifice_iids, demon_iid, events):
+    """Discard 3 (or 4 vs Baphometal) Block cards, summon a Demon from hand."""
+    if g["phase"] != "playing":
+        return "not in playing phase"
+    if idx != g["current_index"]:
+        return "not your turn"
+    if g["pending"]:
+        return "resolve the pending choice first"
+    if g["turn"]["summoned"]:
+        return "you already summoned this turn"
+    p = g["players"][idx]
+    cost = summon_cost(g, idx)
+    if len(sacrifice_iids) != cost:
+        return f"sacrifice exactly {cost} of your Block cards"
+    sac = []
+    for iid in sacrifice_iids:
+        c = next((c for c in p["in_play"] if c["iid"] == iid), None)
+        if c is None:
+            return "sacrifice cards must be your Block cards in play (not Candles/Demons)"
+        sac.append(c)
+    demon = next((c for c in p["demon_hand"] if c["iid"] == demon_iid), None)
+    if demon is None:
+        return "that Demon is not in your hand"
+    for c in sac:
+        discard_from_play(g, idx, c, events)
+    g["turn"]["summoned"] = True
+    if demon["eff"] == "rosemarys_egg":
+        _rosemary_replace(g, idx, demon, events)
+    else:
+        summon_demon(g, idx, demon, events)
+    check_win(g, events)
+    return None
+
+
+def _rosemary_replace(g, idx, egg, events):
+    """Rosemary's Egg: summoned then immediately discarded; look at the top
+    3 Demon cards, summon one, discard the other 2 (choice pending)."""
+    p = g["players"][idx]
+    if egg in p["demon_hand"]:
+        p["demon_hand"].remove(egg)
+    g["demon_discard"].append(egg)
+    events.append(f"🥚 {p['name']} summons Rosemary's Egg, which immediately "
+                  f"discards itself and hatches...")
+    _reshuffle(g, "demon_deck", "demon_discard", events)
+    top = [g["demon_deck"].pop() for _ in range(min(3, len(g["demon_deck"])))]
+    if not top:
+        return
+    g["pending"] = {"kind": "rosemary", "player": idx, "options": [c["iid"] for c in top],
+                    "top": top}
+
+
+def put_demon_in_play(g, idx, demon, events, free=False):
+    """Summon a Demon into play, handling Rosemary's Egg replacement."""
+    if demon["eff"] == "rosemarys_egg":
+        _rosemary_replace(g, idx, demon, events)
+    else:
+        summon_demon(g, idx, demon, events, free=free)
+    check_win(g, events)
+
+
+# ---------------- Activation resolution ----------------
+
+def _victims(g, idx):
+    """Indices that idx's steal/discard effects may target (no Wraithlok)."""
+    return [j for j in range(len(g["players"])) if j != idx
+            and not has_demon(g, j, "wraithlok")]
+
+
+def _stealable(g, j, filt=None):
+    """Stealable cards of player j (never Candles)."""
+    p = g["players"][j]
+    cards = list(p["in_play"]) + list(p["demons"])
+    if filt == "kid":
+        cards = [c for c in cards if c["ctype"] in ("boy", "girl")]
+    elif filt == "any":
+        pass
+    return cards
+
+
+def _req_met(g, idx, card):
+    """Additional (red-text) activation requirement, checked at activation time."""
+    eff = card["eff"]
+    p = g["players"][idx]
+    if eff == "dog":
+        return len(_kids(g, idx)) >= 1
+    if eff == "rabbit":
+        return sum(1 for c in p["in_play"] if c["ctype"] == "animal") >= 3
+    if eff in ("rabid_dog", "stray_cat"):
+        return len(_kids(g, idx)) == 0
+    if eff == "rainbow_parrot":
+        return type_count(g, idx, "boy") >= 2 or type_count(g, idx, "girl") >= 2
+    if eff == "chuck":
+        return align_count(g, idx, "sweet", exclude_iid=card["iid"]) >= 1
+    if eff == "calvin":
+        return align_count(g, idx, "rotten") >= 3
+    return True
+
+
+def _lose_card(g, idx, card, events):
+    """Remove a card from play to the discard pile (no other checks)."""
+    p = g["players"][idx]
+    if card in p["in_play"]:
+        p["in_play"].remove(card)
+        g["discard"].append(card)
+        events.append(f"🗑 {card['name']} discarded.")
+        return True
+    if card in p["demons"]:
+        p["demons"].remove(card)
+        g["demon_discard"].append(card)
+        events.append(f"🗑 {card['name']} discarded.")
+        return True
+    return False
+
+
+def drain(g, events):
+    """Resolve the activation queue until empty or paused on a choice."""
+    while g["act_queue"] and not g["pending"] and g["phase"] != "game_end":
+        owner, iid = g["act_queue"].pop(0)
+        o2, card = find_card(g, iid)
+        if card is None or o2 != owner or iid in g["activated"]:
+            continue
+        g["activated"].append(iid)
+        if not _req_met(g, owner, card):
+            events.append(f"⛔ {card['name']} does nothing (requirement not met).")
+            continue
+        _resolve(g, owner, card, events)
+        check_win(g, events)
+
+
+def _enqueue(g, owner, cards):
+    """Chain activations right after the current card."""
+    fresh = [[owner, c["iid"]] for c in cards if c["iid"] not in g["activated"]]
+    g["act_queue"] = fresh + g["act_queue"]
+
+
+def _steal_souls_choice(g, idx, amount, events):
+    opts = [j for j in _victims(g, idx) if g["players"][j]["souls"] > 0]
+    if g["supply"] > 0:
+        opts = opts + ["supply"]
+    if not opts:
+        events.append("👻 No Souls to steal.")
+        return
+    if len(opts) == 1:
+        steal_souls(g, idx, amount, opts[0], events)
+        return
+    g["pending"] = {"kind": "steal_souls", "player": idx, "amount": amount, "options": opts}
+
+
+def _gain_block_choice(g, idx, filt, events):
+    opts = [c["iid"] for c in g["market"]
+            if (filt == "any" or (filt == "animal" and c["ctype"] == "animal")
+                or (filt == "boy" and c["ctype"] == "boy")
+                or (filt == "rotten_kid" and c["ctype"] in ("boy", "girl") and c["align"] == "rotten"))]
+    if not opts:
+        events.append("🕳 No matching card on THE BLOCK.")
+        return
+    if len(opts) == 1:
+        card = next(c for c in g["market"] if c["iid"] == opts[0])
+        g["market"].remove(card)
+        events.append(f"🛒 {g['players'][idx]['name']} gains {card['name']} from THE BLOCK.")
+        gain_card(g, idx, card, events)
+        return
+    g["pending"] = {"kind": "gain_block", "player": idx, "options": opts}
+
+
+def _optional(g, idx, card, after, events):
+    """'YOU MAY DISCARD THIS' effects: ask before paying the discard cost."""
+    g["pending"] = {"kind": "optional", "player": idx, "card_iid": card["iid"],
+                    "after": after, "name": card["name"]}
+
+
+def _resolve(g, idx, card, events):
+    """Resolve one activation. May set g["pending"] (pauses draining)."""
+    eff = card["eff"]
+    p = g["players"][idx]
+    name = card["name"]
+
+    def ev(s):
+        events.append(f"⚡ {name} ({p['name']}): {s}")
+
+    # --- Candles and Demons with numeric activations ---
+    if eff == "candle":
+        gain_souls(g, idx, 1, events, source=card)
+        return
+    if eff == "serpent":
+        g["phase"] = "game_end"
+        g["winner"] = p["user_id"]
+        ev("wins the game immediately!")
+        return
+    if eff == "porkus":
+        gain_souls(g, idx, 5, events, source=card)
+        return
+    if eff == "anti_christ":
+        _steal_souls_choice(g, idx, 5, events)
+        return
+    if eff == "baala":
+        _steal_souls_choice(g, idx, sum(1 for c in p["in_play"] if c["ctype"] == "animal"), events)
+        return
+    if eff == "beelzebuddy":
+        ev("activates all of your BOYS and GIRLS.")
+        _enqueue(g, idx, [c for c in p["in_play"] if c["ctype"] in ("boy", "girl")])
+        return
+    if eff == "gross_book":
+        _reshuffle(g, "demon_deck", "demon_discard", events)
+        if not g["demon_deck"]:
+            ev("no Demons left in the deck to find.")
+            return
+        g["pending"] = {"kind": "gross_book", "player": idx,
+                        "options": [c["iid"] for c in g["demon_deck"]]}
+        return
+    if eff == "clockwork":
+        gain_souls(g, idx, 1, events, source=card)
+        g["extra_turn"] = True
+        ev("collects a Soul and takes an additional turn "
+           "(only YOUR cards can activate during that turn)!")
+        return
+    if eff == "krampus":
+        for _ in range(2):
+            c = draw_block(g, events)
+            if c is not None:
+                ev(f"gains {c['name']} from the top of the Block Deck.")
+                gain_card(g, idx, c, events)
+        return
+    if eff == "nine_stopheles":
+        opts = [{"player": j, "iid": c["iid"]} for j in _victims(g, idx)
+                for c in _stealable(g, j, "any")]
+        if not opts:
+            ev("no cards to steal.")
+            return
+        g["pending"] = {"kind": "steal_card", "player": idx, "options": opts}
+        return
+    if eff == "the_devil":
+        opts = [j for j in _victims(g, idx) if _stealable(g, j, "any")]
+        if not opts:
+            ev("no cards to steal.")
+            return
+        if len(opts) == 1:
+            _devil_steal(g, idx, opts[0], events)
+            return
+        g["pending"] = {"kind": "steal_player", "player": idx, "options": opts}
+        return
+    if eff == "wee_r_legion":
+        n = len(p["in_play"]) + len(p["demons"]) + (1 if p["candle"] else 0)
+        ev(f"collects {n} Soul(s), one per card in play.")
+        gain_souls(g, idx, n, events, source=card)
+        return
+    # --- Simple Block souls ---
+    if eff == "soul1":
+        gain_souls(g, idx, 1, events, source=card)
+        return
+    if eff == "soul2":
+        gain_souls(g, idx, 2, events, source=card)
+        return
+    if eff == "soul5":
+        gain_souls(g, idx, 5, events, source=card)
+        return
+    if eff == "lola":
+        n = type_count(g, idx, "boy")
+        ev(f"collects {n} Soul(s), one per BOY.")
+        gain_souls(g, idx, n, events, source=card)
+        return
+    if eff == "romeo":
+        n = type_count(g, idx, "girl")
+        ev(f"collects {n} Soul(s), one per GIRL.")
+        gain_souls(g, idx, n, events, source=card)
+        return
+    if eff == "pippi":
+        n = sum(1 for c in p["in_play"] if c["ctype"] == "animal")
+        ev(f"collects {n} Soul(s), one per ANIMAL.")
+        gain_souls(g, idx, n, events, source=card)
+        return
+    if eff == "lisa":
+        n = align_count(g, idx, "sweet")
+        ev(f"collects {n} Soul(s), one per SWEET BOY/GIRL (including this one).")
+        gain_souls(g, idx, n, events, source=card)
+        return
+    if eff == "chuck":
+        gain_souls(g, idx, 2, events, source=card)
+        return
+    if eff == "dog":
+        gain_souls(g, idx, 1, events, source=card)
+        return
+    if eff == "rabbit":
+        gain_souls(g, idx, 2, events, source=card)
+        return
+    if eff in ("rabid_dog", "rainbow_parrot"):
+        gain_souls(g, idx, 2, events, source=card)
+        return
+    if eff == "calvin":
+        _steal_souls_choice(g, idx, 2, events)
+        return
+    if eff == "dillinger":
+        _steal_souls_choice(g, idx, 1, events)
+        return
+    if eff == "donnie":
+        _steal_souls_choice(g, idx, align_count(g, idx, "rotten"), events)
+        return
+    if eff == "glen":
+        gain_souls(g, idx, 2, events, source=card)
+        others = [j for j in range(len(g["players"])) if j != idx]
+        if len(others) == 1:
+            gain_souls(g, others[0], 1, events)
+        else:
+            g["pending"] = {"kind": "glen_player", "player": idx, "options": others}
+        return
+    if eff == "irwin":
+        ev("activates all of your ANIMALS.")
+        _enqueue(g, idx, [c for c in p["in_play"] if c["ctype"] == "animal"])
+        return
+    if eff == "destiny":
+        opts = [c["iid"] for c in p["in_play"]
+                if c["ctype"] in ("boy", "girl") and c["align"] == "sweet"
+                and c["iid"] != card["iid"] and c["iid"] not in g["activated"]]
+        if not opts:
+            ev("no other SWEET BOYS or GIRLS to activate.")
+            return
+        if len(opts) == 1:
+            _enqueue(g, idx, [next(c for c in p["in_play"] if c["iid"] == opts[0])])
+            return
+        g["pending"] = {"kind": "activate_choice", "player": idx, "options": opts}
+        return
+    if eff == "jane":
+        _gain_block_choice(g, idx, "animal", events)
+        return
+    if eff == "marylin":
+        _gain_block_choice(g, idx, "boy", events)
+        return
+    if eff == "cat":
+        c = draw_block(g, events)
+        if c is None:
+            ev("Block Deck is empty.")
+        elif c["ctype"] == "animal":
+            ev(f"gains {c['name']}!")
+            gain_card(g, idx, c, events)
+        else:
+            g["discard"].append(c)
+            ev(f"discards {c['name']} (not an ANIMAL).")
+        return
+    if eff == "tommy":
+        c = draw_block(g, events)
+        if c is None:
+            ev("Block Deck is empty.")
+        elif c["ctype"] == "girl":
+            ev(f"gains {c['name']}!")
+            gain_card(g, idx, c, events)
+        else:
+            g["discard"].append(c)
+            ev(f"discards {c['name']} (not a GIRL).")
+        return
+    if eff == "alice":
+        for _ in range(2):
+            c = draw_block(g, events)
+            if c is None:
+                break
+            if c["ctype"] in ("boy", "girl") and c["align"] == "sweet":
+                ev(f"gains discarded {c['name']}!")
+                gain_card(g, idx, c, events)
+            else:
+                g["discard"].append(c)
+        return
+    if eff == "stray_cat":
+        c = draw_block(g, events)
+        if c is not None:
+            ev(f"gains {c['name']} from the top of the Block Deck!")
+            gain_card(g, idx, c, events)
+        return
+    if eff == "skunk":
+        ev("everyone discards ALL of their Non-Demon cards!")
+        for j, pl in enumerate(g["players"]):
+            if has_demon(g, j, "wraithlok") and j != idx:
+                events.append(f"🛡️ Wraithlok protects {pl['name']}.")
+                continue
+            for c in list(pl["in_play"]):
+                discard_from_play(g, j, c, events)
+        return
+    if eff == "delores":
+        ev("replaces every SWEET KID on THE BLOCK.")
+        for slot, c in enumerate(list(g["market"])):
+            if c["ctype"] in ("boy", "girl") and c["align"] == "sweet":
+                g["discard"].append(c)
+                new = draw_block(g, events)
+                if new is not None:
+                    g["market"][slot] = new
+                    events.append(f"🔁 {c['name']} replaced by {new['name']}.")
+                else:
+                    g["market"].pop(slot)
+        _gain_block_choice(g, idx, "rotten_kid", events)
+        return
+    # --- Optional 'YOU MAY DISCARD...' effects ---
+    if eff in ("alligator", "goldfish", "hawk", "owl", "damian"):
+        _optional(g, idx, card, eff, events)
+        return
+    if eff == "goat":
+        boys = [c["iid"] for c in p["in_play"] if c["ctype"] == "boy"]
+        girls = [c["iid"] for c in p["in_play"] if c["ctype"] == "girl"]
+        if not boys or not girls:
+            ev("cannot discard 1 BOY and 1 GIRL - nothing happens.")
+            return
+        _optional(g, idx, card, "goat", events)
+        return
+    if eff == "sam":
+        if not any(c["ctype"] == "animal" for c in p["in_play"]):
+            ev("no ANIMALS to discard - nothing happens.")
+            return
+        _optional(g, idx, card, "sam", events)
+        return
+    if eff == "annie":
+        _optional(g, idx, card, "annie", events)
+        return
+    ev("does nothing.")
+
+
+def _devil_steal(g, idx, target, events):
+    p = g["players"][idx]
+    victim = g["players"][target]
+    stolen = _stealable(g, target, "any")
+    for c in stolen:
+        if c in victim["in_play"]:
+            victim["in_play"].remove(c)
+            p["in_play"].append(c)
+        else:
+            victim["demons"].remove(c)
+            p["demons"].append(c)
+    events.append(f"😈 {p['name']} steals ALL of {victim['name']}'s cards "
+                  f"({len(stolen)})!")
+
+
+def _after_optional(g, idx, card, after, events):
+    """Apply the main effect after an optional discard cost was paid."""
+    p = g["players"][idx]
+    if after == "goldfish":
+        gain_souls(g, idx, 5, events, source=card)
+    elif after == "damian":
+        if p["demon_hand"]:
+            demon = random.choice(p["demon_hand"])
+            put_demon_in_play(g, idx, demon, events, free=True)
+        else:
+            events.append("😈 No Demons in hand to summon.")
+    elif after == "hawk":
+        gained = []
+        for _ in range(7):
+            c = draw_block(g, events)
+            if c is None:
+                break
+            if c["ctype"] == "animal":
+                gained.append(c["name"])
+                gain_card(g, idx, c, events)
+            else:
+                g["discard"].append(c)
+        events.append(f"🦅 Hawk: gained {', '.join(gained) or 'no ANIMALs'}.")
+    elif after == "owl":
+        gain_souls(g, idx, 4, events, source=card)
+        g["pending"] = {"kind": "replace_block", "player": idx,
+                        "options": [c["iid"] for c in g["market"]]}
+    elif after == "alligator":
+        opts = [{"player": j, "iid": c["iid"]} for j in _victims(g, idx)
+                for c in _stealable(g, j, "kid")]
+        if not opts:
+            events.append("🐊 No BOYs/GIRLs to discard.")
+            return
+        g["pending"] = {"kind": "alligator", "player": idx, "remaining": 2, "options": opts}
+    elif after == "goat":
+        boys = [c["iid"] for c in p["in_play"] if c["ctype"] == "boy"]
+        g["pending"] = {"kind": "goat_boy", "player": idx, "options": boys}
+    elif after == "sam":
+        opts = [c["iid"] for c in p["in_play"] if c["ctype"] == "animal"]
+        if len(opts) == 1:
+            c = next(c for c in p["in_play"] if c["iid"] == opts[0])
+            discard_from_play(g, idx, c, events)
+            gain_souls(g, idx, 6, events, source=card)
+        else:
+            g["pending"] = {"kind": "sam_animal", "player": idx,
+                            "options": opts, "source_iid": card["iid"]}
+    elif after == "annie":
+        g["pending"] = {"kind": "annie_branch", "player": idx}
+
+
+def apply_choice(g, idx, choice, events):
+    """Apply the current pending choice. Returns error or None."""
+    pend = g.get("pending")
+    if not pend or pend["player"] != idx:
+        return "no pending choice for you"
+    kind = pend["kind"]
+    p = g["players"][idx]
+    if kind == "reroll":
+        if choice == "reroll":
+            g["dice"] = [random.randint(1, 6), random.randint(1, 6)]
+            events.append(f"🔁 Re-Rollucifer re-rolls: {g['dice'][0]}+{g['dice'][1]}={sum(g['dice'])}.")
+        g["pending"] = None
+        _finalize_roll(g, idx, events)
+        return None
+    if kind == "optional":
+        g["pending"] = None
+        if choice == "do":
+            _, card = find_card(g, pend["card_iid"])
+            if card is not None:
+                discard_from_play(g, idx, card, events)
+                _after_optional(g, idx, card, pend["after"], events)
+        drain(g, events)
+        return None
+    if kind == "steal_souls":
+        g["pending"] = None
+        steal_souls(g, idx, pend["amount"], choice, events)
+    elif kind == "glen_player":
+        g["pending"] = None
+        gain_souls(g, choice, 1, events)
+    elif kind == "steal_player":
+        g["pending"] = None
+        _devil_steal(g, idx, choice, events)
+    elif kind == "steal_card":
+        g["pending"] = None
+        opt = next((o for o in pend["options"] if o["player"] == choice.get("player")
+                    and o["iid"] == choice.get("iid")), None)
+        if opt is None:
+            return "that card cannot be stolen"
+        j, c = opt["player"], None
+        victim = g["players"][j]
+        c = next((c for c in victim["in_play"] + victim["demons"] if c["iid"] == opt["iid"]), None)
+        if c is None:
+            return "that card is no longer available"
+        if c in victim["in_play"]:
+            victim["in_play"].remove(c)
+            p["in_play"].append(c)
+        else:
+            victim["demons"].remove(c)
+            p["demons"].append(c)
+        events.append(f"😈 {p['name']} steals {c['name']} from {victim['name']}!")
+    elif kind == "gain_block":
+        g["pending"] = None
+        card = next((c for c in g["market"] if c["iid"] == choice), None)
+        if card is None:
+            return "that card is not on THE BLOCK"
+        g["market"].remove(card)
+        events.append(f"🛒 {p['name']} gains {card['name']} from THE BLOCK.")
+        gain_card(g, idx, card, events)
+    elif kind == "activate_choice":
+        g["pending"] = None
+        _, card = find_card(g, choice)
+        if card is None:
+            return "that card is not in play"
+        _enqueue(g, idx, [card])
+    elif kind == "replace_block":
+        # Choice is a list (Mini App multi-select), a single iid (one at a
+        # time, Telegram), or "done" to finish.
+        if choice == "done":
+            g["pending"] = None
+        else:
+            iids = choice if isinstance(choice, list) else [choice]
+            for iid in iids:
+                slot = next((i for i, c in enumerate(g["market"]) if c["iid"] == iid), None)
+                if slot is not None:
+                    old = g["market"].pop(slot)
+                    g["discard"].append(old)
+                    new = draw_block(g, events)
+                    if new is not None:
+                        g["market"].insert(slot, new)
+                        events.append(f"🔁 {old['name']} replaced by {new['name']}.")
+            if isinstance(choice, list):
+                g["pending"] = None
+    elif kind == "alligator":
+        if choice == "done":
+            g["pending"] = None
+        else:
+            opt = next((o for o in pend["options"] if o["player"] == choice.get("player")
+                        and o["iid"] == choice.get("iid")), None)
+            if opt is None:
+                return "that card cannot be discarded"
+            j = opt["player"]
+            victim = g["players"][j]
+            c = next((c for c in victim["in_play"] if c["iid"] == opt["iid"]), None)
+            if c is None:
+                return "that card is no longer available"
+            discard_from_play(g, j, c, events)
+            pend["remaining"] -= 1
+            pend["options"] = [{"player": o["player"], "iid": o["iid"]} for o in pend["options"]
+                               if o["iid"] != opt["iid"]]
+            if pend["remaining"] <= 0 or not pend["options"]:
+                g["pending"] = None
+    elif kind == "goat_boy":
+        card = next((c for c in p["in_play"] if c["iid"] == choice), None)
+        if card is None or card["ctype"] != "boy":
+            return "choose one of your BOYs"
+        discard_from_play(g, idx, card, events)
+        girls = [c["iid"] for c in p["in_play"] if c["ctype"] == "girl"]
+        g["pending"] = {"kind": "goat_girl", "player": idx, "options": girls}
+    elif kind == "goat_girl":
+        card = next((c for c in p["in_play"] if c["iid"] == choice), None)
+        if card is None or card["ctype"] != "girl":
+            return "choose one of your GIRLs"
+        discard_from_play(g, idx, card, events)
+        g["pending"] = None
+        _reshuffle(g, "demon_deck", "demon_discard", events)
+        if g["demon_deck"]:
+            demon = g["demon_deck"].pop()
+            events.append(f"🐐 Goat summons the top Demon ({demon['name']}) for free!")
+            put_demon_in_play(g, idx, demon, events, free=True)
+    elif kind == "sam_animal":
+        card = next((c for c in p["in_play"] if c["iid"] == choice), None)
+        if card is None or card["ctype"] != "animal":
+            return "choose one of your ANIMALS"
+        g["pending"] = None
+        discard_from_play(g, idx, card, events)
+        _, src = find_card(g, pend.get("source_iid"))
+        gain_souls(g, idx, 6, events, source=src)
+    elif kind == "annie_branch":
+        if choice == "steal":
+            opts = [{"player": j, "iid": c["iid"]} for j in _victims(g, idx)
+                    for c in _stealable(g, j, "kid")]
+            if not opts:
+                g["pending"] = None
+                events.append("😈 No BOYs/GIRLs to steal.")
+            else:
+                g["pending"] = {"kind": "steal_card", "player": idx, "options": opts}
+        elif choice == "gain":
+            g["pending"] = None
+            _gain_block_choice(g, idx, "any", events)
+        else:
+            return "choose steal or gain"
+    elif kind == "rosemary":
+        g["pending"] = None
+        top = pend["top"]
+        chosen = next((c for c in top if c["iid"] == choice), None)
+        if chosen is None:
+            return "choose one of the top 3 Demons"
+        for c in top:
+            if c is not chosen:
+                g["demon_discard"].append(c)
+        events.append(f"🥚 {p['name']} hatches {chosen['name']}!")
+        summon_demon(g, idx, chosen, events, free=True)
+    elif kind == "gross_book":
+        g["pending"] = None
+        chosen = next((c for c in g["demon_deck"] if c["iid"] == choice), None)
+        if chosen is None:
+            return "that Demon is not in the Demon Deck"
+        g["demon_deck"].remove(chosen)
+        random.shuffle(g["demon_deck"])
+        events.append(f"📖 Gross Book summons {chosen['name']} for free!")
+        put_demon_in_play(g, idx, chosen, events, free=True)
+    else:
+        return "unknown choice"
+    drain(g, events)
+    check_win(g, events)
+    return None

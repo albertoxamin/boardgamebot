@@ -88,6 +88,7 @@ COMMANDS = (
     "play - Play Flip 7 (HTML game)\n"
     "regicide - Co-op Regicide game\n"
     "odin - Card-shedding Odin game\n"
+    "lsd - Let's Summon Demons dice game\n"
     "score - Show board and scores\n"
     "rules - How to play Flip 7\n"
     "cancel - Creator cancels the game\n"

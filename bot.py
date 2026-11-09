@@ -12,6 +12,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import game as G
 import regicide as R
 import odin as O
+import lsd as D
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT_TOKEN", "")
 API = f"https://api.telegram.org/bot{TOKEN}" if TOKEN else ""
@@ -43,6 +44,7 @@ HELP = """🎴 <b>Boardgame bot</b>
 /score - show board &amp; scores   /rules - how to play   /cancel - creator cancels
 /regicide - co-op Regicide (also: -join -start -play <cards> -yield -discard <cards> -rules -cancel)
 /odin - card-shedding Odin (also: -join -start -play <cards> -pass -pickup <card> -score -cancel -rules)
+/lsd - dice game Let's Summon Demons (also: -join -start -roll -buy <n> -summon <demon> <sacrifices> -end -score -cancel -rules)
 Play: on your turn tap <b>Hit</b> to flip a card or <b>Stay</b> to bank.
 Duplicate number = bust (0 pts). 7 unique numbers = Flip 7 (+15), round ends.
 First to 200 wins. Cards are face-up/public, just like the physical game."""
@@ -134,23 +136,23 @@ def web_keyboard(chat_type="private", chat_id=None, game="flip7"):
     startapp=<game><chat_id> (no second BotFather app needed)."""
     if not WEB_URL:
         return None
-    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
+    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "lsd": "🎮 Play Summon Demons (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
     if chat_type in ("group", "supergroup", "channel"):
         if chat_id:
-            start = f"{game}{chat_id}" if game in ("regicide", "odin") else str(chat_id)
+            start = f"{game}{chat_id}" if game in ("regicide", "odin", "lsd") else str(chat_id)
             url = f"https://t.me/flip7groupbot?startapp={start}"
         else:
             url = WEB_URL
         btn = {"text": label, "url": url}
     else:
-        url = WEB_URL + (f"?app={game}" if game in ("regicide", "odin") else "")
+        url = WEB_URL + (f"?app={game}" if game in ("regicide", "odin", "lsd") else "")
         btn = {"text": label, "web_app": {"url": url}}
     return [[btn]]
 
 
 # ---------- State ----------
 def load_state():
-    s = {"games": {}, "regicide": {}, "odin": {}}
+    s = {"games": {}, "regicide": {}, "odin": {}, "lsd": {}}
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE) as f:
@@ -160,6 +162,7 @@ def load_state():
     s.setdefault("games", {})
     s.setdefault("regicide", {})  # migrate old state files
     s.setdefault("odin", {})
+    s.setdefault("lsd", {})
     return s
 
 
@@ -845,6 +848,261 @@ def handle_odin(state, msg, cmd, text, uid, name):
     return False
 
 
+# ---------- Let's Summon Demons (dice activation, market, demons) ----------
+LSD_RULES = """😈 <b>Let's Summon Demons rules</b> (Cryptozoic, 2-5 players): be first to 3 summoned Demons AND 10 Souls.
+Setup: 5 Souls each, a Candle in play (collects 1 Soul on any of its numbers), 3 hidden Demon cards in hand, 5 cards face-up on THE BLOCK.
+On your turn, once each in any order: <b>roll 2d6</b> (mandatory), <b>buy 1 Block card for 3 Souls</b>, <b>summon a Demon</b> by discarding 3 of your Block cards (4 if an opponent has Baphometal).
+Every roll activates all matching cards in play for everyone (Demons only on their owner's rolls), in turn order from the roller. Candles never leave play.
+Win check runs after every effect. Full card texts are shown in the Mini App / on each card."""
+
+
+def lsd_get(state, chat_id):
+    return state.setdefault("lsd", {}).get(str(chat_id))
+
+
+def lsd_board_text(g):
+    if g["phase"] == "lobby":
+        return (f"😈 <b>Let's Summon Demons lobby</b> - {len(g['players'])} player(s). "
+                f"Friends: /lsd-join, anyone: /lsd-start")
+    if g["phase"] == "game_end":
+        w = D.name_of(g, g["winner"])
+        scores = " · ".join(f"{p['name']} {p['souls']}👻/{len(p['demons'])}😈" for p in g["players"])
+        return f"🏆 <b>{html.escape(w)} is the ultimate Demon Summoner!</b>\nScores: {scores}"
+    lines = ["😈 <b>Let's Summon Demons</b>"]
+    lines.append("THE BLOCK: " + " · ".join(f"{i+1}:{c['name']}({c['num']})" for i, c in enumerate(g["market"])))
+    if g.get("dice"):
+        lines.append(f"Last roll: {g['dice'][0]}+{g['dice'][1]}={g['last_total']}")
+    for i, p in enumerate(g["players"]):
+        turn = " 👈" if i == g["current_index"] else ""
+        lines.append(f"• {html.escape(p['name'])}: {p['souls']}👻 · {len(p['demons'])}😈 · "
+                     + ", ".join(f"{c['name']}({c['num'] if c['num'] is not None else '∞'})" for c in p["in_play"])
+                     + (f" + candle {p['candle']['name']}" if p["candle"] else "") + turn)
+    if g["pending"]:
+        lines.append("⏳ Choice needed - tap a button below.")
+    return "\n".join(lines)
+
+
+def lsd_pending_options(g):
+    """Human-labelled options for the current pending choice (shared by
+    Telegram buttons and the Mini App)."""
+    pend = g.get("pending")
+    if not pend:
+        return []
+    kind, pl = pend["kind"], pend["player"]
+
+    def card_label(iid):
+        _, c = D.find_card(g, iid)
+        if c:
+            return c["name"]
+        c = next((c for c in g["market"] if c["iid"] == iid), None)
+        return c["name"] if c else f"card#{iid}"
+
+    def player_label(j):
+        return g["players"][j]["name"]
+
+    if kind == "reroll":
+        return [{"choice": "reroll", "label": "🔁 Re-roll"}, {"choice": "keep", "label": "Keep roll"}]
+    if kind == "optional":
+        return [{"choice": "do", "label": f"✅ Do it (discard {pend['name']})"},
+                {"choice": "skip", "label": "Skip"}]
+    if kind == "steal_souls":
+        return [{"choice": j, "label": player_label(j)} for j in pend["options"] if j != "supply"] + \
+               ([{"choice": "supply", "label": "Supply"}] if "supply" in pend["options"] else [])
+    if kind in ("steal_card", "alligator"):
+        opts = [{"choice": {"player": o["player"], "iid": o["iid"]},
+                 "label": f"{player_label(o['player'])}: {card_label(o['iid'])}"} for o in pend["options"]]
+        if kind == "alligator":
+            opts.append({"choice": "done", "label": "✅ Done"})
+        return opts
+    if kind == "gain_block":
+        return [{"choice": iid, "label": card_label(iid)} for iid in pend["options"]]
+    if kind == "activate_choice":
+        return [{"choice": iid, "label": card_label(iid)} for iid in pend["options"]]
+    if kind == "replace_block":
+        return [{"choice": iid, "label": card_label(iid)} for iid in pend["options"]] + \
+               [{"choice": "done", "label": "✅ Done"}]
+    if kind in ("goat_boy", "goat_girl", "sam_animal"):
+        return [{"choice": iid, "label": card_label(iid)} for iid in pend["options"]]
+    if kind == "rosemary":
+        return [{"choice": iid, "label": card_label(iid)} for iid in pend["options"]]
+    if kind == "gross_book":
+        return [{"choice": iid, "label": card_label(iid)} for iid in pend["options"]]
+    if kind in ("glen_player", "steal_player"):
+        return [{"choice": j, "label": player_label(j)} for j in pend["options"]]
+    if kind == "annie_branch":
+        return [{"choice": "steal", "label": "😈 Steal a BOY/GIRL"},
+                {"choice": "gain", "label": "🛒 Gain from THE BLOCK"}]
+    return []
+
+
+def lsd_keyboard(g):
+    ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
+    wk = web_keyboard(ct, g["chat_id"], game="lsd")
+    if g["phase"] == "lobby":
+        return [[{"text": "🙋 Join Summon Demons", "callback_data": "lsd:join"}]] + (wk or [])
+    kb = []
+    if g["pending"]:
+        opts = lsd_pending_options(g)
+        # Telegram callbacks encode the choice compactly; Mini App sends JSON.
+        for o in opts:
+            ch = o["choice"]
+            if isinstance(ch, dict):
+                data = f"lsd:c:{g['pending']['kind']}:{ch['player']}:{ch['iid']}"
+            else:
+                data = f"lsd:c:{g['pending']['kind']}:{ch}"
+            kb.append([{"text": o["label"][:60], "callback_data": data}])
+    else:
+        if g["phase"] == "playing":
+            kb.append([{"text": "🎲 Roll dice", "callback_data": "lsd:roll"},
+                       {"text": "🏁 End turn", "callback_data": "lsd:end"}])
+            for i in range(len(g["market"])):
+                kb.append([{"text": f"🛒 Buy #{i+1} {g['market'][i]['name']}",
+                            "callback_data": f"lsd:buy:{i}"}])
+    if wk:
+        kb.extend(wk)
+    return kb or None
+
+
+def lsd_render(g, events=None):
+    chat_id = g["chat_id"]
+    if events is None:
+        events = []
+    lines = [html.escape(e) for e in events]
+    ping = None
+    if g["players"] and g["phase"] == "playing":
+        if g["pending"]:
+            who = g["pending"]["player"]
+            ping = f"👉 {lsd_mention(g, g['players'][who]['user_id'])} - make the choice shown below"
+        else:
+            who = g["current_index"]
+            ping = f"👉 {lsd_mention(g, g['players'][who]['user_id'])} - your turn (roll, buy, summon, end)"
+    if ping:
+        lines.append(ping)
+    text = "\n".join(lines + [lsd_board_text(g)]) if lines else lsd_board_text(g)
+    kb = lsd_keyboard(g)
+    r = send(chat_id, text, kb)
+    if r.get("ok"):
+        old = g.get("board_message_id")
+        g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=chat_id, message_id=old)
+
+
+def lsd_mention(g, user_id):
+    return f'<a href="tg://user?id={user_id}">{html.escape(D.name_of(g, user_id))}</a>'
+
+
+def _lsd_by_slug(g, idx, slug):
+    """Find a card by slug in a player's in-play / demon hand / market."""
+    for c in g["players"][idx]["in_play"] + g["players"][idx]["demons"] + g["players"][idx]["demon_hand"]:
+        if c["slug"] == slug:
+            return c
+    return None
+
+
+def handle_lsd(state, msg, cmd, text, uid, name):
+    chat_id = msg["chat"]["id"]
+    g = lsd_get(state, chat_id)
+    if cmd == "/lsd-rules":
+        send(chat_id, LSD_RULES)
+        return True
+    if cmd == "/lsd":
+        if not g:
+            g = D.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state.setdefault("lsd", {})[str(chat_id)] = g
+            send(chat_id, "😈 Let's Summon Demons game created! Friends: /lsd-join, anyone: /lsd-start")
+            lsd_render(g)
+        else:
+            lsd_render(g)
+        return True
+    if not g:
+        send(chat_id, "No Summon Demons game here yet - send /lsd to create one.")
+        return True
+    g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd == "/lsd-join":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p["user_id"] == uid for p in g["players"]):
+            send(chat_id, "You're already in!")
+        elif len(g["players"]) >= 5:
+            send(chat_id, "⛔ Let's Summon Demons is 2-5 players (full).")
+        else:
+            g["players"].append({"user_id": uid, "name": msg.get("from", {}).get("first_name") or "Player",
+                                 "souls": 5, "candle": None, "in_play": [], "demons": [], "demon_hand": []})
+            send(chat_id, f"🙋 <b>{name}</b> joined Let's Summon Demons ({len(g['players'])} players).")
+            lsd_render(g)
+        return True
+    if cmd == "/lsd-start":
+        if g["phase"] != "lobby":
+            send(chat_id, "Already started.")
+        elif len(g["players"]) < 2:
+            send(chat_id, "⛔ Need at least 2 players.")
+        else:
+            ev = []
+            err = D.start_game(g, ev)
+            if err:
+                send(chat_id, f"⛔ {err}")
+            else:
+                lsd_render(g, ev)
+        return True
+    if cmd == "/lsd-cancel":
+        if uid != g["created_by"]:
+            send(chat_id, "⛔ Only the creator can cancel.")
+        else:
+            del state["lsd"][str(chat_id)]
+            send(chat_id, "🗑 Summon Demons game cancelled.")
+        return True
+    if cmd == "/lsd-score":
+        lsd_render(g)
+        return True
+    idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == uid), None)
+    if idx is None:
+        send(chat_id, "⛔ You're not in this game - /lsd-join in lobby.")
+        return True
+    ev = []
+    if cmd == "/lsd-roll":
+        err = D.roll_dice(g, idx, ev)
+    elif cmd == "/lsd-end":
+        if g["pending"]:
+            err = "resolve the pending choice first"
+        elif not g["turn"]["rolled"]:
+            err = "you must roll the dice first"
+        else:
+            D.end_turn(g, ev)
+            err = None
+    elif cmd.startswith("/lsd-buy"):
+        parts = text.split()
+        if len(parts) != 2 or not parts[1].isdigit() or not (1 <= int(parts[1]) <= len(g["market"])):
+            send(chat_id, "Usage: /lsd-buy <1-5> (market position)")
+            return True
+        err = D.buy_card(g, idx, g["market"][int(parts[1]) - 1]["iid"], ev)
+    elif cmd == "/lsd-summon":
+        parts = text.split()[1:]
+        if len(parts) < 2:
+            send(chat_id, "Usage: /lsd-summon <demon-slug> <sacrifice-slugs...> e.g. /lsd-summon porkus adam eve jane")
+            return True
+        demon = _lsd_by_slug(g, idx, parts[0].lower())
+        if demon is None or demon["kind"] != "demon":
+            send(chat_id, "⛔ That Demon is not in your hand.")
+            return True
+        sac = []
+        for s in parts[1:]:
+            c = _lsd_by_slug(g, idx, s.lower())
+            if c is None:
+                send(chat_id, f"⛔ You don't have {s} in play.")
+                return True
+            sac.append(c["iid"])
+        err = D.summon(g, idx, sac, demon["iid"], ev)
+    else:
+        return False
+    if err:
+        send(chat_id, f"⛔ {err}")
+    else:
+        lsd_render(g, ev)
+    return True
+
+
 # ---------- Handlers ----------
 def get_game(state, chat_id):
     return state["games"].get(str(chat_id))
@@ -882,6 +1140,12 @@ def handle_command(state, msg):
         return
     if cmd.startswith("/odin"):
         handle_odin(state, msg, cmd, text, uid, name)
+        return
+    if cmd.startswith("/lsd"):
+        handle_lsd(state, msg, cmd, text, uid, name)
+        return
+    if cmd.startswith("/lsd"):
+        handle_lsd(state, msg, cmd, text, uid, name)
         return
     if cmd in ("/start", "/help", "/commands"):
         send(chat_id, HELP)
@@ -1016,6 +1280,64 @@ def handle_callback(state, cb):
     data = cb.get("data", "")
     uid = cb.get("from", {}).get("id")
     chat_id = cb.get("message", {}).get("chat", {}).get("id")
+    if data.startswith("lsd:"):
+        ls = lsd_get(state, chat_id)
+        if not ls:
+            return answer_cb(cb["id"], "No Summon Demons game here.")
+        parts = data.split(":")
+        idx = next((i for i, p in enumerate(ls["players"]) if p["user_id"] == uid), None)
+        ev = []
+        if parts == ["lsd", "join"]:
+            if ls["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            if idx is not None:
+                return answer_cb(cb["id"], "Already in!")
+            ls["players"].append({"user_id": uid, "name": cb["from"].get("first_name") or "Player",
+                                  "souls": 5, "candle": None, "in_play": [], "demons": [], "demon_hand": []})
+            answer_cb(cb["id"], "Joined!")
+            lsd_render(ls, [f"🙋 {cb['from'].get('first_name')} joined Let's Summon Demons."])
+        elif parts == ["lsd", "roll"]:
+            err = D.roll_dice(ls, idx, ev) if idx is not None else "not in game"
+            answer_cb(cb["id"], err or "Rolled")
+            if not err:
+                lsd_render(ls, ev)
+        elif parts == ["lsd", "end"]:
+            if ls["pending"]:
+                return answer_cb(cb["id"], "Resolve the pending choice first.")
+            if idx is None or idx != ls["current_index"]:
+                return answer_cb(cb["id"], "Not your turn.")
+            if not ls["turn"]["rolled"]:
+                return answer_cb(cb["id"], "Roll the dice first.")
+            D.end_turn(ls, ev)
+            answer_cb(cb["id"], "Turn ended")
+            lsd_render(ls, ev)
+        elif len(parts) == 3 and parts[1] == "buy":
+            err = D.buy_card(ls, idx, ls["market"][int(parts[2])]["iid"], ev) if idx is not None else "not in game"
+            answer_cb(cb["id"], err or "Bought")
+            if not err:
+                lsd_render(ls, ev)
+        elif len(parts) >= 3 and parts[1] == "c":
+            pend = ls.get("pending")
+            if not pend or pend["player"] != idx:
+                return answer_cb(cb["id"], "No choice pending for you.")
+            kind = parts[2]
+            if kind in ("steal_card", "alligator") and len(parts) == 5:
+                choice = {"player": int(parts[3]), "iid": int(parts[4])}
+            elif kind in ("steal_souls", "glen_player", "steal_player") and parts[3] != "supply":
+                choice = int(parts[3])
+            elif kind in ("gain_block", "activate_choice", "goat_boy", "goat_girl", "sam_animal", "rosemary", "gross_book") and parts[3].isdigit():
+                choice = int(parts[3])
+            else:
+                choice = parts[3] if len(parts) > 3 else ""
+                if kind == "replace_block" and choice != "done":
+                    choice = int(choice) if choice.isdigit() else choice
+            err = D.apply_choice(ls, idx, choice, ev)
+            answer_cb(cb["id"], err or "Done")
+            if not err:
+                lsd_render(ls, ev)
+        else:
+            answer_cb(cb["id"], "Unknown button.")
+        return
     if data.startswith("od:"):
         od = odin_get(state, chat_id)
         if not od:
@@ -1422,6 +1744,86 @@ def odin_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
+def lsd_board_json(g, viewer_id=None):
+    """LSD board; Demon hands are private (only counts are public)."""
+    me = next((p for p in g["players"] if p["user_id"] == viewer_id), None)
+    pend = g.get("pending")
+    pend_out = None
+    if pend:
+        pend_out = dict(pend)
+        pend_out["options_detail"] = lsd_pending_options(g)
+    return {
+        "chat_id": g["chat_id"], "phase": g["phase"],
+        "current_index": g["current_index"], "created_by": g["created_by"],
+        "is_player": me is not None,
+        "market": g["market"], "supply": g["supply"],
+        "dice": g.get("dice"), "last_total": g.get("last_total"),
+        "turn": g.get("turn"), "pending": pend_out,
+        "winner": g.get("winner"),
+        "players": [{"user_id": p["user_id"], "name": p["name"], "souls": p["souls"],
+                     "candle": p["candle"], "in_play": p["in_play"], "demons": p["demons"],
+                     "demon_hand_count": len(p["demon_hand"])} for p in g["players"]],
+        "my_demon_hand": me["demon_hand"] if me else [],
+    }
+
+
+def lsd_api_move(state, chat_id, user_id, body):
+    g = lsd_get(state, chat_id)
+    if not g:
+        return [], "no summon demons game in that chat"
+    idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
+    action = body.get("action")
+    ev = []
+    if action == "join":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        if idx is not None:
+            return ev, None
+        if len(g["players"]) >= 5:
+            return [], "full"
+        iu_name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
+        g["players"].append({"user_id": user_id, "name": iu_name, "souls": 5,
+                             "candle": None, "in_play": [], "demons": [], "demon_hand": []})
+        ev.append("🙋 joined Let's Summon Demons.")
+    elif action == "start":
+        if g["phase"] != "lobby":
+            return [], "already started"
+        err = D.start_game(g, ev)
+        if err:
+            return [], err
+    elif idx is None:
+        return [], "not in this game"
+    elif action == "roll":
+        err = D.roll_dice(g, idx, ev)
+        if err:
+            return [], err
+    elif action == "buy":
+        err = D.buy_card(g, idx, int(body.get("market_iid", 0)), ev)
+        if err:
+            return [], err
+    elif action == "summon":
+        sac = body.get("sacrifice") or []
+        err = D.summon(g, idx, [int(x) for x in sac], int(body.get("demon_iid", 0)), ev)
+        if err:
+            return [], err
+    elif action == "end":
+        if g["pending"]:
+            return [], "resolve the pending choice first"
+        if idx != g["current_index"]:
+            return [], "not your turn"
+        if not g["turn"]["rolled"]:
+            return [], "you must roll the dice first"
+        D.end_turn(g, ev)
+    elif action == "choice":
+        err = D.apply_choice(g, idx, body.get("choice"), ev)
+        if err:
+            return [], err
+    else:
+        return [], "unknown action"
+    lsd_render(g, ev)
+    return ev, None
+
+
 def start_web_server(state):
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -1456,6 +1858,14 @@ def start_web_server(state):
             if u.path == "/odin.js":
                 p = os.path.join(os.path.dirname(JS_PATH), "odin.js")
                 return self._send(200, open(p, "rb").read(), "text/javascript")
+            if u.path == "/lsd.js":
+                p = os.path.join(os.path.dirname(JS_PATH), "lsd.js")
+                return self._send(200, open(p, "rb").read(), "text/javascript")
+            if u.path.startswith("/lsd-cards/") and u.path.endswith(".jpg"):
+                p = os.path.join(os.path.dirname(JS_PATH), "lsd_cards", os.path.basename(u.path))
+                if os.path.exists(p):
+                    return self._send(200, open(p, "rb").read(), "image/jpeg", cache="public, max-age=86400")
+                return self._send(404, {"ok": False})
             if u.path == "/flip7-cards.webp":
                 p = os.path.join(os.path.dirname(JS_PATH), "flip7-cards.webp")
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
@@ -1482,6 +1892,25 @@ def start_web_server(state):
                     games = [board_json(g, uid) for g in state["games"].values()
                              if any(p["user_id"] == uid for p in g["players"])]
                 return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/lsd/mygames":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                with STATE_LOCK:
+                    games = [lsd_board_json(g, uid) for g in state.get("lsd", {}).values()
+                             if any(p["user_id"] == uid for p in g["players"])]
+                return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/lsd/game":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                chat_id = q.get("chat_id", [""])[0]
+                with STATE_LOCK:
+                    g = lsd_get(state, chat_id)
+                    board = lsd_board_json(g, uid) if g else None
+                return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/odin/mygames":
                 q = urllib.parse.parse_qs(u.query)
                 uid = verify_init_data(q.get("init_data", [""])[0])
@@ -1537,6 +1966,52 @@ def start_web_server(state):
 
         def do_POST(self):
             path = urllib.parse.urlparse(self.path).path
+            if path in ("/api/lsd/create", "/api/lsd/move"):
+                try:
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                except Exception:
+                    return self._send(400, {"ok": False, "error": "bad json"})
+                iu = init_user(body.get("init_data", ""))
+                if iu is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                uid, name, start_param, chat_instance = iu
+                if path == "/api/lsd/create":
+                    chat_id = None
+                    for cand in (chat_instance, start_param, str(body.get("chat_id") or "")):
+                        cand = str(cand)
+                        if cand.startswith("lsd"):
+                            cand = cand[len("lsd"):]
+                        try:
+                            chat_id = int(cand)
+                            break
+                        except (TypeError, ValueError):
+                            continue
+                    if not chat_id:
+                        return self._send(400, {"ok": False, "error": "open the Mini App from a chat (startapp link)"})
+                    with STATE_LOCK:
+                        g = lsd_get(state, chat_id)
+                        if g and g["phase"] != "game_end":
+                            return self._send(200, {"ok": True, "game": lsd_board_json(g, uid), "created": False})
+                        g = D.new_game(chat_id, uid, name)
+                        g["chat_type"] = "supergroup" if chat_id < 0 else "private"
+                        state.setdefault("lsd", {})[str(chat_id)] = g
+                        lsd_render(g, [f"😈 Let's Summon Demons created by {name} via Mini App!"])
+                        save_state(state)
+                        board = lsd_board_json(g, uid)
+                    return self._send(200, {"ok": True, "game": board, "created": True})
+                chat_id = body.get("chat_id")
+                if not chat_id and start_param.startswith("lsd"):
+                    try:
+                        chat_id = int(start_param[len("lsd"):])
+                    except ValueError:
+                        pass
+                with STATE_LOCK:
+                    events, err = lsd_api_move(state, chat_id, uid, body)
+                    g = lsd_get(state, chat_id)
+                    board = lsd_board_json(g, uid) if g else None
+                    save_state(state)
+                return self._send(200 if not err else 400,
+                                  {"ok": not err, "error": err, "events": events, "game": board})
             if path in ("/api/odin/create", "/api/odin/move"):
                 try:
                     body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))

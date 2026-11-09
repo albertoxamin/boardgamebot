@@ -66,6 +66,17 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 .handbacks .ocard{width:24px;height:34px;background-image:none;cursor:default}
 .odtable{display:flex;align-items:center;gap:10px;justify-content:flex-start;margin:8px 0}
 .odvalue{background:#f59e0b;color:#111;border-radius:999px;padding:4px 12px;font-weight:900;font-size:18px}
+/* Let's Summon Demons: round cards from scans, circular crop */
+.lsdcard{width:64px;height:64px;border-radius:50%;object-fit:cover;box-shadow:1px 2px 3px #0008;flex:none;cursor:pointer;transition:transform .15s ease;background:#000}
+.lsdcard.big{width:84px;height:84px}
+.lsdcard:active{transform:scale(.92)}
+.lsdcard.sel{outline:3px solid #f59e0b;transform:translateY(-4px);animation:selPop .3s ease}
+.lsdcard.dim{opacity:.45}
+.lsdrow{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0}
+.lsdseat{background:rgba(15,23,42,.85);border:2px solid #334155;border-radius:12px;padding:8px;margin:6px 0}
+.lsdseat.current{border-color:#f59e0b}
+.lsdchoice{display:block;width:100%;text-align:left;background:#334155;color:#fff;font-size:15px;padding:10px 12px;border-radius:10px;margin:4px 0;border:0;cursor:pointer}
+.lsdchoice:active{transform:scale(.98)}
 </style></head><body>
 <h1>🎴 Flip 7</h1>
 <div id="regicide" class="hidden">
@@ -92,6 +103,17 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <button class="primary hidden" id="odStart">🎮 Start game</button>
 <div class="log" id="odLog"></div>
 </div>
+<div id="lsd" class="hidden">
+<div id="lsdBoard"></div>
+<div id="lsdTurn" style="font-size:18px;font-weight:700"></div>
+<div id="lsdChoice"></div>
+<div id="lsdActions"></div>
+<button class="hit hidden" id="lsdRoll">🎲 Roll dice</button>
+<button class="hit hidden" id="lsdSummon">😈 Summon (select cards)</button>
+<button class="stay hidden" id="lsdEnd">🏁 End turn</button>
+<button class="primary hidden" id="lsdStart">🎮 Start game</button>
+<div class="log" id="lsdLog"></div>
+</div>
 <div id="synced">
 <div id="syncBoard"></div>
 <div id="syncTurn" style="font-size:18px;font-weight:700"></div>
@@ -101,7 +123,8 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <button class="primary hidden" id="syncStart">🎮 Start game</button>
 <div class="log" id="syncLog"></div>
 </div>
-<script data-cfasync="false" src="flip7.js?v=18"></script>
+<script data-cfasync="false" src="flip7.js?v=19"></script>
 <script data-cfasync="false" src="regicide.js?v=15"></script>
 <script data-cfasync="false" src="odin.js?v=7"></script>
+<script data-cfasync="false" src="lsd.js?v=1"></script>
 </body></html>

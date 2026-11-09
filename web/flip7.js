@@ -7,6 +7,7 @@ let G=null;
   try{let p=new URLSearchParams(Telegram.WebApp.initData||''); start=start||p.get('start_param')||'';}catch(e){}
   if(String(start).startsWith('regicide')){document.getElementById('regicide').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='⚔️ Regicide';}
   else if(String(start).startsWith('odin')){document.getElementById('odin').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='🛡️ Odin';}
+  else if(String(start).startsWith('lsd')){document.getElementById('lsd').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='😈 Summon Demons';}
  }catch(e){}})();
 function buildDeck(){let d=[{k:'n',v:0}];for(let n=1;n<=12;n++)for(let i=0;i<n;i++)d.push({k:'n',v:n});
 ['+2','+4','+6','+8','+10','x2'].forEach(m=>d.push({k:'m',v:m}));
@@ -216,5 +217,5 @@ document.getElementById('syncHit').addEventListener('click',()=>move('hit'));
 document.getElementById('syncStay').addEventListener('click',()=>move('stay'));
 document.getElementById('syncStart').addEventListener('click',()=>move('start'));
 (function autoSync(){let tg=tgInit(); if(!tg.id)return;
- // Regicide/Odin modes are started by their own scripts (loaded after this file).
- if(document.getElementById('regicide').classList.contains('hidden')&&document.getElementById('odin').classList.contains('hidden')) loadGames();})();
+ // Regicide/Odin/LSD modes are started by their own scripts (loaded after this file).
+ if(document.getElementById('regicide').classList.contains('hidden')&&document.getElementById('odin').classList.contains('hidden')&&document.getElementById('lsd').classList.contains('hidden')) loadGames();})();

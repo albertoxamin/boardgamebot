@@ -1194,7 +1194,7 @@ def spots_board_text(g):
         scores = " · ".join(f"{p['name']} {len(p['scored'])}🏅" for p in g["players"])
         return f"🏆 <b>{html.escape(w)} wins Spots!</b>\nScores: {scores}"
     lines = ["🐶 <b>Spots</b> · Tricks: " + " ".join(
-        f"{SP.TILE_NAMES[t['slug']]}{'🦴' if t['treat_on'] else ''}" if t["faceup"] else f"[{SP.TILE_NAMES[t['slug']]}↓]"
+        f"{SP.TILE_NAMES[t['slug']]}{' ×'+str(t['treat_on']) if t.get('treat_on') else ''}" if t["faceup"] else f"[{SP.TILE_NAMES[t['slug']]}↓]"
         for t in g["tiles"])]
     if g.get("last_roll"):
         lines.append(f"🎲 Last roll: {', '.join(map(str, g['last_roll']))}")
@@ -1286,7 +1286,7 @@ def spots_keyboard(g):
     elif g["phase"] == "playing" and not g["trick"]:
         for t in g["tiles"]:
             if t["faceup"]:
-                kb.append([{"text": f"🎪 {SP.TILE_NAMES[t['slug']]}{' 🦴' if t['treat_on'] else ''}",
+                kb.append([{"text": f"🎪 {SP.TILE_NAMES[t['slug']]}{' ×'+str(t['treat_on']) if t.get('treat_on') else ''}",
                             "callback_data": f"spots:trick:{t['slug']}"}])
         kb.append([{"text": "🏅 Score dogs", "callback_data": "spots:score"}])
     if wk:
@@ -2482,6 +2482,9 @@ def start_web_server(state):
             if u.path in ("/spots-dogs.webp", "/spots-dogs-scored.webp"):
                 p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
+            if u.path == "/treat.png":
+                p = os.path.join(os.path.dirname(JS_PATH), "treat.png")
+                return self._send(200, open(p, "rb").read(), "image/png", cache="public, max-age=86400")
             if u.path == "/spots-dice.png":
                 p = os.path.join(os.path.dirname(JS_PATH), "spots-dice.png")
                 return self._send(200, open(p, "rb").read(), "image/png", cache="public, max-age=86400")

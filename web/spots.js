@@ -39,7 +39,7 @@ function spRender(){let b=SP.board; if(!b)return;
  let me=b.players.find(p=>p.user_id===SP.user_id);
  let cur=b.players[b.current_index]; let myTurn=(b.phase==='playing'&&cur&&(cur.user_id===SP.user_id||cur.npc)&&!b.pending);
  let tiles='<div class="small"><b>Trick tiles</b> (tap one to do it — the card shows its steps)</div><div>'
-  + b.tiles.map(t=>'<span class="tiley'+(t.faceup?'':' tilety')+'" data-slug="'+t.slug+'" title="'+escapeHtml(t.slug)+'"><img src="spots-tiles/'+t.slug+'.jpg?v=2" alt="'+escapeHtml(t.slug)+'">'+(t.treat_on?'<div>🦴</div>':'')+'</span>').join('') + '</div>';
+  + b.tiles.map(t=>'<span class="tiley'+(t.faceup?'':' tilety')+'" data-slug="'+t.slug+'" title="'+escapeHtml(t.slug)+'"><img src="spots-tiles/'+t.slug+'.jpg?v=2" alt="'+escapeHtml(t.slug)+'">'+(t.treat_on?'<div class="tiletreats">'+Array.from({length:t.treat_on},()=>'<img class="treatic" src="treat.png" alt="treat">').join('')+'</div>':'')+'</span>').join('') + '</div>';
  let seats=b.players.map((p,i)=>{
    let isTurn=b.current_index===i&&b.phase==='playing';
    return '<div class="lsdseat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score">'+p.scored.length+'🏅 · '+p.treats+'🦴</span></div>'

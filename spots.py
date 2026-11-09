@@ -90,7 +90,7 @@ def new_game(chat_id, creator_id, creator_name):
                      "dogs": [], "scored": [], "yard": [], "treats": START_TREATS}],
         "phase": "lobby",  # lobby|playing|game_end
         "dog_deck": [], "dice_supply": TOTAL_DICE, "treat_supply": TOTAL_TREATS,
-        "tiles": [],  # {slug, faceup, treat_on}
+        "tiles": [],  # {slug, faceup, treat_on: count}
         "current_index": 0, "winner": None,
         "trick": None,   # active trick state (see below)
         "pending": None, "board_message_id": None, "last_roll": None,
@@ -115,7 +115,7 @@ def start_game(g, events):
         d["iid"] = i + 1
     g["dice_supply"] = TOTAL_DICE - n          # 1 die each for the opening roll
     g["treat_supply"] = TOTAL_TREATS - n
-    g["tiles"] = [{"slug": s, "faceup": True, "treat_on": False} for s in BEGINNER_TILES]
+    g["tiles"] = [{"slug": s, "faceup": True, "treat_on": 0} for s in BEGINNER_TILES]
     g["trick"] = None
     g["pending"] = None
     for p in g["players"]:
@@ -261,7 +261,7 @@ def _end_turn(g, events):
     if len(faceup) == 1:
         t = faceup[0]
         if g["treat_supply"] > 0:
-            t["treat_on"] = True
+            t["treat_on"] = t.get("treat_on", 0) + 1
             g["treat_supply"] -= 1
             events.append(f"🦴 A treat is placed on {TILE_NAMES[t['slug']]} and all "
                           f"trick tiles flip faceup.")
@@ -302,9 +302,10 @@ def choose_trick(g, idx, slug, events):
         return "that trick is face down"
     tile["faceup"] = False
     if tile["treat_on"]:
-        tile["treat_on"] = False
-        _gain_treats(g, idx, 1, events)
-        events.append(f"🦴 {g['players'][idx]['name']} takes the treat on {TILE_NAMES[slug]}!")
+        n = tile["treat_on"]
+        tile["treat_on"] = 0
+        _gain_treats(g, idx, n, events)
+        events.append(f"🦴 {g['players'][idx]['name']} takes {n} treat(s) on {TILE_NAMES[slug]}!")
     g["trick"] = _fresh_trick(slug, idx)
     events.append(f"🎪 {g['players'][idx]['name']} chooses {TILE_NAMES[slug]}!")
     advance(g, events)
@@ -687,7 +688,7 @@ def _end_turn(g, events):
     if len(faceup) == 1:
         t = faceup[0]
         if g["treat_supply"] > 0:
-            t["treat_on"] = True
+            t["treat_on"] = t.get("treat_on", 0) + 1
             g["treat_supply"] -= 1
             events.append(f"🦴 A treat is placed on {TILE_NAMES[t['slug']]} and all "
                           f"trick tiles flip faceup.")

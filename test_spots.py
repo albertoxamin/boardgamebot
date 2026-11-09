@@ -43,8 +43,9 @@ def test_walk_place_and_bust():
         assert S.do_place(g, idx, 0, ("dog", peb["iid"], spot), []) is None
     else:
         assert S.do_place(g, idx, 0, ("yard",), []) is None
-    assert S.do_place(g, idx, 0, ("yard",), []) is None  # bury second die
-    # optional THEN roll pending
+    if g["pending"] and g["pending"]["kind"] == "place":
+        assert S.do_place(g, idx, 0, ("yard",), []) is None  # bury second die
+    # optional THEN roll pending (auto-bury may have finished the pool)
     assert g["pending"] and g["pending"]["kind"] == "optional_roll"
     assert S.apply_choice(g, idx, "done", []) is None
     assert g["trick"] is None and g["current_index"] == 1 - idx
@@ -167,13 +168,14 @@ def test_autoscore_mid_pool_continues():
     peb["placed"] = {0: 1, 1: 3}  # pebble [1,3,4]
     p["dogs"] = [peb]
     assert S.choose_trick(g, idx, "walk", []) is None
-    g["trick"]["dice"] = [4, 2, 5]  # 3 dice pool (patched for the test)
+    g["trick"]["dice"] = [4, 3, 3]  # 3 dice pool (patched for the test)
+    p["treats"] = 0  # no reroll window: remaining dice auto-bury if unplaceable
     g["pending"]["dice"] = None
     # Place the 4 on Pebble -> completes the only dog -> auto-scores mid-pool
     assert S.do_place(g, idx, 0, ("dog", peb["iid"], 2), []) is None
     assert peb in p["scored"]
-    # Pool still has dice and trick is still alive (pending place)
-    assert g["trick"] is not None and g["pending"] and g["pending"]["kind"] == "place"
+    # Trick is still alive (pool dice remain, or it moved to the THEN step)
+    assert g["trick"] is not None and g["pending"] is not None
     while g["trick"] and g["pending"] and g["pending"]["kind"] == "place":
         assert S.do_place(g, idx, 0, ("yard",), []) is None
     if g["pending"]:

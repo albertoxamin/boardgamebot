@@ -46,6 +46,7 @@ HELP = """🎴 <b>Boardgame bot</b>
 /regicide - co-op Regicide (also: -join -start -play <cards> -yield -discard <cards> -rules -cancel)
 /odin - card-shedding Odin (also: -join -start -play <cards> -pass -pickup <card> -score -cancel -rules)
 /spots - push-your-luck dog dice (also: -join -start -trick <tile> -place <die> <dog> <spot>|yard -reroll -score -cancel -rules)
+/games - list the games you can start (and what's running here)
 /lsd - dice game Let's Summon Demons (also: -join -start -roll -buy <n> -summon <demon> <sacrifices> -end -score -cancel -rules)
 Play: on your turn tap <b>Hit</b> to flip a card or <b>Stay</b> to bank.
 Duplicate number = bust (0 pts). 7 unique numbers = Flip 7 (+15), round ends.
@@ -1504,6 +1505,28 @@ def handle_command(state, msg):
                 _handler(state, msg, cmd, text, uid, name)
                 return
         # else fall through to the Flip 7 section below
+    if cmd == "/games":
+        _catalog = (
+            ("games", "🎴 Flip 7", "/newgame", "/join", "press-your-luck dice, first to 200"),
+            ("regicide", "⚔️ Regicide", "/regicide", "/regicide-join", "co-op vs 12 royals, private hands"),
+            ("odin", "🛡️ Odin", "/odin", "/odin-join", "card shedding, fewest points wins"),
+            ("lsd", "😈 Let's Summon Demons", "/lsd", "/lsd-join", "dice activations, 3 demons + 10 souls"),
+            ("spots", "🐶 Spots", "/spots", "/spots-join", "dog dice push-your-luck, 6 scored wins"),
+        )
+        lines = ["🎮 <b>Games you can start:</b>"]
+        for _key, _name, _new, _join, _desc in _catalog:
+            _g = state.get(_key, {}).get(str(chat_id))
+            if _g is None:
+                _st = "not started here"
+            elif _g["phase"] == "lobby":
+                _st = f"lobby ({len(_g['players'])} in) - {_join}"
+            elif _g["phase"] in ("game_end", "won", "lost"):
+                _st = "finished - start a new one"
+            else:
+                _st = "in progress"
+            lines.append(f"• {_name} — {_new} ({_desc}) · {_st}")
+        send(chat_id, "\n".join(lines))
+        return
     if cmd == "/cancel" and msg.get("reply_to_message"):
         # Reply-targeted cancel: cancels the one game whose board message
         # was replied to (searches every game type in this chat).

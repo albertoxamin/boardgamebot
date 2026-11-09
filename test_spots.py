@@ -123,6 +123,64 @@ def test_reroll_and_win():
     assert g["phase"] == "game_end" and g["winner"] == p["user_id"]
 
 
+
+def test_scavenge_and_search_finish():
+    g = mk(2)
+    idx = g["current_index"]
+    p = g["players"][idx]
+    p["yard"] = [5, 5]  # buried total 10: any die < 10 may be discarded
+    g["tiles"].append({"slug": "scavenge", "faceup": True, "treat_on": False})
+    g["tiles"].append({"slug": "search", "faceup": True, "treat_on": False})
+    assert S.choose_trick(g, idx, "scavenge", []) is None
+    assert g["pending"]["kind"] == "scavenge"
+    # discard one die, then done -> placement pending with the rest
+    assert S.apply_choice(g, idx, g["pending"]["options"][0], []) is None
+    assert S.apply_choice(g, idx, "done", []) is None
+    assert g["pending"]["kind"] == "place"
+    while g["trick"] and g["pending"] and g["pending"]["kind"] == "place":
+        assert S.do_place(g, idx, 0, ("yard",), []) is None
+    assert g["trick"] is None  # trick completed, turn advanced
+    # Search: place to 8 then Done via choice
+    idx2 = g["current_index"]
+    # Onto a dog (burying 8 would bust): Lil Beth spots [5,3]
+    lb = next(d for d in g["dog_deck"] if 3 in d["spots"] and 5 in d["spots"])
+    g["dog_deck"].remove(lb)
+    lb["placed"] = {}
+    g["players"][idx2]["dogs"] = [lb]
+    assert S.choose_trick(g, idx2, "search", []) is None
+    g["trick"]["dice"] = [3, 5, 2]
+    # place 3 + 5 = 8 exactly on the dog, then Done
+    i3 = lb["spots"].index(3); i5 = lb["spots"].index(5)
+    assert S.do_place(g, idx2, 0, ("dog", lb["iid"], i3), []) is None  # 3
+    assert S.do_place(g, idx2, 0, ("dog", lb["iid"], i5), []) is None  # 5
+    assert S.apply_choice(g, idx2, "done", []) is None
+    assert g["trick"] is None
+
+
+def test_autoscore_mid_pool_continues():
+    g = mk(2)
+    idx = g["current_index"]
+    p = g["players"][idx]
+    p["yard"] = [1]
+    peb = next(d for d in g["dog_deck"] if d["slug"] == "pebble")
+    g["dog_deck"].remove(peb)
+    peb["placed"] = {0: 1, 1: 3}  # pebble [1,3,4]
+    p["dogs"] = [peb]
+    assert S.choose_trick(g, idx, "walk", []) is None
+    g["trick"]["dice"] = [4, 2, 5]  # 3 dice pool (patched for the test)
+    g["pending"]["dice"] = None
+    # Place the 4 on Pebble -> completes the only dog -> auto-scores mid-pool
+    assert S.do_place(g, idx, 0, ("dog", peb["iid"], 2), []) is None
+    assert peb in p["scored"]
+    # Pool still has dice and trick is still alive (pending place)
+    assert g["trick"] is not None and g["pending"] and g["pending"]["kind"] == "place"
+    while g["trick"] and g["pending"] and g["pending"]["kind"] == "place":
+        assert S.do_place(g, idx, 0, ("yard",), []) is None
+    if g["pending"]:
+        assert S.apply_choice(g, idx, "done", []) is None
+    assert g["trick"] is None
+
+
 if __name__ == "__main__":
     for name, fn in sorted(list(globals().items())):
         if name.startswith("test_"):

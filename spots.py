@@ -279,8 +279,8 @@ def _incomplete_dogs(g, idx):
 
 # ---------------- Trick engine ----------------
 
-def _fresh_trick(slug):
-    return {"tile": slug, "step": 0, "dice": [], "placed_roll": 0,
+def _fresh_trick(slug, idx=0):
+    return {"tile": slug, "idx": idx, "step": 0, "dice": [], "placed_roll": 0,
             "rolled_steps": [], "opt_done": False, "repeat_done": False,
             "fetch_num": None, "guard_num": None, "bolt_left": None,
             "chase_n": 0, "pd_buried": None, "trot_stage": None,
@@ -304,7 +304,7 @@ def choose_trick(g, idx, slug, events):
         tile["treat_on"] = False
         _gain_treats(g, idx, 1, events)
         events.append(f"🦴 {g['players'][idx]['name']} takes the treat on {TILE_NAMES[slug]}!")
-    g["trick"] = _fresh_trick(slug)
+    g["trick"] = _fresh_trick(slug, idx)
     events.append(f"🎪 {g['players'][idx]['name']} chooses {TILE_NAMES[slug]}!")
     advance(g, events)
     return None
@@ -460,12 +460,6 @@ def _step_scavenge(g, events):
         t["placed_roll"] = 0
         g["pending"] = {"kind": "scavenge", "player": t["idx"],
                         "options": list(range(len(t["dice"])))}
-        return False
-    if t.get("scav_done") is None:
-        t["dice"] = list(t["scav_rolled"])
-        t["placed_roll"] = 0
-        g["pending"] = {"kind": "place", "player": t["idx"], "only_num": None,
-                        "hunt_limit": None, "search": False, "placed_sum": 0}
         return False
     return True
 
@@ -666,7 +660,8 @@ def do_place(g, idx, die_pos, target, events):
         t["pd_buried"] = die if was_buried else None
     if _check_bust(g, idx, events):
         return None
-    if _maybe_auto_score(g, idx, events):
+    _maybe_auto_score(g, idx, events)
+    if g["phase"] == "game_end":
         return None
     if pend.get("hunt_limit") is not None and t["placed_roll"] >= pend["hunt_limit"]:
         _place_done(g, events)
@@ -785,7 +780,9 @@ def apply_choice(g, idx, choice, events):
         if choice == "done":
             g["pending"] = None
             t["scav_done"] = True
-            advance(g, events)
+            t["placed_roll"] = 0
+            g["pending"] = {"kind": "place", "player": idx, "only_num": None,
+                            "hunt_limit": None, "search": False, "placed_sum": 0}
             return None
         i = choice
         if not (0 <= i < len(t["dice"])):
@@ -795,6 +792,10 @@ def apply_choice(g, idx, choice, events):
         _return_dice(g, 1)
         events.append(f"🗑 Discards a {t['dice'].pop(i)} (Scavenge).")
         pend["options"] = list(range(len(t["dice"])))
+        return None
+    if kind == "place" and choice == "done" and pend.get("search"):
+        _place_done(g, events)
+        advance(g, events)
         return None
     if kind == "trot":
         opt = choice

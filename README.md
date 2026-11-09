@@ -138,12 +138,12 @@ Rocket-Loader-transformed scripts. Three ways to offer it:
    rejects them in groups with `BUTTON_TYPE_INVALID`), so the bot sends a
    plain `url` button in groups/supergroups (opens the same page) and a
    `web_app` button in private chats.
-   **Live instance:** Cloudflare Tunnel `b9013c79-c72e-4aff-a908-75dcf33e011b`
-   (hostname `flip7.xamin.it` → `http://localhost:8080`, running via
-   `cloudflared tunnel run b9013c79-…` with `TUNNEL_TOKEN` in env) exposes
-   the game at **https://flip7.xamin.it/flip7.html** (verified via
-   `curl --resolve flip7.xamin.it:443:104.21.2.249`, since this host's DNS
-   returns only unreachable IPv6). `FLIP7_WEB_URL` is set in `.env`.
+    **Live instance:** a Cloudflare Tunnel (tunnel ID and `TUNNEL_TOKEN` in the
+    server's `.env`, never committed) forwards the tunnel hostname to
+    `http://localhost:8080`, exposing the game over HTTPS. `FLIP7_WEB_URL`
+    is set in `.env`. (Host this yourself: create a tunnel with
+    `cloudflared tunnel create`, point its hostname at `localhost:8080`,
+    and set `FLIP7_WEB_URL` to that HTTPS URL.)
 3. **Telegram HTML5 Game (legacy):** register a short name in @BotFather
    (`/newgame` → name/description/photo), host the HTML over HTTPS, set
    `FLIP7_GAME_URL=https://<tunnel>/flip7.html` and

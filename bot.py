@@ -2535,6 +2535,9 @@ def start_web_server(state):
                 chat_id = q.get("chat_id", [""])[0]
                 with STATE_LOCK:
                     g = spots_get(state, chat_id)
+                    if g and g.get("trick") and not g.get("pending"):
+                        SP.advance(g, [])  # self-heal a stranded trick
+                        save_state(state)
                     board = spots_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/lsd/mygames":

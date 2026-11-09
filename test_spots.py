@@ -83,7 +83,9 @@ def test_score_action_and_autoscore():
     burt["placed"] = {0: 1}
     p["dogs"].append(burt)
     p["scored"] = [peb]
-    g["trick"] = S._fresh_trick("walk")
+    g["current_index"] = idx
+    g["trick"] = S._fresh_trick("walk", idx)
+    g["trick"]["rolled_steps"] = {0}  # pretend the Walk roll already happened
     g["trick"]["dice"] = [1]
     g["pending"] = {"kind": "place", "player": idx, "only_num": None,
                     "hunt_limit": None, "search": False, "placed_sum": 0}
@@ -93,6 +95,15 @@ def test_score_action_and_autoscore():
     gum["placed"] = {0: 2, 1: 6}
     p["dogs"] = [gum]
     assert S.do_place(g, idx, 0, ("dog", gum["iid"], 2), []) is None
+    assert gum not in p["scored"] and S.dog_complete(gum)  # manual scoring only
+    # finish the trick, then score it as its own action
+    while g["trick"] and g["pending"] and g["pending"]["kind"] == "place":
+        assert S.do_place(g, idx, 0, ("yard",), []) is None
+    if g["pending"]:
+        assert S.apply_choice(g, idx, "done", []) is None
+    assert g["trick"] is None and g["current_index"] == 1 - idx
+    g["current_index"] = idx
+    assert S.score_action(g, idx, []) is None
     assert gum in p["scored"] and len(p["scored"]) == 2
 
 
@@ -171,10 +182,10 @@ def test_autoscore_mid_pool_continues():
     g["trick"]["dice"] = [4, 3, 3]  # 3 dice pool (patched for the test)
     p["treats"] = 0  # no reroll window: remaining dice auto-bury if unplaceable
     g["pending"]["dice"] = None
-    # Place the 4 on Pebble -> completes the only dog -> auto-scores mid-pool
+    # Place the 4 on Pebble -> completes the only dog; scoring is manual now,
+    # so the dog stays complete in the pack and the trick continues.
     assert S.do_place(g, idx, 0, ("dog", peb["iid"], 2), []) is None
-    assert peb in p["scored"]
-    # Trick is still alive (pool dice remain, or it moved to the THEN step)
+    assert peb not in p["scored"] and S.dog_complete(peb)
     assert g["trick"] is not None and g["pending"] is not None
     while g["trick"] and g["pending"] and g["pending"]["kind"] == "place":
         assert S.do_place(g, idx, 0, ("yard",), []) is None
@@ -189,3 +200,23 @@ if __name__ == "__main__":
             fn()
             print(f"PASS {name}")
     print("all spots tests passed")
+
+
+def test_auto_place():
+    g = mk(2)
+    idx = g["current_index"]
+    p = g["players"][idx]
+    p["treats"] = 0
+    peb = next(d for d in g["dog_deck"] if d["slug"] == "pebble")
+    g["dog_deck"].remove(peb)
+    peb["placed"] = {0: 1}
+    p["dogs"] = [peb]
+    assert S.choose_trick(g, idx, "walk", []) is None
+    g["trick"]["dice"] = [3, 4, 2, 6]
+    assert S.auto_place(g, idx, []) is None
+    assert peb["placed"] == {0: 1, 1: 3, 2: 4}
+    assert g["trick"]["dice"] == [2, 6]  # unplaceable dice stay in the pool
+    # Hunt/Search-style pools are excluded from auto-place
+    g["trick"]["dice"] = [3]
+    g["pending"]["hunt_limit"] = 2
+    assert S.auto_place(g, idx, []) == "auto-place is not available for this trick's dice"

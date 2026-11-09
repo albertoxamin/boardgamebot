@@ -721,7 +721,6 @@ def do_place(g, idx, die_pos, target, events):
         t["pd_buried"] = die if was_buried else None
     if _check_bust(g, idx, events):
         return None
-    _maybe_auto_score(g, idx, events)
     if g["phase"] == "game_end":
         return None
     if not _autobury(g, events):
@@ -764,6 +763,45 @@ def do_reroll(g, idx, indices, events):
                   f"{'some' if t['tile'] == 'track' else 'all'} dice for a treat: "
                   f"{', '.join(map(str, t['dice']))}.")
     pend["placed_sum"] = 0
+    return None
+
+
+def auto_place(g, idx, events):
+    """Greedily place every pool die that has a legal free spot (first dog
+    in pack order). Dice with no placement stay in the pool for manual
+    burying. Returns error or None."""
+    pend = g.get("pending")
+    if not pend or pend["kind"] != "place" or pend["player"] != idx:
+        return "no placement pending"
+    t = g["trick"]
+    p = g["players"][idx]
+    if pend.get("only_num") is not None or pend.get("search") or pend.get("hunt_limit") is not None:
+        return "auto-place is not available for this trick's dice"
+    placed_any = False
+    for die in list(t["dice"]):
+        spot = None
+        for d in p["dogs"]:
+            d.setdefault("placed", {})
+            for si, s in enumerate(d["spots"]):
+                if s == die and si not in d["placed"]:
+                    spot = (d, si)
+                    break
+            if spot:
+                break
+        if spot is None:
+            continue
+        d, si = spot
+        d["placed"][si] = die
+        t["dice"].remove(die)
+        t["placed_roll"] += 1
+        placed_any = True
+        events.append(f"🐾 {p['name']} auto-places {die} on {d['name']} "
+                      f"({len(d['placed'])}/{len(d['spots'])}).")
+    if not placed_any:
+        return "no dice in the pool fit your dogs"
+    if not t["dice"]:
+        _place_done(g, events)
+        advance(g, events)
     return None
 
 

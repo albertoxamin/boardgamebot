@@ -33,7 +33,7 @@ async function spMove(action,extra){
  let body=Object.assign({chat_id:SP.chat_id,action:action,init_data:SP.init},extra||{});
  let r=await spApi('/api/spots/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
  if(r.events)r.events.forEach(e=>spLog(e)); if(r.error)spLog('⛔ '+r.error);
- if(r.game){SP.board=r.game; SP.dieSel=null; SP.rerollSel=new Set(); spRender();}}
+ if(r.game){SP.board=r.game; SP.dieSel=(action==='place'&&r.game.trick&&r.game.trick.dice&&r.game.trick.dice.length)?0:null; SP.rerollSel=new Set(); spRender();}}
 function spRender(){let b=SP.board; if(!b)return;
  SP.spectating=b.is_player===false&&!(cur&&cur.npc);
  let me=b.players.find(p=>p.user_id===SP.user_id);
@@ -55,6 +55,8 @@ function spRender(){let b=SP.board; if(!b)return;
    let dice=(b.trick?b.trick.dice:[]);
    poolHtml='<div class="card" style="border-color:#f59e0b"><div class="small"><b>🎲 Dice to place:</b> tap a die, then tap a matching spot on a dog or your yard'+(b.trick&&b.trick.tile==='search'?' — place dice totalling exactly 8, then Done':'')+'</div><div>'
     + dice.map((v,i)=>'<span class="sdice'+(SP.dieSel===i?' sel':'')+'" data-i="'+i+'" title="die showing '+v+'" style="background-position:-'+((v-1)*40)+'px 0"></span>').join('')+'</div>'
+    + (SP.dieSel!==null&&dice[SP.dieSel]!==undefined&&me.yard.reduce((a,c)=>a+c,0)+dice[SP.dieSel]>7
+       ?'<div class="small" style="color:#fca5a5">⚠️ Burying this die busts you (yard '+me.yard.reduce((a,c)=>a+c,0)+' + '+dice[SP.dieSel]+' = '+(me.yard.reduce((a,c)=>a+c,0)+dice[SP.dieSel])+')</div>':'')
     + '<button class="lsdchoice" id="spBury">⛏ Bury selected die in yard</button>'
     + (me.treats>0?'<button class="lsdchoice" id="spReroll">🎲 Reroll'+(b.trick&&b.trick.tile==='track'?' selected':' all')+' (1 treat)</button>':'')
     + (b.trick&&b.trick.tile==='search'?'<button class="lsdchoice" id="spDone">✅ Done (discard rest)</button>':'')+'</div>';

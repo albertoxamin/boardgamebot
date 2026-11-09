@@ -13,6 +13,7 @@ import game as G
 import regicide as R
 import odin as O
 import lsd as D
+import spots as SP
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT_TOKEN", "")
 API = f"https://api.telegram.org/bot{TOKEN}" if TOKEN else ""
@@ -44,6 +45,7 @@ HELP = """🎴 <b>Boardgame bot</b>
 /score - show board &amp; scores   /rules - how to play   /cancel - creator cancels
 /regicide - co-op Regicide (also: -join -start -play <cards> -yield -discard <cards> -rules -cancel)
 /odin - card-shedding Odin (also: -join -start -play <cards> -pass -pickup <card> -score -cancel -rules)
+/spots - push-your-luck dog dice (also: -join -start -trick <tile> -place <die> <dog> <spot>|yard -reroll -score -cancel -rules)
 /lsd - dice game Let's Summon Demons (also: -join -start -roll -buy <n> -summon <demon> <sacrifices> -end -score -cancel -rules)
 Play: on your turn tap <b>Hit</b> to flip a card or <b>Stay</b> to bank.
 Duplicate number = bust (0 pts). 7 unique numbers = Flip 7 (+15), round ends.
@@ -136,23 +138,23 @@ def web_keyboard(chat_type="private", chat_id=None, game="flip7"):
     startapp=<game><chat_id> (no second BotFather app needed)."""
     if not WEB_URL:
         return None
-    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "lsd": "🎮 Play Summon Demons (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
+    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "lsd": "🎮 Play Summon Demons (HTML)", "spots": "🎮 Play Spots (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
     if chat_type in ("group", "supergroup", "channel"):
         if chat_id:
-            start = f"{game}{chat_id}" if game in ("regicide", "odin", "lsd") else str(chat_id)
+            start = f"{game}{chat_id}" if game in ("regicide", "odin", "lsd", "spots") else str(chat_id)
             url = f"https://t.me/flip7groupbot?startapp={start}"
         else:
             url = WEB_URL
         btn = {"text": label, "url": url}
     else:
-        url = WEB_URL + (f"?app={game}" if game in ("regicide", "odin", "lsd") else "")
+        url = WEB_URL + (f"?app={game}" if game in ("regicide", "odin", "lsd", "spots") else "")
         btn = {"text": label, "web_app": {"url": url}}
     return [[btn]]
 
 
 # ---------- State ----------
 def load_state():
-    s = {"games": {}, "regicide": {}, "odin": {}, "lsd": {}}
+    s = {"games": {}, "regicide": {}, "odin": {}, "lsd": {}, "spots": {}}
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE) as f:
@@ -163,6 +165,7 @@ def load_state():
     s.setdefault("regicide", {})  # migrate old state files
     s.setdefault("odin", {})
     s.setdefault("lsd", {})
+    s.setdefault("spots", {})
     return s
 
 
@@ -1103,6 +1106,274 @@ def handle_lsd(state, msg, cmd, text, uid, name):
     return True
 
 
+# ---------- Spots (push-your-luck dog dice) ----------
+SPOTS_RULES = """🐶 <b>Spots rules</b> (CMYK, 2-4 players): fill the spots on your dog cards to score them. First to 6 scored wins.
+Setup: 2 dog cards each (gray side up), 1 treat, 1 die buried in your yard. Highest opening die starts.
+On your turn either <b>do a trick</b> (choose a face-up trick tile, flip it down, follow its steps: roll dice, place each die on a matching open spot on your dogs or bury it in your yard; spend treats to reroll a whole roll before placing) or <b>score</b> all your completed dogs (needs at least 1 complete; flip them, draw replacements up to 6 total cards).
+Buried total over 7 = <b>bust</b>: all dice on your unscored dogs and in your yard are discarded, turn ends. Completing all your dogs mid-trick auto-scores them instantly.
+Dog cards are public. Trick set in play: Adoption Event (Howl, Roll Over, Walk, Run, Fetch, Beg)."""
+
+
+def spots_get(state, chat_id):
+    return state.setdefault("spots", {}).get(str(chat_id))
+
+
+def spots_board_text(g):
+    if g["phase"] == "lobby":
+        return (f"🐶 <b>Spots lobby</b> - {len(g['players'])} player(s). "
+                f"Friends: /spots-join, anyone: /spots-start")
+    if g["phase"] == "game_end":
+        w = SP.name_of(g, g["winner"])
+        scores = " · ".join(f"{p['name']} {len(p['scored'])}🏅" for p in g["players"])
+        return f"🏆 <b>{html.escape(w)} wins Spots!</b>\nScores: {scores}"
+    lines = ["🐶 <b>Spots</b> · Tricks: " + " ".join(
+        f"{SP.TILE_NAMES[t['slug']]}{'🦴' if t['treat_on'] else ''}" if t["faceup"] else f"[{SP.TILE_NAMES[t['slug']]}↓]"
+        for t in g["tiles"])]
+    if g.get("trick"):
+        t = g["trick"]
+        lines.append(f"🎪 Trick: {SP.TILE_NAMES[t['tile']]} · Dice to place: "
+                     f"{', '.join(map(str, t['dice'])) or '-'}")
+    for i, p in enumerate(g["players"]):
+        turn = " 👈" if i == g["current_index"] and g["phase"] == "playing" else ""
+        dogs = "; ".join(
+            f"{d['name']}[{','.join(str(s) for s in d['spots'])}]"
+            f"{'{'+','.join(str(v) for v in d.get('placed', {}).values())+'}' if d.get('placed') else ''}"
+            for d in p["dogs"])
+        lines.append(f"• {html.escape(p['name'])}: {len(p['scored'])}🏅 · {p['treats']}🦴 · "
+                     f"yard {p['yard']} = {SP.yard_total(p)} · dogs {dogs or '-'}{turn}")
+    if g["pending"]:
+        lines.append("⏳ Choice needed - tap a button below or use /spots-place.")
+    return "\n".join(lines)
+
+
+def spots_pending_options(g):
+    pend = g.get("pending")
+    if not pend:
+        return []
+    kind = pend["kind"]
+
+    def dog_label(iid):
+        for p in g["players"]:
+            d = next((d for d in p["dogs"] if d["iid"] == iid), None)
+            if d:
+                return d["name"]
+        return f"dog#{iid}"
+
+    def yard_label(o):
+        this = f"{g['players'][o['player']]['name']}'s yard die #{o['yard'] + 1}"
+        return this
+
+    if kind == "choose_number":
+        return [{"choice": n, "label": f"Number {n}"} for n in pend["options"]]
+    if kind == "optional_roll":
+        return [{"choice": "roll", "label": "🎲 Roll 1 more die"},
+                {"choice": "done", "label": "✅ Done"}]
+    if kind == "repeat":
+        return [{"choice": "repeat", "label": "🔁 Repeat this step"},
+                {"choice": "done", "label": "✅ Done"}]
+    if kind == "bolt_count":
+        return [{"choice": n, "label": f"{n} dice"} for n in pend["options"]]
+    if kind == "trot":
+        return [{"choice": o, "label": f"{dog_label(o['from_dog'])}♢{o['from_spot'] + 1} → "
+                 f"{dog_label(o['to_dog'])}♢{o['to_spot'] + 1}"} for o in pend["options"]]
+    if kind == "dig":
+        return [{"choice": o, "label": f"{yard_label(o)} {'+1' if o['delta'] > 0 else '-1'}"}
+                for o in pend["options"]] + [{"choice": "done", "label": "✅ Done"}]
+    if kind == "scavenge":
+        dice = (g.get("trick") or {}).get("dice", [])
+        return [{"choice": i, "label": f"Discard die #{i + 1}"
+                 + (f" ({dice[i]})" if i < len(dice) else "")} for i in pend["options"]] + \
+               [{"choice": "done", "label": "✅ Done discarding"}]
+    if kind == "dogpile_take":
+        opts = []
+        for o in pend["options"]:
+            if o["src"] == "yard":
+                opts.append({"choice": o, "label": yard_label(o)})
+            else:
+                opts.append({"choice": o, "label": f"{dog_label(o['dog'])} die"})
+        return opts
+    return []
+
+
+def spots_keyboard(g):
+    ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
+    wk = web_keyboard(ct, g["chat_id"], game="spots")
+    if g["phase"] == "lobby":
+        return [[{"text": "🙋 Join Spots", "callback_data": "spots:join"}]] + (wk or [])
+    kb = []
+    if g["pending"]:
+        kind = g["pending"]["kind"]
+        for o in spots_pending_options(g):
+            ch = o["choice"]
+            if kind == "trot":
+                data = f"spots:c:trot:{ch['from_dog']}:{ch['from_spot']}:{ch['to_dog']}:{ch['to_spot']}"
+            elif kind == "dig":
+                data = "spots:c:dig:done" if ch == "done" else f"spots:c:dig:{ch['player']}:{ch['yard']}:{ch['delta']}"
+            elif kind == "dogpile_take":
+                data = f"spots:c:dogpile_take:yard:{ch['yard']}" if ch["src"] == "yard" else f"spots:c:dogpile_take:dog:{ch['dog']}:{ch['spot']}"
+            else:
+                data = f"spots:c:{kind}:{ch}"
+            kb.append([{"text": o["label"][:60], "callback_data": data}])
+    elif g["phase"] == "playing" and not g["trick"]:
+        for t in g["tiles"]:
+            if t["faceup"]:
+                kb.append([{"text": f"🎪 {SP.TILE_NAMES[t['slug']]}{' 🦴' if t['treat_on'] else ''}",
+                            "callback_data": f"spots:trick:{t['slug']}"}])
+        kb.append([{"text": "🏅 Score dogs", "callback_data": "spots:score"}])
+    if wk:
+        kb.extend(wk)
+    return kb or None
+
+
+def spots_render(g, events=None):
+    chat_id = g["chat_id"]
+    if events is None:
+        events = []
+    lines = [html.escape(e) for e in events]
+    ping = None
+    if g["players"] and g["phase"] == "playing":
+        who = g["pending"]["player"] if g["pending"] else g["current_index"]
+        ping = f"👉 {spots_mention(g, g['players'][who]['user_id'])} - your turn"
+    if ping:
+        lines.append(ping)
+    text = "\n".join(lines + [spots_board_text(g)]) if lines else spots_board_text(g)
+    kb = spots_keyboard(g)
+    r = send(chat_id, text, kb)
+    if r.get("ok"):
+        old = g.get("board_message_id")
+        g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=chat_id, message_id=old)
+
+
+def spots_mention(g, user_id):
+    return f'<a href="tg://user?id={user_id}">{html.escape(SP.name_of(g, user_id))}</a>'
+
+
+def handle_spots(state, msg, cmd, text, uid, name):
+    chat_id = msg["chat"]["id"]
+    g = spots_get(state, chat_id)
+    if cmd == "/spots-rules":
+        send(chat_id, SPOTS_RULES)
+        return True
+    if cmd == "/spots":
+        if not g:
+            g = SP.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state.setdefault("spots", {})[str(chat_id)] = g
+            send(chat_id, "🐶 Spots game created! Friends: /spots-join, anyone: /spots-start")
+            spots_render(g)
+        else:
+            spots_render(g)
+        return True
+    if not g:
+        send(chat_id, "No Spots game here yet - send /spots to create one.")
+        return True
+    g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd == "/spots-join":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p["user_id"] == uid for p in g["players"]):
+            send(chat_id, "You're already in!")
+        elif len(g["players"]) >= 4:
+            send(chat_id, "⛔ Spots is 1-4 players (full).")
+        else:
+            g["players"].append({"user_id": uid, "name": msg.get("from", {}).get("first_name") or "Player",
+                                 "dogs": [], "scored": [], "yard": [], "treats": 1})
+            send(chat_id, f"🙋 <b>{name}</b> joined Spots ({len(g['players'])} players).")
+            spots_render(g)
+        return True
+    if cmd == "/spots-start":
+        if g["phase"] != "lobby":
+            send(chat_id, "Already started.")
+        elif len(g["players"]) < 2:
+            send(chat_id, "⛔ Need at least 2 players.")
+        else:
+            ev = []
+            err = SP.start_game(g, ev)
+            if err:
+                send(chat_id, f"⛔ {err}")
+            else:
+                spots_render(g, ev)
+        return True
+    if cmd == "/spots-cancel":
+        if uid != g["created_by"]:
+            send(chat_id, "⛔ Only the creator can cancel.")
+        else:
+            del state["spots"][str(chat_id)]
+            send(chat_id, "🗑 Spots game cancelled.")
+        return True
+    if cmd == "/spots-score":
+        idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == uid), None)
+        if idx is None:
+            send(chat_id, "⛔ You're not in this game - /spots-join in lobby.")
+            return True
+        ev = []
+        err = SP.score_action(g, idx, ev)
+        if err:
+            send(chat_id, f"⛔ {err}")
+        else:
+            spots_render(g, ev)
+        return True
+    if cmd.startswith("/spots-trick"):
+        idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == uid), None)
+        if idx is None:
+            send(chat_id, "⛔ You're not in this game - /spots-join in lobby.")
+            return True
+        parts = text.split()
+        if len(parts) != 2 or parts[1].lower() not in SP.ALL_TILES:
+            send(chat_id, "Usage: /spots-trick <tile> (e.g. walk, run, fetch, beg, howl, roll-over)")
+            return True
+        ev = []
+        err = SP.choose_trick(g, idx, parts[1].lower(), ev)
+        if err:
+            send(chat_id, f"⛔ {err}")
+        else:
+            spots_render(g, ev)
+        return True
+    if cmd.startswith("/spots-place"):
+        idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == uid), None)
+        if idx is None:
+            send(chat_id, "⛔ You're not in this game - /spots-join in lobby.")
+            return True
+        parts = text.split()
+        ev = []
+        err = None
+        if len(parts) == 3 and parts[2] == "yard" and parts[1].isdigit():
+            err = SP.do_place(g, idx, int(parts[1]) - 1, ("yard",), ev)
+        elif len(parts) == 5 and parts[1].isdigit():
+            dog = next((d for d in g["players"][idx]["dogs"] if d["slug"] == parts[3].lower()), None)
+            if dog is None or not parts[4].isdigit():
+                err = "usage: /spots-place <die#> <dog-slug> <spot#> | /spots-place <die#> yard"
+            else:
+                err = SP.do_place(g, idx, int(parts[1]) - 1, ("dog", dog["iid"], int(parts[4]) - 1), ev)
+        else:
+            err = "usage: /spots-place <die#> <dog-slug> <spot#> | /spots-place <die#> yard"
+        if err:
+            send(chat_id, f"⛔ {err}")
+        else:
+            spots_render(g, ev)
+        return True
+    if cmd.startswith("/spots-reroll"):
+        idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == uid), None)
+        if idx is None:
+            send(chat_id, "⛔ You're not in this game - /spots-join in lobby.")
+            return True
+        parts = text.split()[1:]
+        if parts and parts[0] == "all":
+            indices = None
+        else:
+            indices = [int(x) - 1 for x in parts if x.isdigit()] or None
+        ev = []
+        err = SP.do_reroll(g, idx, indices, ev)
+        if err:
+            send(chat_id, f"⛔ {err}")
+        else:
+            spots_render(g, ev)
+        return True
+    return False
+
+
 # ---------- Handlers ----------
 def get_game(state, chat_id):
     return state["games"].get(str(chat_id))
@@ -1144,8 +1415,8 @@ def handle_command(state, msg):
     if cmd.startswith("/lsd"):
         handle_lsd(state, msg, cmd, text, uid, name)
         return
-    if cmd.startswith("/lsd"):
-        handle_lsd(state, msg, cmd, text, uid, name)
+    if cmd.startswith("/spots"):
+        handle_spots(state, msg, cmd, text, uid, name)
         return
     if cmd in ("/start", "/help", "/commands"):
         send(chat_id, HELP)
@@ -1280,6 +1551,115 @@ def handle_callback(state, cb):
     data = cb.get("data", "")
     uid = cb.get("from", {}).get("id")
     chat_id = cb.get("message", {}).get("chat", {}).get("id")
+    if data.startswith("spots:"):
+        sp = spots_get(state, chat_id)
+        if not sp:
+            return answer_cb(cb["id"], "No Spots game here.")
+        parts = data.split(":")
+        idx = next((i for i, p in enumerate(sp["players"]) if p["user_id"] == uid), None)
+        ev = []
+        if parts == ["spots", "join"]:
+            if sp["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            if idx is not None:
+                return answer_cb(cb["id"], "Already in!")
+            sp["players"].append({"user_id": uid, "name": cb["from"].get("first_name") or "Player",
+                                  "dogs": [], "scored": [], "yard": [], "treats": 1})
+            answer_cb(cb["id"], "Joined!")
+            spots_render(sp, [f"🙋 {cb['from'].get('first_name')} joined Spots."])
+        elif len(parts) == 3 and parts[1] == "trick":
+            err = SP.choose_trick(sp, idx, parts[2], ev) if idx is not None else "not in game"
+            answer_cb(cb["id"], err or "Trick chosen")
+            if not err:
+                spots_render(sp, ev)
+        elif parts == ["spots", "score"]:
+            err = SP.score_action(sp, idx, ev) if idx is not None else "not in game"
+            answer_cb(cb["id"], err or "Scored")
+            if not err:
+                spots_render(sp, ev)
+        elif len(parts) >= 4 and parts[1] == "c":
+            pend = sp.get("pending")
+            if not pend or pend["player"] != idx:
+                return answer_cb(cb["id"], "No choice pending for you.")
+            kind = parts[2]
+            if kind in ("choose_number", "bolt_count"):
+                choice = int(parts[3])
+            elif kind in ("optional_roll", "repeat"):
+                choice = parts[3]
+            elif kind == "dig":
+                if parts[3] == "done":
+                    choice = "done"
+                else:
+                    choice = {"player": int(parts[3]), "yard": int(parts[4]), "delta": int(parts[5])}
+            elif kind == "trot":
+                choice = {"from_dog": int(parts[3]), "from_spot": int(parts[4]),
+                          "to_dog": int(parts[5]), "to_spot": int(parts[6])}
+            elif kind == "dogpile_take":
+                if parts[3] == "yard":
+                    choice = {"src": "yard", "yard": int(parts[4])}
+                else:
+                    choice = {"src": "dog", "dog": int(parts[4]), "spot": int(parts[5])}
+            else:
+                choice = parts[3]
+            err = SP.apply_choice(sp, idx, choice, ev)
+            answer_cb(cb["id"], err or "Done")
+            if not err:
+                spots_render(sp, ev)
+        else:
+            answer_cb(cb["id"], "Unknown button.")
+        return
+    if data.startswith("spots:"):
+        sp = spots_get(state, chat_id)
+        if not sp:
+            return answer_cb(cb["id"], "No Spots game here.")
+        parts = data.split(":")
+        idx = next((i for i, p in enumerate(sp["players"]) if p["user_id"] == uid), None)
+        ev = []
+        if parts == ["spots", "join"]:
+            if sp["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            if idx is not None:
+                return answer_cb(cb["id"], "Already in!")
+            sp["players"].append({"user_id": uid, "name": cb["from"].get("first_name") or "Player",
+                                  "dogs": [], "scored": [], "yard": [], "treats": 1})
+            answer_cb(cb["id"], "Joined!")
+            spots_render(sp, [f"🙋 {cb['from'].get('first_name')} joined Spots."])
+        elif len(parts) == 3 and parts[1] == "trick":
+            err = SP.choose_trick(sp, idx, parts[2], ev) if idx is not None else "not in game"
+            answer_cb(cb["id"], err or "Trick chosen")
+            if not err:
+                spots_render(sp, ev)
+        elif parts == ["spots", "score"]:
+            err = SP.score_action(sp, idx, ev) if idx is not None else "not in game"
+            answer_cb(cb["id"], err or "Scored")
+            if not err:
+                spots_render(sp, ev)
+        elif len(parts) >= 4 and parts[1] == "c":
+            pend = sp.get("pending")
+            if not pend or pend["player"] != idx:
+                return answer_cb(cb["id"], "No choice pending for you.")
+            kind = parts[2]
+            if kind in ("choose_number", "bolt_count"):
+                choice = int(parts[3])
+            elif kind in ("optional_roll", "repeat"):
+                choice = parts[3]
+            elif kind == "dig":
+                choice = "done" if parts[3] == "done" else {"player": int(parts[3]), "yard": int(parts[4]), "delta": int(parts[5])}
+            elif kind == "trot":
+                choice = {"from_dog": int(parts[3]), "from_spot": int(parts[4]), "to_dog": int(parts[5]), "to_spot": int(parts[6])}
+            elif kind == "dogpile_take":
+                choice = {"src": "yard", "yard": int(parts[4])} if parts[3] == "yard" else {"src": "dog", "dog": int(parts[4]), "spot": int(parts[5])}
+            elif kind == "scavenge":
+                choice = "done" if parts[3] == "done" else int(parts[3])
+            else:
+                choice = parts[3]
+            err = SP.apply_choice(sp, idx, choice, ev)
+            answer_cb(cb["id"], err or "Done")
+            if not err:
+                spots_render(sp, ev)
+        else:
+            answer_cb(cb["id"], "Unknown button.")
+        return
     if data.startswith("lsd:"):
         ls = lsd_get(state, chat_id)
         if not ls:
@@ -1824,6 +2204,96 @@ def lsd_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
+def spots_board_json(g, viewer_id=None):
+    """Spots board. Dogs/yards are public; is_player gates actions."""
+    me = next((p for p in g["players"] if p["user_id"] == viewer_id), None)
+    pend = g.get("pending")
+    pend_out = None
+    if pend:
+        pend_out = {"kind": pend["kind"], "player": pend["player"],
+                    "options_detail": spots_pending_options(g)}
+    trick = None
+    if g.get("trick"):
+        t = g["trick"]
+        trick = {"tile": t["tile"], "dice": t.get("dice", [])}
+    return {
+        "chat_id": g["chat_id"], "phase": g["phase"],
+        "current_index": g["current_index"], "created_by": g["created_by"],
+        "is_player": me is not None,
+        "tiles": g["tiles"], "dice_supply": g["dice_supply"],
+        "treat_supply": g["treat_supply"], "trick": trick,
+        "pending": pend_out, "winner": g.get("winner"),
+        "players": [{"user_id": p["user_id"], "name": p["name"], "treats": p["treats"],
+                     "yard": p["yard"], "dogs": p["dogs"], "scored": p["scored"]}
+                    for p in g["players"]],
+    }
+
+
+def spots_api_move(state, chat_id, user_id, body):
+    g = spots_get(state, chat_id)
+    if not g:
+        return [], "no spots game in that chat"
+    idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
+    action = body.get("action")
+    ev = []
+    if action == "join":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        if idx is not None:
+            return ev, None
+        if len(g["players"]) >= 4:
+            return [], "full"
+        iu_name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
+        g["players"].append({"user_id": user_id, "name": iu_name, "dogs": [],
+                             "scored": [], "yard": [], "treats": 1})
+        ev.append("🙋 joined Spots.")
+    elif action == "start":
+        if g["phase"] != "lobby":
+            return [], "already started"
+        err = SP.start_game(g, ev)
+        if err:
+            return [], err
+    elif action == "score":
+        if idx is None:
+            return [], "not in this game"
+        err = SP.score_action(g, idx, ev)
+        if err:
+            return [], err
+    elif action == "trick":
+        if idx is None:
+            return [], "not in this game"
+        err = SP.choose_trick(g, idx, str(body.get("tile", "")), ev)
+        if err:
+            return [], err
+    elif action == "place":
+        if idx is None:
+            return [], "not in this game"
+        tgt = body.get("target") or []
+        if not tgt:
+            return [], "bad target"
+        if tgt[0] == "yard":
+            target = ("yard",)
+        else:
+            target = ("dog", int(tgt[1]), int(tgt[2]))
+        err = SP.do_place(g, idx, int(body.get("die_pos", 0)), target, ev)
+        if err:
+            return [], err
+    elif action == "reroll":
+        if idx is None:
+            return [], "not in this game"
+        err = SP.do_reroll(g, idx, body.get("indices"), ev)
+        if err:
+            return [], err
+    elif action == "choice":
+        err = SP.apply_choice(g, idx, body.get("choice"), ev)
+        if err:
+            return [], err
+    else:
+        return [], "unknown action"
+    spots_render(g, ev)
+    return ev, None
+
+
 def start_web_server(state):
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -1861,6 +2331,12 @@ def start_web_server(state):
             if u.path == "/lsd.js":
                 p = os.path.join(os.path.dirname(JS_PATH), "lsd.js")
                 return self._send(200, open(p, "rb").read(), "text/javascript")
+            if u.path == "/spots.js":
+                p = os.path.join(os.path.dirname(JS_PATH), "spots.js")
+                return self._send(200, open(p, "rb").read(), "text/javascript")
+            if u.path in ("/spots-dogs.webp", "/spots-dogs-scored.webp"):
+                p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
+                return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
             if u.path.startswith("/lsd-cards/") and u.path.endswith(".jpg"):
                 p = os.path.join(os.path.dirname(JS_PATH), "lsd_cards", os.path.basename(u.path))
                 if os.path.exists(p):
@@ -1892,6 +2368,25 @@ def start_web_server(state):
                     games = [board_json(g, uid) for g in state["games"].values()
                              if any(p["user_id"] == uid for p in g["players"])]
                 return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/spots/mygames":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                with STATE_LOCK:
+                    games = [spots_board_json(g, uid) for g in state.get("spots", {}).values()
+                             if any(p["user_id"] == uid for p in g["players"])]
+                return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/spots/game":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                chat_id = q.get("chat_id", [""])[0]
+                with STATE_LOCK:
+                    g = spots_get(state, chat_id)
+                    board = spots_board_json(g, uid) if g else None
+                return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/lsd/mygames":
                 q = urllib.parse.parse_qs(u.query)
                 uid = verify_init_data(q.get("init_data", [""])[0])
@@ -1966,6 +2461,52 @@ def start_web_server(state):
 
         def do_POST(self):
             path = urllib.parse.urlparse(self.path).path
+            if path in ("/api/spots/create", "/api/spots/move"):
+                try:
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                except Exception:
+                    return self._send(400, {"ok": False, "error": "bad json"})
+                iu = init_user(body.get("init_data", ""))
+                if iu is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                uid, name, start_param, chat_instance = iu
+                if path == "/api/spots/create":
+                    chat_id = None
+                    for cand in (chat_instance, start_param, str(body.get("chat_id") or "")):
+                        cand = str(cand)
+                        if cand.startswith("spots"):
+                            cand = cand[len("spots"):]
+                        try:
+                            chat_id = int(cand)
+                            break
+                        except (TypeError, ValueError):
+                            continue
+                    if not chat_id:
+                        return self._send(400, {"ok": False, "error": "open the Mini App from a chat (startapp link)"})
+                    with STATE_LOCK:
+                        g = spots_get(state, chat_id)
+                        if g and g["phase"] != "game_end":
+                            return self._send(200, {"ok": True, "game": spots_board_json(g, uid), "created": False})
+                        g = SP.new_game(chat_id, uid, name)
+                        g["chat_type"] = "supergroup" if chat_id < 0 else "private"
+                        state.setdefault("spots", {})[str(chat_id)] = g
+                        spots_render(g, [f"🐶 Spots game created by {name} via Mini App!"])
+                        save_state(state)
+                        board = spots_board_json(g, uid)
+                    return self._send(200, {"ok": True, "game": board, "created": True})
+                chat_id = body.get("chat_id")
+                if not chat_id and start_param.startswith("spots"):
+                    try:
+                        chat_id = int(start_param[len("spots"):])
+                    except ValueError:
+                        pass
+                with STATE_LOCK:
+                    events, err = spots_api_move(state, chat_id, uid, body)
+                    g = spots_get(state, chat_id)
+                    board = spots_board_json(g, uid) if g else None
+                    save_state(state)
+                return self._send(200 if not err else 400,
+                                  {"ok": not err, "error": err, "events": events, "game": board})
             if path in ("/api/lsd/create", "/api/lsd/move"):
                 try:
                     body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))

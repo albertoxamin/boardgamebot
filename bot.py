@@ -1233,6 +1233,9 @@ def spots_pending_options(g):
         return this
 
     if kind == "choose_number":
+        if (g.get("trick") or {}).get("tile") == "fetch":
+            rolled = (g.get("trick") or {}).get("fetch_rolled") or []
+            return [{"choice": n, "label": f"Number {n} ×{rolled.count(n)}"} for n in pend["options"]]
         return [{"choice": n, "label": f"Number {n}"} for n in pend["options"]]
     if kind == "optional_roll":
         return [{"choice": "roll", "label": "🎲 Roll 1 more die"},

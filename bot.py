@@ -2485,7 +2485,7 @@ def start_web_server(state):
             if u.path.startswith("/spots-tiles/") and u.path.endswith(".jpg"):
                 p = os.path.join(os.path.dirname(JS_PATH), "spots_tiles", os.path.basename(u.path))
                 if os.path.exists(p):
-                    return self._send(200, open(p, "rb").read(), "image/jpeg", cache="public, max-age=86400")
+                    return self._send(200, open(p, "rb").read(), "image/jpeg", cache="no-store")
                 return self._send(404, {"ok": False})
             if u.path.startswith("/lsd-cards/") and u.path.endswith(".jpg"):
                 p = os.path.join(os.path.dirname(JS_PATH), "lsd_cards", os.path.basename(u.path))

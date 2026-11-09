@@ -43,7 +43,7 @@ function spRender(){let b=SP.board; if(!b)return;
  let seats=b.players.map((p,i)=>{
    let isTurn=b.current_index===i&&b.phase==='playing';
    return '<div class="lsdseat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score">'+p.scored.length+'🏅 · '+p.treats+'🦴</span></div>'
-    +'<div class="small">Yard: '+(p.yard.length?p.yard.join(' '):'—')+' = '+p.yard.reduce((a,c)=>a+c,0)+'</div>'
+    +'<div style="display:flex;gap:8px;align-items:flex-start"><div class="tyard" data-yard="'+i+'" style="background-position:-'+(i*84)+'px 0" title="yard (buried dice)"></div><div class="small">Yard: '+(p.yard.length?p.yard.join(' '):'—')+' = '+p.yard.reduce((a,c)=>a+c,0)+'</div></div>'
     + p.dogs.map(d=>'<div style="margin:4px 0">'+spDogImg(d,false)
       +'<div>'+d.spots.map((s,si)=>{let filled=(d.placed||{})[si]!==undefined;
         return '<span class="spotbox'+(filled?' filled':'')+'" data-dog="'+d.iid+'" data-spot="'+si+'">'+(filled?d.placed[si]:s)+'</span>';}).join('')+'</div></div>').join('')
@@ -79,6 +79,12 @@ function spRender(){let b=SP.board; if(!b)return;
    if(rrBtn)rrBtn.addEventListener('click',()=>spMove('reroll',{indices:b.trick&&b.trick.tile==='track'?[...SP.rerollSel]:null}));
    let dnBtn=document.getElementById('spDone');
    if(dnBtn)dnBtn.addEventListener('click',()=>spMove('choice',{choice:'done'}));
+   // yard tap = bury
+   document.querySelectorAll('#spotsBoard .tyard').forEach(el=>el.addEventListener('click',()=>{
+     if(parseInt(el.dataset.yard)!==b.players.indexOf(me))return; // only your own yard
+     if(SP.dieSel===null){spLog('Select a die first');return;}
+     spMove('place',{die_pos:SP.dieSel,target:['yard']});
+   }));
    // dog spot taps
    document.querySelectorAll('#spotsBoard .spotbox').forEach(el=>el.addEventListener('click',()=>{
      if(SP.dieSel===null){spLog('Select a die first');return;}

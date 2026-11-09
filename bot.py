@@ -1630,7 +1630,7 @@ def handle_command(state, msg):
             send(chat_id, "🤖 NPC joined - anyone can play for it!")
             render(g)
         return
-    send(chat_id, "Commands: /web /games /rules /cancel (reply to a board) - or tap the in-game buttons.")
+    send(chat_id, "Commands: /games /rules /cancel (reply to a board) - or use the in-game buttons.")
 
 
 def handle_callback(state, cb):

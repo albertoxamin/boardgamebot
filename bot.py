@@ -1535,7 +1535,20 @@ def handle_command(state, msg):
         send(chat_id, f"Your Telegram user_id is <code>{uid}</code> (for debugging; the HTML Mini App logs you in automatically).")
         return
     if cmd == "/rules":
-        send(chat_id, RULES)
+        # Context-aware rules: a reply to a board message shows that game's
+        # rules; otherwise show the rules of every game present in this chat
+        # (Flip 7 rules as the default when there are none).
+        _mid = (msg.get("reply_to_message") or {}).get("message_id") if msg.get("reply_to_message") else None
+        _by_key = (("games", RULES), ("regicide", REGICIDE_RULES), ("odin", ODIN_RULES),
+                   ("lsd", LSD_RULES), ("spots", SPOTS_RULES))
+        if _mid:
+            for _key, _rules in _by_key:
+                _gg = state.get(_key, {}).get(str(chat_id))
+                if _gg is not None and _gg.get("board_message_id") == _mid:
+                    send(chat_id, _rules)
+                    return
+        _present = [_rules for _key, _rules in _by_key if state.get(_key, {}).get(str(chat_id))]
+        send(chat_id, "\n\n".join(_present) if _present else RULES)
         return
     if cmd in ("/web", "/html"):
         if WEB_URL:

@@ -448,7 +448,7 @@ Play: single card, same-number combo ≤10, or Ace+one card. Jester alone: cance
 ♥ heal from discard under Tavern · ♦ draw · ♣ double damage · ♠ shield (cumulative).
 Enemy immune to its own suit. Kill exact → royal goes on Tavern top as ally (J=10/Q=15/K=20).
 Enemy attack: discard cards ≥ attack or team loses. Yield: skip (not if all just yielded).
-Win: defeat last King. Hands are private - only played cards are public (/regicide-play reveals only the played card)."""
+Win: defeat last King. Hands are private - only played cards are public (/regicide_play reveals only the played card)."""
 
 
 def rg_get(state, chat_id):
@@ -459,7 +459,7 @@ def rg_board_text(g):
     if g["phase"] == "lobby":
         names = ", ".join(html.escape(p["name"]) for p in g["players"])
         return (f"⚔️ <b>Regicide lobby</b> - {len(g['players'])}/4 players: {names}\n"
-                f"Anyone: /regicide-join, /regicide-start (needs 2+)")
+                f"Anyone: /regicide_join, /regicide_start (needs 2+)")
     e = g["enemy"]
     if e:
         atk, hp = R.enemy_stats(g)
@@ -571,7 +571,7 @@ def rg_take_cards(g, idx, cards):
 def handle_regicide(state, msg, cmd, text, uid, name):
     chat_id = msg["chat"]["id"]
     g = rg_get(state, chat_id)
-    if cmd == "/regicide-rules":
+    if cmd == "/regicide_rules":
         send(chat_id, REGICIDE_RULES)
         return True
     if cmd == "/regicide":
@@ -579,7 +579,7 @@ def handle_regicide(state, msg, cmd, text, uid, name):
             g = R.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
             g["chat_type"] = msg.get("chat", {}).get("type", "private")
             state.setdefault("regicide", {})[str(chat_id)] = g
-            send(chat_id, "⚔️ Regicide game created! Friends: /regicide-join, anyone: /regicide-start")
+            send(chat_id, "⚔️ Regicide game created! Friends: /regicide_join, anyone: /regicide_start")
             rg_render(g)
         else:
             rg_render(g)
@@ -588,7 +588,7 @@ def handle_regicide(state, msg, cmd, text, uid, name):
         send(chat_id, "No Regicide game here yet - send /regicide to create one.")
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
-    if cmd == "/regicide-join-npc":
+    if cmd == "/regicide_join_npc":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
         elif any(p.get("npc") for p in g["players"]):
@@ -600,7 +600,7 @@ def handle_regicide(state, msg, cmd, text, uid, name):
             send(chat_id, "🤖 NPC joined - anyone can play for it!")
             rg_render(g)
         return True
-    if cmd == "/regicide-join":
+    if cmd == "/regicide_join":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
         elif any(p["user_id"] == uid for p in g["players"]):
@@ -612,7 +612,7 @@ def handle_regicide(state, msg, cmd, text, uid, name):
             send(chat_id, f"🙋 <b>{name}</b> joined Regicide ({len(g['players'])} players).")
             rg_render(g)
         return True
-    if cmd == "/regicide-start":
+    if cmd == "/regicide_start":
         if g["phase"] != "lobby":
             send(chat_id, "Already started.")
         elif len(g["players"]) < 2:
@@ -625,23 +625,23 @@ def handle_regicide(state, msg, cmd, text, uid, name):
             else:
                 rg_render(g, ev)
         return True
-    if cmd == "/regicide-cancel":
+    if cmd == "/regicide_cancel":
         if uid != g["created_by"]:
             send(chat_id, "⛔ Only the creator can cancel.")
         else:
             del state["regicide"][str(chat_id)]
             send(chat_id, "🗑 Regicide game cancelled.")
         return True
-    if cmd in ("/regicide-play", "/regicide-discard", "/regicide-yield", "/regicide-score"):
+    if cmd in ("/regicide_play", "/regicide_discard", "/regicide_yield", "/regicide_score"):
         idx = _actor_idx(g, uid, g["current_index"])
         if idx is None:
-            send(chat_id, "⛔ You're not in this Regicide game - /regicide-join in lobby.")
+            send(chat_id, "⛔ You're not in this Regicide game - /regicide_join in lobby.")
             return True
         ev = []
-        if cmd == "/regicide-score":
+        if cmd == "/regicide_score":
             rg_render(g, ["📊 Regicide board:"])
             return True
-        if cmd == "/regicide-yield":
+        if cmd == "/regicide_yield":
             err = R.yield_turn(g, idx, ev)
             if err:
                 send(chat_id, f"⛔ {err}")
@@ -650,7 +650,7 @@ def handle_regicide(state, msg, cmd, text, uid, name):
             return True
         parts = text.split()[1:]
         if not parts:
-            send(chat_id, "Usage: /regicide-play 7h  (or 10s, A♠, joker) - played card becomes public; use Mini App for private selection.")
+            send(chat_id, "Usage: /regicide_play 7h  (or 10s, A♠, joker) - played card becomes public; use Mini App for private selection.")
             return True
         cards = [parse_card(t) for t in parts]
         if any(c is None for c in cards):
@@ -660,7 +660,7 @@ def handle_regicide(state, msg, cmd, text, uid, name):
         if err:
             send(chat_id, f"⛔ {err}")
             return True
-        if cmd == "/regicide-play":
+        if cmd == "/regicide_play":
             err = R.play_cards(g, idx, removed, ev)
         else:
             err = R.discard_cards(g, idx, removed, ev)
@@ -692,7 +692,7 @@ def odin_get(state, chat_id):
 def odin_board_text(g):
     if g["phase"] == "lobby":
         return (f"🛡️ <b>Odin lobby</b> - {len(g['players'])} player(s). "
-                f"Friends: /odin-join, anyone: /odin-start")
+                f"Friends: /odin_join, anyone: /odin_start")
     if g["phase"] == "game_end":
         w = ", ".join(g["players"][i]["name"] for i in g["winners"])
         scores = " · ".join(f"{p['name']} {p['score']}" for p in g["players"])
@@ -789,7 +789,7 @@ def odin_take_cards(g, idx, cards):
 def handle_odin(state, msg, cmd, text, uid, name):
     chat_id = msg["chat"]["id"]
     g = odin_get(state, chat_id)
-    if cmd == "/odin-rules":
+    if cmd == "/odin_rules":
         send(chat_id, ODIN_RULES)
         return True
     if cmd == "/odin":
@@ -797,7 +797,7 @@ def handle_odin(state, msg, cmd, text, uid, name):
             g = O.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
             g["chat_type"] = msg.get("chat", {}).get("type", "private")
             state.setdefault("odin", {})[str(chat_id)] = g
-            send(chat_id, "🛡️ Odin game created! Friends: /odin-join, anyone: /odin-start")
+            send(chat_id, "🛡️ Odin game created! Friends: /odin_join, anyone: /odin_start")
             odin_render(g)
         else:
             odin_render(g)
@@ -806,7 +806,7 @@ def handle_odin(state, msg, cmd, text, uid, name):
         send(chat_id, "No Odin game here yet - send /odin to create one.")
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
-    if cmd == "/odin-join-npc":
+    if cmd == "/odin_join_npc":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
         elif any(p.get("npc") for p in g["players"]):
@@ -818,7 +818,7 @@ def handle_odin(state, msg, cmd, text, uid, name):
             send(chat_id, "🤖 NPC joined - anyone can play for it!")
             odin_render(g)
         return True
-    if cmd == "/odin-join":
+    if cmd == "/odin_join":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
         elif any(p["user_id"] == uid for p in g["players"]):
@@ -830,7 +830,7 @@ def handle_odin(state, msg, cmd, text, uid, name):
             send(chat_id, f"🙋 <b>{name}</b> joined Odin ({len(g['players'])} players).")
             odin_render(g)
         return True
-    if cmd == "/odin-start":
+    if cmd == "/odin_start":
         if g["phase"] != "lobby":
             send(chat_id, "Already started.")
         elif len(g["players"]) < 2:
@@ -843,20 +843,20 @@ def handle_odin(state, msg, cmd, text, uid, name):
             else:
                 odin_render(g, ev)
         return True
-    if cmd == "/odin-cancel":
+    if cmd == "/odin_cancel":
         if uid != g["created_by"]:
             send(chat_id, "⛔ Only the creator can cancel.")
         else:
             del state["odin"][str(chat_id)]
             send(chat_id, "🗑 Odin game cancelled.")
         return True
-    if cmd == "/odin-score":
+    if cmd == "/odin_score":
         odin_render(g)
         return True
-    if cmd == "/odin-pass":
+    if cmd == "/odin_pass":
         idx = _actor_idx(g, uid, g["current_index"])
         if idx is None:
-            send(chat_id, "⛔ You're not in this Odin game - /odin-join in lobby.")
+            send(chat_id, "⛔ You're not in this Odin game - /odin_join in lobby.")
             return True
         ev = []
         err = O.pass_turn(g, idx, ev)
@@ -865,16 +865,16 @@ def handle_odin(state, msg, cmd, text, uid, name):
         else:
             odin_render(g, ev)
         return True
-    if cmd in ("/odin-play", "/odin-pickup"):
-        _ref = g["pickup_player"] if cmd == "/odin-pickup" and g.get("pickup_player") is not None else g["current_index"]
+    if cmd in ("/odin_play", "/odin_pickup"):
+        _ref = g["pickup_player"] if cmd == "/odin_pickup" and g.get("pickup_player") is not None else g["current_index"]
         idx = _actor_idx(g, uid, _ref)
         if idx is None:
-            send(chat_id, "⛔ You're not in this Odin game - /odin-join in lobby.")
+            send(chat_id, "⛔ You're not in this Odin game - /odin_join in lobby.")
             return True
         parts = text.split()[1:]
-        if cmd == "/odin-pickup":
+        if cmd == "/odin_pickup":
             if len(parts) != 1 or parse_odin_card(parts[0]) is None:
-                send(chat_id, "Usage: /odin-pickup 6b  (or tap a Take button)")
+                send(chat_id, "Usage: /odin_pickup 6b  (or tap a Take button)")
                 return True
             ev = []
             err = O.choose_pickup(g, idx, parse_odin_card(parts[0]), ev)
@@ -884,7 +884,7 @@ def handle_odin(state, msg, cmd, text, uid, name):
                 odin_render(g, ev)
             return True
         if not parts:
-            send(chat_id, "Usage: /odin-play 6b 3b  (cards you play; notation: number+colour letter, e.g. 6b = 6 blue)")
+            send(chat_id, "Usage: /odin_play 6b 3b  (cards you play; notation: number+colour letter, e.g. 6b = 6 blue)")
             return True
         cards = [parse_odin_card(t) for t in parts]
         if any(c is None for c in cards):
@@ -920,7 +920,7 @@ def lsd_get(state, chat_id):
 def lsd_board_text(g):
     if g["phase"] == "lobby":
         return (f"😈 <b>Let's Summon Demons lobby</b> - {len(g['players'])} player(s). "
-                f"Friends: /lsd-join, anyone: /lsd-start")
+                f"Friends: /lsd_join, anyone: /lsd_start")
     if g["phase"] == "game_end":
         w = D.name_of(g, g["winner"])
         scores = " · ".join(f"{p['name']} {p['souls']}👻/{len(p['demons'])}😈" for p in g["players"])
@@ -1066,7 +1066,7 @@ def _lsd_by_slug(g, idx, slug):
 def handle_lsd(state, msg, cmd, text, uid, name):
     chat_id = msg["chat"]["id"]
     g = lsd_get(state, chat_id)
-    if cmd == "/lsd-rules":
+    if cmd == "/lsd_rules":
         send(chat_id, LSD_RULES)
         return True
     if cmd == "/lsd":
@@ -1074,7 +1074,7 @@ def handle_lsd(state, msg, cmd, text, uid, name):
             g = D.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
             g["chat_type"] = msg.get("chat", {}).get("type", "private")
             state.setdefault("lsd", {})[str(chat_id)] = g
-            send(chat_id, "😈 Let's Summon Demons game created! Friends: /lsd-join, anyone: /lsd-start")
+            send(chat_id, "😈 Let's Summon Demons game created! Friends: /lsd_join, anyone: /lsd_start")
             lsd_render(g)
         else:
             lsd_render(g)
@@ -1083,7 +1083,7 @@ def handle_lsd(state, msg, cmd, text, uid, name):
         send(chat_id, "No Summon Demons game here yet - send /lsd to create one.")
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
-    if cmd == "/lsd-join-npc":
+    if cmd == "/lsd_join_npc":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
         elif any(p.get("npc") for p in g["players"]):
@@ -1096,7 +1096,7 @@ def handle_lsd(state, msg, cmd, text, uid, name):
             send(chat_id, "🤖 NPC joined - anyone can play for it!")
             lsd_render(g)
         return True
-    if cmd == "/lsd-join":
+    if cmd == "/lsd_join":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
         elif any(p["user_id"] == uid for p in g["players"]):
@@ -1109,7 +1109,7 @@ def handle_lsd(state, msg, cmd, text, uid, name):
             send(chat_id, f"🙋 <b>{name}</b> joined Let's Summon Demons ({len(g['players'])} players).")
             lsd_render(g)
         return True
-    if cmd == "/lsd-start":
+    if cmd == "/lsd_start":
         if g["phase"] != "lobby":
             send(chat_id, "Already started.")
         elif len(g["players"]) < 2:
@@ -1122,25 +1122,25 @@ def handle_lsd(state, msg, cmd, text, uid, name):
             else:
                 lsd_render(g, ev)
         return True
-    if cmd == "/lsd-cancel":
+    if cmd == "/lsd_cancel":
         if uid != g["created_by"]:
             send(chat_id, "⛔ Only the creator can cancel.")
         else:
             del state["lsd"][str(chat_id)]
             send(chat_id, "🗑 Summon Demons game cancelled.")
         return True
-    if cmd == "/lsd-score":
+    if cmd == "/lsd_score":
         lsd_render(g)
         return True
     _ref = g["pending"]["player"] if g.get("pending") else g["current_index"]
     idx = _actor_idx(g, uid, _ref)
     if idx is None:
-        send(chat_id, "⛔ You're not in this game - /lsd-join in lobby.")
+        send(chat_id, "⛔ You're not in this game - /lsd_join in lobby.")
         return True
     ev = []
-    if cmd == "/lsd-roll":
+    if cmd == "/lsd_roll":
         err = D.roll_dice(g, idx, ev)
-    elif cmd == "/lsd-end":
+    elif cmd == "/lsd_end":
         if g["pending"]:
             err = "resolve the pending choice first"
         elif not g["turn"]["rolled"]:
@@ -1148,16 +1148,16 @@ def handle_lsd(state, msg, cmd, text, uid, name):
         else:
             D.end_turn(g, ev)
             err = None
-    elif cmd.startswith("/lsd-buy"):
+    elif cmd.startswith("/lsd_buy"):
         parts = text.split()
         if len(parts) != 2 or not parts[1].isdigit() or not (1 <= int(parts[1]) <= len(g["market"])):
-            send(chat_id, "Usage: /lsd-buy <1-5> (market position)")
+            send(chat_id, "Usage: /lsd_buy <1-5> (market position)")
             return True
         err = D.buy_card(g, idx, g["market"][int(parts[1]) - 1]["iid"], ev)
-    elif cmd == "/lsd-summon":
+    elif cmd == "/lsd_summon":
         parts = text.split()[1:]
         if len(parts) < 2:
-            send(chat_id, "Usage: /lsd-summon <demon-slug> <sacrifice-slugs...> e.g. /lsd-summon porkus adam eve jane")
+            send(chat_id, "Usage: /lsd_summon <demon-slug> <sacrifice-slugs...> e.g. /lsd_summon porkus adam eve jane")
             return True
         demon = _lsd_by_slug(g, idx, parts[0].lower())
         if demon is None or demon["kind"] != "demon":
@@ -1195,7 +1195,7 @@ def spots_get(state, chat_id):
 def spots_board_text(g):
     if g["phase"] == "lobby":
         return (f"🐶 <b>Spots lobby</b> - {len(g['players'])} player(s). "
-                f"Friends: /spots-join, anyone: /spots-start")
+                f"Friends: /spots_join, anyone: /spots_start")
     if g["phase"] == "game_end":
         w = SP.name_of(g, g["winner"])
         scores = " · ".join(f"{p['name']} {len(p['scored'])}🏅" for p in g["players"])
@@ -1218,7 +1218,7 @@ def spots_board_text(g):
         lines.append(f"• {html.escape(p['name'])}: {len(p['scored'])}🏅 · {p['treats']}🦴 · "
                      f"yard {p['yard']} = {SP.yard_total(p)} · dogs {dogs or '-'}{turn}")
     if g["pending"]:
-        lines.append("⏳ Choice needed - tap a button below or use /spots-place.")
+        lines.append("⏳ Choice needed - tap a button below or use /spots_place.")
     return "\n".join(lines)
 
 
@@ -1336,7 +1336,7 @@ def spots_mention(g, user_id):
 def handle_spots(state, msg, cmd, text, uid, name):
     chat_id = msg["chat"]["id"]
     g = spots_get(state, chat_id)
-    if cmd == "/spots-rules":
+    if cmd == "/spots_rules":
         send(chat_id, SPOTS_RULES)
         return True
     if cmd == "/spots":
@@ -1344,7 +1344,7 @@ def handle_spots(state, msg, cmd, text, uid, name):
             g = SP.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
             g["chat_type"] = msg.get("chat", {}).get("type", "private")
             state.setdefault("spots", {})[str(chat_id)] = g
-            send(chat_id, "🐶 Spots game created! Friends: /spots-join, anyone: /spots-start")
+            send(chat_id, "🐶 Spots game created! Friends: /spots_join, anyone: /spots_start")
             spots_render(g)
         else:
             spots_render(g)
@@ -1353,7 +1353,7 @@ def handle_spots(state, msg, cmd, text, uid, name):
         send(chat_id, "No Spots game here yet - send /spots to create one.")
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
-    if cmd == "/spots-join-npc":
+    if cmd == "/spots_join_npc":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
         elif any(p.get("npc") for p in g["players"]):
@@ -1365,7 +1365,7 @@ def handle_spots(state, msg, cmd, text, uid, name):
             send(chat_id, "🤖 NPC joined - anyone can play for it!")
             spots_render(g)
         return True
-    if cmd == "/spots-join":
+    if cmd == "/spots_join":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
         elif any(p["user_id"] == uid for p in g["players"]):
@@ -1378,7 +1378,7 @@ def handle_spots(state, msg, cmd, text, uid, name):
             send(chat_id, f"🙋 <b>{name}</b> joined Spots ({len(g['players'])} players).")
             spots_render(g)
         return True
-    if cmd == "/spots-start":
+    if cmd == "/spots_start":
         if g["phase"] != "lobby":
             send(chat_id, "Already started.")
         elif len(g["players"]) < 2:
@@ -1391,18 +1391,18 @@ def handle_spots(state, msg, cmd, text, uid, name):
             else:
                 spots_render(g, ev)
         return True
-    if cmd == "/spots-cancel":
+    if cmd == "/spots_cancel":
         if uid != g["created_by"]:
             send(chat_id, "⛔ Only the creator can cancel.")
         else:
             del state["spots"][str(chat_id)]
             send(chat_id, "🗑 Spots game cancelled.")
         return True
-    if cmd == "/spots-score":
+    if cmd == "/spots_score":
         _ref = g["pending"]["player"] if g.get("pending") else g["current_index"]
         idx = _actor_idx(g, uid, _ref)
         if idx is None:
-            send(chat_id, "⛔ You're not in this game - /spots-join in lobby.")
+            send(chat_id, "⛔ You're not in this game - /spots_join in lobby.")
             return True
         ev = []
         err = SP.score_action(g, idx, ev)
@@ -1411,15 +1411,15 @@ def handle_spots(state, msg, cmd, text, uid, name):
         else:
             spots_render(g, ev)
         return True
-    if cmd.startswith("/spots-trick"):
+    if cmd.startswith("/spots_trick"):
         _ref = g["pending"]["player"] if g.get("pending") else g["current_index"]
         idx = _actor_idx(g, uid, _ref)
         if idx is None:
-            send(chat_id, "⛔ You're not in this game - /spots-join in lobby.")
+            send(chat_id, "⛔ You're not in this game - /spots_join in lobby.")
             return True
         parts = text.split()
         if len(parts) != 2 or parts[1].lower() not in SP.ALL_TILES:
-            send(chat_id, "Usage: /spots-trick <tile> (e.g. walk, run, fetch, beg, howl, roll-over)")
+            send(chat_id, "Usage: /spots_trick <tile> (e.g. walk, run, fetch, beg, howl, roll-over)")
             return True
         ev = []
         err = SP.choose_trick(g, idx, parts[1].lower(), ev)
@@ -1428,11 +1428,11 @@ def handle_spots(state, msg, cmd, text, uid, name):
         else:
             spots_render(g, ev)
         return True
-    if cmd.startswith("/spots-place"):
+    if cmd.startswith("/spots_place"):
         _ref = g["pending"]["player"] if g.get("pending") else g["current_index"]
         idx = _actor_idx(g, uid, _ref)
         if idx is None:
-            send(chat_id, "⛔ You're not in this game - /spots-join in lobby.")
+            send(chat_id, "⛔ You're not in this game - /spots_join in lobby.")
             return True
         parts = text.split()
         ev = []
@@ -1442,21 +1442,21 @@ def handle_spots(state, msg, cmd, text, uid, name):
         elif len(parts) == 5 and parts[1].isdigit():
             dog = next((d for d in g["players"][idx]["dogs"] if d["slug"] == parts[3].lower()), None)
             if dog is None or not parts[4].isdigit():
-                err = "usage: /spots-place <die#> <dog-slug> <spot#> | /spots-place <die#> yard"
+                err = "usage: /spots_place <die#> <dog-slug> <spot#> | /spots_place <die#> yard"
             else:
                 err = SP.do_place(g, idx, int(parts[1]) - 1, ("dog", dog["iid"], int(parts[4]) - 1), ev)
         else:
-            err = "usage: /spots-place <die#> <dog-slug> <spot#> | /spots-place <die#> yard"
+            err = "usage: /spots_place <die#> <dog-slug> <spot#> | /spots_place <die#> yard"
         if err:
             send(chat_id, f"⛔ {err}")
         else:
             spots_render(g, ev)
         return True
-    if cmd.startswith("/spots-reroll"):
+    if cmd.startswith("/spots_reroll"):
         _ref = g["pending"]["player"] if g.get("pending") else g["current_index"]
         idx = _actor_idx(g, uid, _ref)
         if idx is None:
-            send(chat_id, "⛔ You're not in this game - /spots-join in lobby.")
+            send(chat_id, "⛔ You're not in this game - /spots_join in lobby.")
             return True
         parts = text.split()[1:]
         if parts and parts[0] == "all":
@@ -1544,7 +1544,7 @@ def handle_command(state, msg):
     raw_cmd = text.split()[0]
     if "@" in raw_cmd and raw_cmd.split("@", 1)[1].lower() != "flip7groupbot":
         return
-    cmd = raw_cmd.split("@")[0].lower()
+    cmd = raw_cmd.split("@")[0].lower().replace("-", "_")  # Telegram links only [a-z0-9_]
     g = get_game(state, chat_id)
     if g:
         g["chat_type"] = msg.get("chat", {}).get("type", g.get("chat_type", "private"))
@@ -1552,10 +1552,10 @@ def handle_command(state, msg):
     if cmd == "/games":
         _catalog = (
             ("games", "🎴 Flip 7", "/newgame", "/join", "press-your-luck dice, first to 200"),
-            ("regicide", "⚔️ Regicide", "/regicide", "/regicide-join", "co-op vs 12 royals, private hands"),
-            ("odin", "🛡️ Odin", "/odin", "/odin-join", "card shedding, fewest points wins"),
-            ("lsd", "😈 Let's Summon Demons", "/lsd", "/lsd-join", "dice activations, 3 demons + 10 souls"),
-            ("spots", "🐶 Spots", "/spots", "/spots-join", "dog dice push-your-luck, 6 scored wins"),
+            ("regicide", "⚔️ Regicide", "/regicide", "/regicide_join", "co-op vs 12 royals, private hands"),
+            ("odin", "🛡️ Odin", "/odin", "/odin_join", "card shedding, fewest points wins"),
+            ("lsd", "😈 Let's Summon Demons", "/lsd", "/lsd_join", "dice activations, 3 demons + 10 souls"),
+            ("spots", "🐶 Spots", "/spots", "/spots_join", "dog dice push-your-luck, 6 scored wins"),
         )
         lines = ["🎮 <b>Games you can start:</b>"]
         for _key, _name, _new, _join, _desc in _catalog:
@@ -1656,7 +1656,7 @@ def handle_command(state, msg):
     if not g:
         send(chat_id, "No game here yet - send /newgame to create one. /rules for how to play.")
         return
-    if cmd in ("/join-npc", "/npc-join"):
+    if cmd in ("/join_npc", "/npc_join"):
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
         elif any(p.get("npc") for p in g["players"]):

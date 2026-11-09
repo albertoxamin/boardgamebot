@@ -156,9 +156,9 @@ Rocket-Loader-transformed scripts. Three ways to offer it:
 
 Co-op vs 12 royals (J 10/20, Q 15/30, K 20/40), 2–4 players, hand limit 7/6/5.
 Text commands (distinct from Flip 7): `/regicide` (create, also auto-creates from the
-Mini App), `/regicide-join`, `/regicide-start` (anyone), `/regicide-play 7h` (played card
-becomes public; combos/Ace-pairs/joker via Mini App private hand UI), `/regicide-yield`,
-`/regicide-discard 4s`, `/regicide-rules`, `/regicide-cancel` (creator). Hands are private:
+Mini App), `/regicide_join`, `/regicide_start` (anyone), `/regicide_play 7h` (played card
+becomes public; combos/Ace-pairs/joker via Mini App private hand UI), `/regicide_yield`,
+`/regicide_discard 4s`, `/regicide_rules`, `/regicide_cancel` (creator). Hands are private:
 boards show only hand counts, the API returns only *your* hand (`/api/regicide/mygames`,
 `/api/regicide/game`, `POST /api/regicide/move` + `/api/regicide/create`, initData-only).
 Mini App: Flip 7 board button = `?startapp=<chat>` (Flip 7 view), Regicide board button =

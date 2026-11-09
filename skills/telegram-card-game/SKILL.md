@@ -31,7 +31,7 @@ Distilled from Flip 7 + Regicide + Odin (`@flip7groupbot`). Use as a checklist t
 - Turn enforcement server-side: action buttons only work for `current_index` player; action-target buttons only for the chooser and only eligible targets. Any player may start (needs ≥2; official minimums noted in rules). `/cancel` stays creator-only.
 - **Public vs private info is a design decision per game.** Flip 7 is face-up, so the group board shows everyone's pile. Regicide hands are private: board text and the Mini App API must expose only the viewer's own hand plus other players' hand *counts* (a `*_board_json(g, viewer_id)` filter) — never serialise full state to the client or a group message.
 - Turn pings: on every new turn, ping the player with `<a href="tg://user?id=…">` in the *new* events message (edits are silent) and the board; add an HTML button row to the playing/action keyboards (Mini App link in groups, `web_app` in private) so actions can be done in the Mini App too.
-- Commands are namespaced per game (`/newgame /hit /stay` vs `/regicide /regicide-play …`), and each game's button opens the correct Mini App view (§4 router).
+- Commands are namespaced per game (`/newgame /hit /stay` vs `/regicide /regicide_play …`), and each game's button opens the correct Mini App view (§4 router).
 
 ## 4. HTML5 Mini App synced to live games (the hard part)
 

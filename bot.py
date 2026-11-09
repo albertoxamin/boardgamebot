@@ -1504,6 +1504,18 @@ def handle_command(state, msg):
                 _handler(state, msg, cmd, text, uid, name)
                 return
         # else fall through to the Flip 7 section below
+    if cmd == "/cancel" and msg.get("reply_to_message"):
+        # Reply-targeted cancel: cancels the one game whose board message
+        # was replied to (searches every game type in this chat).
+        _mid = msg["reply_to_message"].get("message_id")
+        for _key in ("games", "regicide", "odin", "lsd", "spots"):
+            _gg = state.get(_key, {}).get(str(chat_id))
+            if _gg is not None and _gg.get("board_message_id") == _mid:
+                del state[_key][str(chat_id)]
+                save_state(state)
+                send(chat_id, f"🗑 Game cancelled ({_key}).")
+                return
+        # No matching board message: fall through to the normal /cancel.
     if cmd.startswith("/regicide"):
         handle_regicide(state, msg, cmd, text, uid, name)
         return

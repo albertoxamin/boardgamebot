@@ -39,9 +39,9 @@ function summonCost(b){
   if((b.players[j].demons||[]).some(c=>c.eff==='baphometal')) return 4; }
  return 3;}
 function sdRender(){let b=SD.board; if(!b)return;
- SD.spectating=b.is_player===false;
+ SD.spectating=b.is_player===false&&!((b.players[b.current_index]||{}).npc)&&!((b.players[b.pending?b.pending.player:-1]||{}).npc);
  let me=b.players.find(p=>p.user_id===SD.user_id);
- let myTurn=(b.phase==='playing'&&b.players[b.current_index]&&b.players[b.current_index].user_id===SD.user_id&&!b.pending);
+ let cur=b.players[b.current_index]; let myTurn=(b.phase==='playing'&&cur&&(cur.user_id===SD.user_id||cur.npc)&&!b.pending);
  let cost=summonCost(b);
  let marketKeys=(b.market||[]).map(c=>c.iid), newMarket=sdNew(SD.prevMarket,marketKeys); SD.prevMarket=marketKeys;
  let market='<div class="small"><b>THE BLOCK</b> (buy for 3 👻) · Supply '+b.supply+'</div><div class="lsdrow">'

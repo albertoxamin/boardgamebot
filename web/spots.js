@@ -35,11 +35,11 @@ async function spMove(action,extra){
  if(r.events)r.events.forEach(e=>spLog(e)); if(r.error)spLog('⛔ '+r.error);
  if(r.game){SP.board=r.game; SP.dieSel=null; SP.rerollSel=new Set(); spRender();}}
 function spRender(){let b=SP.board; if(!b)return;
- SP.spectating=b.is_player===false;
+ SP.spectating=b.is_player===false&&!(cur&&cur.npc);
  let me=b.players.find(p=>p.user_id===SP.user_id);
- let myTurn=(b.phase==='playing'&&b.players[b.current_index]&&b.players[b.current_index].user_id===SP.user_id&&!b.pending);
- let tiles='<div class="small"><b>Trick tiles</b></div><div>'
-  + b.tiles.map(t=>'<span class="tiley'+(t.faceup?'':' tilety')+'">'+escapeHtml(t.slug)+(t.treat_on?' 🦴':'')+'</span>').join('') + '</div>';
+ let cur=b.players[b.current_index]; let myTurn=(b.phase==='playing'&&cur&&(cur.user_id===SP.user_id||cur.npc)&&!b.pending);
+ let tiles='<div class="small"><b>Trick tiles</b> (tap one to do it — the card shows its steps)</div><div>'
+  + b.tiles.map(t=>'<span class="tiley'+(t.faceup?'':' tilety')+'" data-slug="'+t.slug+'" title="'+escapeHtml(t.slug)+'"><img src="spots-tiles/'+t.slug+'.jpg" alt="'+escapeHtml(t.slug)+'">'+(t.treat_on?'<div>🦴</div>':'')+'</span>').join('') + '</div>';
  let seats=b.players.map((p,i)=>{
    let isTurn=b.current_index===i&&b.phase==='playing';
    return '<div class="lsdseat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score">'+p.scored.length+'🏅 · '+p.treats+'🦴</span></div>'
@@ -55,7 +55,7 @@ function spRender(){let b=SP.board; if(!b)return;
  // Trick tiles tap (choose a trick)
  if(myTurn && !b.trick){
    document.querySelectorAll('#spotsBoard .tiley').forEach(el=>{
-     if(!el.classList.contains('tilety')) el.addEventListener('click',()=>spMove('trick',{tile:el.textContent.replace(' 🦴','').toLowerCase().replace(/ /g,'-')}));
+     if(!el.classList.contains('tilety')) el.addEventListener('click',()=>spMove('trick',{tile:el.dataset.slug}));
    });
  }
  // Dice pool (placement pending)
@@ -64,11 +64,11 @@ function spRender(){let b=SP.board; if(!b)return;
  if(pend&&pend.kind==='place'&&me&&b.current_index===b.players.indexOf(me)){
    let dice=(b.trick?b.trick.dice:[]);
     pool.innerHTML='<div class="small"><b>Dice to place:</b> tap a die, then tap a matching spot or your yard'+(b.trick&&b.trick.tile==='search'?' — place dice totalling exactly 8, then use Done below':'')+'</div><div>'
-     + dice.map((v,i)=>'<span class="spotsdie'+(SP.dieSel===i?' sel':'')+'" data-i="'+i+'">'+v+'</span>').join('')+'</div>'
+     + dice.map((v,i)=>'<span class="sdice'+(SP.dieSel===i?' sel':'')+'" data-i="'+i+'" title="die showing '+v+'" style="background-position:-'+((v-1)*40)+'px 0"></span>').join('')+'</div>'
      + '<button class="lsdchoice" id="spBury">⛏ Bury selected die in yard</button>'
      + (me.treats>0?'<button class="lsdchoice" id="spReroll">🎲 Reroll'+(b.trick&&b.trick.tile==='track'?' selected':' all')+' (1 treat)</button>':'')
      + (b.trick&&b.trick.tile==='search'?'<button class="lsdchoice" id="spDone">✅ Done (discard rest)</button>':'');
-   pool.querySelectorAll('.spotsdie').forEach(el=>el.addEventListener('click',()=>{
+   pool.querySelectorAll('.sdice').forEach(el=>el.addEventListener('click',()=>{
      let i=parseInt(el.dataset.i);
      if(b.trick&&b.trick.tile==='track'){SP.rerollSel.has(i)?SP.rerollSel.delete(i):SP.rerollSel.add(i); el.classList.toggle('sel');}
      else {SP.dieSel=SP.dieSel===i?null:i; spRender();}

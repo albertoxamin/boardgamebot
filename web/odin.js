@@ -40,7 +40,7 @@ async function odMove(action,extra){
  if(r.events)r.events.forEach(e=>odLog(e)); if(r.error)odLog('⛔ '+r.error);
  if(r.game){OD.board=r.game; OD.selected=[]; OD.pickupSel=null; odRender();}}
 function odRender(){let b=OD.board; if(!b)return;
- OD.spectating=b.is_player===false;
+ OD.spectating=b.is_player===false&&!((b.players[b.current_index]||{}).npc)&&!((b.players[b.pickup_player]||{}).npc);
  let tableKeys=(b.table||[]).map(c=>c.rank+c.suit), newTable=odNew(OD.prevTable,tableKeys); OD.prevTable=tableKeys;
  let tableHtml=b.table&&b.table.length
   ? '<div class="odtable">'+b.table.map((c,i)=>odCard(c,false,newTable.has(i)?'card-in':'',true)).join('')
@@ -67,8 +67,8 @@ function odRender(){let b=OD.board; if(!b)return;
    let k=el.dataset.rank+el.dataset.suit;
    if(OD.selected.includes(k)) OD.selected=OD.selected.filter(x=>x!==k); else OD.selected.push(k); odRenderHandOnly();}));
  odPreview();
- let myTurn=(b.phase==='playing'&&b.players[b.current_index]&&b.players[b.current_index].user_id===OD.user_id);
- let myPickup=(b.phase==='pickup'&&b.pickup_player!==null&&b.players[b.pickup_player]&&b.players[b.pickup_player].user_id===OD.user_id);
+ let cur=b.players[b.current_index]; let myTurn=(b.phase==='playing'&&cur&&(cur.user_id===OD.user_id||cur.npc));
+ let myPickup=(b.phase==='pickup'&&b.pickup_player!==null&&b.players[b.pickup_player]&&(b.players[b.pickup_player].user_id===OD.user_id||b.players[b.pickup_player].npc));
  document.getElementById('odPlay').classList.toggle('hidden',!myTurn);
  document.getElementById('odPass').classList.toggle('hidden',!(myTurn&&b.table&&b.table.length));
  document.getElementById('odPickup').classList.toggle('hidden',!myPickup);

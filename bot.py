@@ -179,6 +179,21 @@ def save_state(state):
     os.replace(tmp, STATE_FILE)
 
 
+NPC_ID = -1  # sentinel Telegram user_id for the mock NPC player
+
+
+def _npc_player():
+    return {"user_id": NPC_ID, "name": "🤖 NPC", "npc": True}
+
+
+def _actor_idx(g, user_id, ref):
+    """Index to act as: your own, or the reference player's if it is the
+    NPC (anyone may control the NPC)."""
+    if g["players"][ref].get("npc"):
+        return ref
+    return next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
+
+
 # ---------- Orchestration (loops until a human must act) ----------
 def end_turn(g, events):
     nxt = G.next_active(g, g["current_index"] + 1)
@@ -330,9 +345,14 @@ def turn_ping(g):
     """Who must act now (action chooser, else current player), or None."""
     if g["pending_action"]:
         uid = g["pending_action"]["chooser_id"]
+        cp = next((p for p in g["players"] if p["user_id"] == uid), None)
+        if cp and cp.get("npc"):
+            return f"❓ 🤖 NPC chooses who gets <b>{g['pending_action']['action']}</b> - anyone can tap!"
         return f"❓ {mention(g, uid)} - choose who gets <b>{g['pending_action']['action']}</b>"
     if g["phase"] == "playing":
         p = g["players"][g["current_index"]]
+        if p.get("npc"):
+            return "👉 🤖 NPC's turn - anyone can play for it: Hit or Stay?"
         return f"👉 {mention(g, p['user_id'])} - your turn: Hit or Stay?"
     return None
 
@@ -492,11 +512,14 @@ def rg_render(g, events=None):
     ping = None
     if g["phase"] in ("playing", "discard") and g["players"]:
         p = g["players"][g["current_index"]]
-        ping = f"👉 {mention_rg(g, p['user_id'])} - your turn"
-        if g["phase"] == "discard":
+        ping = ("👉 🤖 NPC's turn - anyone can play for it!"
+                if p.get("npc") else f"👉 {mention_rg(g, p['user_id'])} - your turn")
+        if g["phase"] == "discard" and not p.get("npc"):
             ping += f" (discard ≥{g.get('discard_needed', 0)}, done {g.get('discard_total', 0)})"
     if g["phase"] == "jester_next" and g.get("jester_player") is not None:
-        ping = f"🎯 {mention_rg(g, g['players'][g['jester_player']]['user_id'])} - pick who goes next"
+        _jp = g['players'][g['jester_player']]
+        ping = ("🎯 🤖 NPC picks who goes next - anyone can tap!"
+                if _jp.get("npc") else f"🎯 {mention_rg(g, _jp['user_id'])} - pick who goes next")
     if ping:
         lines.append(ping)
     text = "\n".join(lines + [rg_board_text(g)]) if lines else rg_board_text(g)
@@ -562,6 +585,18 @@ def handle_regicide(state, msg, cmd, text, uid, name):
         send(chat_id, "No Regicide game here yet - send /regicide to create one.")
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd in ("/join-npc", "/npc-join"):
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p.get("npc") for p in g["players"]):
+            send(chat_id, "🤖 NPC is already in this game.")
+        elif len(g["players"]) >= 4:
+            send(chat_id, "⛔ Regicide is 2-4 players (full).")
+        else:
+            g["players"].append({**_npc_player(), "hand": []})
+            send(chat_id, "🤖 NPC joined - anyone can play for it!")
+            rg_render(g)
+        return True
     if cmd == "/regicide-join":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
@@ -595,7 +630,7 @@ def handle_regicide(state, msg, cmd, text, uid, name):
             send(chat_id, "🗑 Regicide game cancelled.")
         return True
     if cmd in ("/regicide-play", "/regicide-discard", "/regicide-yield", "/regicide-score"):
-        idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == uid), None)
+        idx = _actor_idx(g, uid, g["current_index"])
         if idx is None:
             send(chat_id, "⛔ You're not in this Regicide game - /regicide-join in lobby.")
             return True
@@ -700,8 +735,9 @@ def odin_render(g, events=None):
     if g["players"] and g["phase"] in ("playing", "pickup"):
         who = g["pickup_player"] if g["phase"] == "pickup" else g["current_index"]
         p = g["players"][who]
-        ping = f"👉 {odin_mention(g, p['user_id'])} - " + (
-            "take 1 card from the previous set" if g["phase"] == "pickup" else "your turn")
+        ping = ("👉 🤖 NPC to move - anyone can play for it!" if p.get("npc")
+                else f"👉 {odin_mention(g, p['user_id'])} - " + (
+            "take 1 card from the previous set" if g["phase"] == "pickup" else "your turn"))
     if ping:
         lines.append(ping)
     text = "\n".join(lines + [odin_board_text(g)]) if lines else odin_board_text(g)
@@ -765,6 +801,18 @@ def handle_odin(state, msg, cmd, text, uid, name):
         send(chat_id, "No Odin game here yet - send /odin to create one.")
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd in ("/join-npc", "/npc-join"):
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p.get("npc") for p in g["players"]):
+            send(chat_id, "🤖 NPC is already in this game.")
+        elif len(g["players"]) >= 6:
+            send(chat_id, "⛔ Odin is 2-6 players (full).")
+        else:
+            g["players"].append({**_npc_player(), "hand": [], "score": 0})
+            send(chat_id, "🤖 NPC joined - anyone can play for it!")
+            odin_render(g)
+        return True
     if cmd == "/odin-join":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
@@ -801,7 +849,7 @@ def handle_odin(state, msg, cmd, text, uid, name):
         odin_render(g)
         return True
     if cmd == "/odin-pass":
-        idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == uid), None)
+        idx = _actor_idx(g, uid, g["current_index"])
         if idx is None:
             send(chat_id, "⛔ You're not in this Odin game - /odin-join in lobby.")
             return True
@@ -813,7 +861,8 @@ def handle_odin(state, msg, cmd, text, uid, name):
             odin_render(g, ev)
         return True
     if cmd in ("/odin-play", "/odin-pickup"):
-        idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == uid), None)
+        _ref = g["pickup_player"] if cmd == "/odin-pickup" and g.get("pickup_player") is not None else g["current_index"]
+        idx = _actor_idx(g, uid, _ref)
         if idx is None:
             send(chat_id, "⛔ You're not in this Odin game - /odin-join in lobby.")
             return True
@@ -975,10 +1024,14 @@ def lsd_render(g, events=None):
     if g["players"] and g["phase"] == "playing":
         if g["pending"]:
             who = g["pending"]["player"]
-            ping = f"👉 {lsd_mention(g, g['players'][who]['user_id'])} - make the choice shown below"
+            _pp = g["players"][who]
+            ping = ("👉 🤖 NPC to choose - anyone can tap below!"
+                    if _pp.get("npc") else f"👉 {lsd_mention(g, _pp['user_id'])} - make the choice shown below")
         else:
             who = g["current_index"]
-            ping = f"👉 {lsd_mention(g, g['players'][who]['user_id'])} - your turn (roll, buy, summon, end)"
+            _cp = g["players"][who]
+            ping = ("👉 🤖 NPC's turn - anyone can play for it!"
+                    if _cp.get("npc") else f"👉 {lsd_mention(g, _cp['user_id'])} - your turn (roll, buy, summon, end)")
     if ping:
         lines.append(ping)
     text = "\n".join(lines + [lsd_board_text(g)]) if lines else lsd_board_text(g)
@@ -1023,6 +1076,19 @@ def handle_lsd(state, msg, cmd, text, uid, name):
         send(chat_id, "No Summon Demons game here yet - send /lsd to create one.")
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd in ("/join-npc", "/npc-join"):
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p.get("npc") for p in g["players"]):
+            send(chat_id, "🤖 NPC is already in this game.")
+        elif len(g["players"]) >= 5:
+            send(chat_id, "⛔ Let's Summon Demons is 2-5 players (full).")
+        else:
+            g["players"].append({**_npc_player(), "souls": 5, "candle": None,
+                                 "in_play": [], "demons": [], "demon_hand": []})
+            send(chat_id, "🤖 NPC joined - anyone can play for it!")
+            lsd_render(g)
+        return True
     if cmd == "/lsd-join":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
@@ -1059,7 +1125,8 @@ def handle_lsd(state, msg, cmd, text, uid, name):
     if cmd == "/lsd-score":
         lsd_render(g)
         return True
-    idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == uid), None)
+    _ref = g["pending"]["player"] if g.get("pending") else g["current_index"]
+    idx = _actor_idx(g, uid, _ref)
     if idx is None:
         send(chat_id, "⛔ You're not in this game - /lsd-join in lobby.")
         return True
@@ -1233,7 +1300,9 @@ def spots_render(g, events=None):
     ping = None
     if g["players"] and g["phase"] == "playing":
         who = g["pending"]["player"] if g["pending"] else g["current_index"]
-        ping = f"👉 {spots_mention(g, g['players'][who]['user_id'])} - your turn"
+        _pp = g["players"][who]
+        ping = ("👉 🤖 NPC to move - anyone can play for it!"
+                if _pp.get("npc") else f"👉 {spots_mention(g, _pp['user_id'])} - your turn")
     if ping:
         lines.append(ping)
     text = "\n".join(lines + [spots_board_text(g)]) if lines else spots_board_text(g)
@@ -1270,6 +1339,18 @@ def handle_spots(state, msg, cmd, text, uid, name):
         send(chat_id, "No Spots game here yet - send /spots to create one.")
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd in ("/join-npc", "/npc-join"):
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p.get("npc") for p in g["players"]):
+            send(chat_id, "🤖 NPC is already in this game.")
+        elif len(g["players"]) >= 4:
+            send(chat_id, "⛔ Spots is 1-4 players (full).")
+        else:
+            g["players"].append({**_npc_player(), "dogs": [], "scored": [], "yard": [], "treats": 1})
+            send(chat_id, "🤖 NPC joined - anyone can play for it!")
+            spots_render(g)
+        return True
     if cmd == "/spots-join":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
@@ -1304,7 +1385,8 @@ def handle_spots(state, msg, cmd, text, uid, name):
             send(chat_id, "🗑 Spots game cancelled.")
         return True
     if cmd == "/spots-score":
-        idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == uid), None)
+        _ref = g["pending"]["player"] if g.get("pending") else g["current_index"]
+        idx = _actor_idx(g, uid, _ref)
         if idx is None:
             send(chat_id, "⛔ You're not in this game - /spots-join in lobby.")
             return True
@@ -1316,7 +1398,8 @@ def handle_spots(state, msg, cmd, text, uid, name):
             spots_render(g, ev)
         return True
     if cmd.startswith("/spots-trick"):
-        idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == uid), None)
+        _ref = g["pending"]["player"] if g.get("pending") else g["current_index"]
+        idx = _actor_idx(g, uid, _ref)
         if idx is None:
             send(chat_id, "⛔ You're not in this game - /spots-join in lobby.")
             return True
@@ -1332,7 +1415,8 @@ def handle_spots(state, msg, cmd, text, uid, name):
             spots_render(g, ev)
         return True
     if cmd.startswith("/spots-place"):
-        idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == uid), None)
+        _ref = g["pending"]["player"] if g.get("pending") else g["current_index"]
+        idx = _actor_idx(g, uid, _ref)
         if idx is None:
             send(chat_id, "⛔ You're not in this game - /spots-join in lobby.")
             return True
@@ -1355,7 +1439,8 @@ def handle_spots(state, msg, cmd, text, uid, name):
             spots_render(g, ev)
         return True
     if cmd.startswith("/spots-reroll"):
-        idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == uid), None)
+        _ref = g["pending"]["player"] if g.get("pending") else g["current_index"]
+        idx = _actor_idx(g, uid, _ref)
         if idx is None:
             send(chat_id, "⛔ You're not in this game - /spots-join in lobby.")
             return True
@@ -1406,6 +1491,14 @@ def handle_command(state, msg):
     if g:
         g["chat_type"] = msg.get("chat", {}).get("type", g.get("chat_type", "private"))
 
+    if cmd in ("/join-npc", "/npc-join"):
+        for _getter, _handler in ((rg_get, handle_regicide), (odin_get, handle_odin),
+                                  (lsd_get, handle_lsd), (spots_get, handle_spots)):
+            _gg = _getter(state, chat_id)
+            if _gg and _gg["phase"] == "lobby":
+                _handler(state, msg, cmd, text, uid, name)
+                return
+        # else fall through to the Flip 7 section below
     if cmd.startswith("/regicide"):
         handle_regicide(state, msg, cmd, text, uid, name)
         return
@@ -1466,6 +1559,20 @@ def handle_command(state, msg):
     if not g:
         send(chat_id, "No game here yet - send /newgame to create one. /rules for how to play.")
         return
+    if cmd in ("/join-npc", "/npc-join"):
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p.get("npc") for p in g["players"]):
+            send(chat_id, "🤖 NPC is already in this game.")
+        elif len(g["players"]) >= 6:
+            send(chat_id, "⛔ Game is full.")
+        else:
+            _npc = G.new_player(NPC_ID, "🤖 NPC")
+            _npc["npc"] = True
+            g["players"].append(_npc)
+            send(chat_id, "🤖 NPC joined - anyone can play for it!")
+            render(g)
+        return
     if cmd == "/join":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
@@ -1524,7 +1631,7 @@ def handle_command(state, msg):
         events = []
         if g["phase"] != "playing" or g["pending_action"]:
             send(chat_id, "Not your turn / waiting on an action choice.")
-        elif g["players"][g["current_index"]]["user_id"] != uid:
+        elif g["players"][g["current_index"]]["user_id"] != uid and not g["players"][g["current_index"]].get("npc"):
             send(chat_id, f"⛔ It's {g['players'][g['current_index']]['name']}'s turn.")
         elif cmd == "/hit":
             do_hit(g, g["current_index"], events)
@@ -1557,6 +1664,10 @@ def handle_callback(state, cb):
             return answer_cb(cb["id"], "No Spots game here.")
         parts = data.split(":")
         idx = next((i for i, p in enumerate(sp["players"]) if p["user_id"] == uid), None)
+        if idx is None and sp.get("pending"):
+            idx = _actor_idx(sp, uid, sp["pending"]["player"])
+        elif idx is None:
+            idx = _actor_idx(sp, uid, sp["current_index"])
         ev = []
         if parts == ["spots", "join"]:
             if sp["phase"] != "lobby":
@@ -1614,6 +1725,10 @@ def handle_callback(state, cb):
             return answer_cb(cb["id"], "No Spots game here.")
         parts = data.split(":")
         idx = next((i for i, p in enumerate(sp["players"]) if p["user_id"] == uid), None)
+        if idx is None and sp.get("pending"):
+            idx = _actor_idx(sp, uid, sp["pending"]["player"])
+        elif idx is None:
+            idx = _actor_idx(sp, uid, sp["current_index"])
         ev = []
         if parts == ["spots", "join"]:
             if sp["phase"] != "lobby":
@@ -1666,6 +1781,9 @@ def handle_callback(state, cb):
             return answer_cb(cb["id"], "No Summon Demons game here.")
         parts = data.split(":")
         idx = next((i for i, p in enumerate(ls["players"]) if p["user_id"] == uid), None)
+        if idx is None:
+            _ref = ls["pending"]["player"] if ls.get("pending") else ls["current_index"]
+            idx = _actor_idx(ls, uid, _ref)
         ev = []
         if parts == ["lsd", "join"]:
             if ls["phase"] != "lobby":
@@ -1724,6 +1842,9 @@ def handle_callback(state, cb):
             return answer_cb(cb["id"], "No Odin game here.")
         parts = data.split(":")
         idx = next((i for i, p in enumerate(od["players"]) if p["user_id"] == uid), None)
+        if idx is None:
+            _ref = od["pickup_player"] if od.get("pickup_player") is not None else od["current_index"]
+            idx = _actor_idx(od, uid, _ref)
         ev = []
         if parts == ["od", "join"]:
             if od["phase"] != "lobby":
@@ -1753,6 +1874,9 @@ def handle_callback(state, cb):
             return answer_cb(cb["id"], "No Regicide game here.")
         parts = data.split(":")
         idx = next((i for i, p in enumerate(rg["players"]) if p["user_id"] == uid), None)
+        if idx is None:
+            _ref = rg.get("jester_player") if rg.get("jester_player") is not None else rg["current_index"]
+            idx = _actor_idx(rg, uid, _ref)
         ev = []
         if parts == ["rg", "yield"]:
             err = R.yield_turn(rg, idx, ev) if idx is not None else "not in game"
@@ -1763,7 +1887,9 @@ def handle_callback(state, cb):
             if rg["phase"] != "jester_next":
                 return answer_cb(cb["id"], "Not after a Jester.")
             if rg.get("jester_player") != idx:
-                return answer_cb(cb["id"], "Only the Jester player picks next.")
+                if idx is None or not rg["players"][rg["jester_player"]].get("npc"):
+                    return answer_cb(cb["id"], "Only the Jester player picks next.")
+                idx = rg["jester_player"]
             err = R.jester_next(rg, int(parts[2]), ev)
             answer_cb(cb["id"], err or "Next player set")
             if not err:
@@ -1802,7 +1928,7 @@ def handle_callback(state, cb):
     elif parts == ["f7", "hit"] or parts == ["f7", "stay"]:
         if g["phase"] != "playing" or g["pending_action"]:
             return deny("⛔ Not your turn.")
-        if g["players"][g["current_index"]]["user_id"] != uid:
+        if g["players"][g["current_index"]]["user_id"] != uid and not g["players"][g["current_index"]].get("npc"):
             return deny(f"⛔ It's {g['players'][g['current_index']]['name']}'s turn.")
         answer_cb(cb["id"], "")
         if parts[1] == "hit":
@@ -1814,7 +1940,8 @@ def handle_callback(state, cb):
     elif len(parts) == 3 and parts[0] == "f7" and parts[1] == "act":
         if not g["pending_action"]:
             return deny("No action pending.")
-        if g["pending_action"]["chooser_id"] != uid:
+        _ch = next((p for p in g["players"] if p["user_id"] == g["pending_action"]["chooser_id"]), None)
+        if g["pending_action"]["chooser_id"] != uid and not (_ch and _ch.get("npc")):
             return deny(f"⛔ {G.name_of(g, g['pending_action']['chooser_id'])} chooses.")
         target = int(parts[2])
         if target not in G.eligible_targets(g, g["pending_action"]["action"]):
@@ -1853,7 +1980,7 @@ def board_json(g, viewer_id=None):
         "dealer": g["players"][g["dealer_index"]]["name"],
         "deck_count": len(g["deck"]), "current_index": g["current_index"],
         "winner_id": g["winner_id"],
-        "players": [{"user_id": p["user_id"], "name": p["name"],
+        "players": [{"user_id": p["user_id"], "name": p["name"], "npc": bool(p.get("npc")),
                      "total": p["total"], "numbers": p["numbers"],
                      "modifiers": p["modifiers"],
                      "second_chance": p["second_chance"],
@@ -1919,21 +2046,24 @@ def api_move(state, chat_id, user_id, action, target_index=None, name=""):
     if action == "hit":
         if g["phase"] != "playing" or g["pending_action"]:
             return [], "not your turn"
-        if g["players"][g["current_index"]]["user_id"] != user_id:
-            return [], f"it's {g['players'][g['current_index']]['name']}'s turn"
+        _cur = g["players"][g["current_index"]]
+        if _cur["user_id"] != user_id and not _cur.get("npc"):
+            return [], f"it's {_cur['name']}'s turn"
         do_hit(g, g["current_index"], events)
         advance(g, events)
     elif action == "stay":
         if g["phase"] != "playing" or g["pending_action"]:
             return [], "not your turn"
-        if g["players"][g["current_index"]]["user_id"] != user_id:
-            return [], f"it's {g['players'][g['current_index']]['name']}'s turn"
+        _cur = g["players"][g["current_index"]]
+        if _cur["user_id"] != user_id and not _cur.get("npc"):
+            return [], f"it's {_cur['name']}'s turn"
         if not do_stay(g, g["current_index"], events):
             return [], events[0] if events else "must Hit"
     elif action == "action":
         if not g["pending_action"]:
             return [], "no action pending"
-        if g["pending_action"]["chooser_id"] != user_id:
+        _ch = next((p for p in g["players"] if p["user_id"] == g["pending_action"]["chooser_id"]), None)
+        if g["pending_action"]["chooser_id"] != user_id and not (_ch and _ch.get("npc")):
             return [], "only the chooser picks the target"
         if target_index not in G.eligible_targets(g, g["pending_action"]["action"]):
             return [], "invalid target"
@@ -1979,7 +2109,7 @@ def rg_board_json(g, viewer_id=None):
         "castle": [c["rank"] for c in reversed(g["castle"])],  # ranks only, next first - suits hidden
         "next_suits": next_suits,
         "played": g["played"],
-        "players": [{"user_id": p["user_id"], "name": p["name"], "hand_count": len(p["hand"])}
+        "players": [{"user_id": p["user_id"], "name": p["name"], "npc": bool(p.get("npc")), "hand_count": len(p["hand"])}
                     for p in g["players"]],
         "my_hand": me["hand"] if me else [],
         "hand_limit": R.hand_limit(g),
@@ -1992,6 +2122,9 @@ def rg_api_move(state, chat_id, user_id, body):
         return [], "no regicide game in that chat"
     idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
     action = body.get("action")
+    if action not in ("join", "start"):
+        _ref = g.get("jester_player") if action == "jester_next" and g.get("jester_player") is not None else g["current_index"]
+        idx = _actor_idx(g, user_id, _ref)
     ev = []
     if action == "join":
         if g["phase"] != "lobby":
@@ -2061,7 +2194,7 @@ def odin_board_json(g, viewer_id=None):
         "passes": g.get("passes", 0),
         "deck_count": len(g["deck"]), "discard_count": len(g["discard"]),
         "winners": g.get("winners", []),
-        "players": [{"user_id": p["user_id"], "name": p["name"],
+        "players": [{"user_id": p["user_id"], "name": p["name"], "npc": bool(p.get("npc")),
                      "hand_count": len(p["hand"]), "score": p["score"]}
                     for p in g["players"]],
         "my_hand": me["hand"] if me else [],
@@ -2074,6 +2207,9 @@ def odin_api_move(state, chat_id, user_id, body):
         return [], "no odin game in that chat"
     idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
     action = body.get("action")
+    if action not in ("join", "start"):
+        _ref = g["pickup_player"] if action == "pickup" and g.get("pickup_player") is not None else g["current_index"]
+        idx = _actor_idx(g, user_id, _ref)
     ev = []
     if action == "join":
         if g["phase"] != "lobby":
@@ -2140,7 +2276,7 @@ def lsd_board_json(g, viewer_id=None):
         "dice": g.get("dice"), "last_total": g.get("last_total"),
         "turn": g.get("turn"), "pending": pend_out,
         "winner": g.get("winner"),
-        "players": [{"user_id": p["user_id"], "name": p["name"], "souls": p["souls"],
+        "players": [{"user_id": p["user_id"], "name": p["name"], "npc": bool(p.get("npc")), "souls": p["souls"],
                      "candle": p["candle"], "in_play": p["in_play"], "demons": p["demons"],
                      "demon_hand_count": len(p["demon_hand"])} for p in g["players"]],
         "my_demon_hand": me["demon_hand"] if me else [],
@@ -2153,6 +2289,9 @@ def lsd_api_move(state, chat_id, user_id, body):
         return [], "no summon demons game in that chat"
     idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
     action = body.get("action")
+    if action not in ("join", "start"):
+        _ref = g["pending"]["player"] if g.get("pending") else g["current_index"]
+        idx = _actor_idx(g, user_id, _ref)
     ev = []
     if action == "join":
         if g["phase"] != "lobby":
@@ -2223,7 +2362,7 @@ def spots_board_json(g, viewer_id=None):
         "tiles": g["tiles"], "dice_supply": g["dice_supply"],
         "treat_supply": g["treat_supply"], "trick": trick,
         "pending": pend_out, "winner": g.get("winner"),
-        "players": [{"user_id": p["user_id"], "name": p["name"], "treats": p["treats"],
+        "players": [{"user_id": p["user_id"], "name": p["name"], "npc": bool(p.get("npc")), "treats": p["treats"],
                      "yard": p["yard"], "dogs": p["dogs"], "scored": p["scored"]}
                     for p in g["players"]],
     }
@@ -2235,6 +2374,9 @@ def spots_api_move(state, chat_id, user_id, body):
         return [], "no spots game in that chat"
     idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
     action = body.get("action")
+    if action not in ("join", "start"):
+        _ref = g["pending"]["player"] if g.get("pending") else g["current_index"]
+        idx = _actor_idx(g, user_id, _ref)
     ev = []
     if action == "join":
         if g["phase"] != "lobby":
@@ -2337,6 +2479,14 @@ def start_web_server(state):
             if u.path in ("/spots-dogs.webp", "/spots-dogs-scored.webp"):
                 p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
+            if u.path == "/spots-dice.png":
+                p = os.path.join(os.path.dirname(JS_PATH), "spots-dice.png")
+                return self._send(200, open(p, "rb").read(), "image/png", cache="public, max-age=86400")
+            if u.path.startswith("/spots-tiles/") and u.path.endswith(".jpg"):
+                p = os.path.join(os.path.dirname(JS_PATH), "spots_tiles", os.path.basename(u.path))
+                if os.path.exists(p):
+                    return self._send(200, open(p, "rb").read(), "image/jpeg", cache="public, max-age=86400")
+                return self._send(404, {"ok": False})
             if u.path.startswith("/lsd-cards/") and u.path.endswith(".jpg"):
                 p = os.path.join(os.path.dirname(JS_PATH), "lsd_cards", os.path.basename(u.path))
                 if os.path.exists(p):

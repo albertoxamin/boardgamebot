@@ -184,7 +184,8 @@ function seatHtml(p,i,b){
   +(p.last_round!==null&&p.last_round!==undefined?'<div class="small">last round: +'+p.last_round+'</div>':'')
   +'</div>';}
 function renderSync(){let b=SYNC.board; if(!b)return;
- SYNC.spectating=b.is_player===false;
+ let _ch=b.pending_action?b.players.find(p=>p.user_id===b.pending_action.chooser_id):null;
+ SYNC.spectating=b.is_player===false&&!((b.players[b.current_index]||{}).npc)&&!(_ch&&_ch.npc);
  let deckAnim=(SYNC.prevDeck>=0&&b.deck_count<SYNC.prevDeck)?'card-in':''; SYNC.prevDeck=b.deck_count;
  let seats='<div class="seats">'+b.players.map((p,i)=>seatHtml(p,i,b)).join('')+'</div>';
  let specBar=SYNC.spectating?'<div class="lobby-note">👁 Spectating — view only (join in Telegram to play)</div>':'';
@@ -193,14 +194,14 @@ function renderSync(){let b=SYNC.board; if(!b)return;
  } else {
   document.getElementById('syncBoard').innerHTML='<div class="table">'+specBar+'<div class="deckpile"><div class="fcard" title="deck" style="background-position:-44px -138px"></div><div><b>Deck</b> ×'+b.deck_count+'<br><span class="small">Round '+b.round+' · Dealer '+escapeHtml(b.dealer)+'</span></div></div>'+seats+'</div>';
  }
- let me=b.players.find(p=>p.user_id===SYNC.user_id); let myTurn=b.phase==='playing'&&!b.pending_action&&b.players[b.current_index]&&b.players[b.current_index].user_id===SYNC.user_id;
+ let me=b.players.find(p=>p.user_id===SYNC.user_id); let cur=b.players[b.current_index]; let myTurn=b.phase==='playing'&&!b.pending_action&&cur&&(cur.user_id===SYNC.user_id||cur.npc);
  document.getElementById('syncHit').classList.toggle('hidden',!myTurn);
  document.getElementById('syncStay').classList.toggle('hidden',!myTurn);
  document.getElementById('syncStart').classList.toggle('hidden',!(b.phase==='lobby'&&me));
  let t=document.getElementById('syncTurn'),ab=document.getElementById('syncActions'); ab.innerHTML='';
  if(b.flip3){let tgt=b.players[b.flip3.target_index];
   t.textContent='🎲 '+tgt.name+' is flipping three ('+b.flip3.remaining+' left)';}
- else if(b.pending_action){let iAmChooser=b.pending_action.chooser_id===SYNC.user_id;
+ else if(b.pending_action){let iAmChooser=b.pending_action.chooser_id===SYNC.user_id||(_ch&&_ch.npc);
   t.textContent=iAmChooser? '❓ You choose who gets '+b.pending_action.action : '⏳ Waiting for action choice ('+b.pending_action.action+')';
   if(iAmChooser) b.pending_action.targets.forEach(i=>{let btn=document.createElement('button');btn.className='targetbtn';btn.textContent=(b.pending_action.action==='Flip Three'?'🎲 ':'➡️ ')+b.players[i].name;btn.addEventListener('click',()=>move('action',i));ab.appendChild(btn);});}
  else if(b.phase==='playing') t.textContent=myTurn? '👉 Your turn - Hit or Stay?' : '👉 '+b.players[b.current_index].name+"'s turn";

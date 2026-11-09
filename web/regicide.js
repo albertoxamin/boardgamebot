@@ -41,7 +41,7 @@ async function rgMove(action,extra){
  if(r.events)r.events.forEach(e=>rgLog(e)); if(r.error)rgLog('⛔ '+r.error);
  if(r.game){RG.board=r.game; RG.selected=[]; rgRender();}}
 function rgRender(){let b=RG.board; if(!b)return;
- RG.spectating=b.is_player===false;
+ RG.spectating=b.is_player===false&&!((b.players[b.current_index]||{}).npc);
  let e=b.enemy, atk=e?(e.rank==='K'?20:e.rank==='Q'?15:10):0, hp=e?(e.rank==='K'?40:e.rank==='Q'?30:20):0;
  let enemyKey=e?e.rank+e.suit:'';
  let enemyAnim=enemyKey!==RG.prevEnemyKey?'card-in':(e&&b.enemy_damage>RG.prevDamage?'hit-shake':'');
@@ -68,8 +68,8 @@ function rgRender(){let b=RG.board; if(!b)return;
    let i=hand.findIndex(c=>c.suit===el.dataset.suit&&c.rank===el.dataset.rank);
    if(RG.selected.includes(i)) RG.selected=RG.selected.filter(x=>x!==i); else RG.selected.push(i); rgRenderHandOnly();}));
  rgPreview();
- let myTurn=(b.phase==='playing'&&b.players[b.current_index]&&b.players[b.current_index].user_id===RG.user_id);
- let myDiscard=(b.phase==='discard'&&b.players[b.current_index]&&b.players[b.current_index].user_id===RG.user_id);
+ let cur=b.players[b.current_index]; let myTurn=(b.phase==='playing'&&cur&&(cur.user_id===RG.user_id||cur.npc));
+ let myDiscard=(b.phase==='discard'&&b.players[b.current_index]&&(b.players[b.current_index].user_id===RG.user_id||b.players[b.current_index].npc));
  document.getElementById('rgPlay').classList.toggle('hidden',!myTurn);
  document.getElementById('rgYield').classList.toggle('hidden',!myTurn);
  document.getElementById('rgDiscard').classList.toggle('hidden',!myDiscard);

@@ -1143,10 +1143,11 @@ def handle_callback(state, cb):
 # WEB_PORT (tunnel forwards flip7.xamin.it -> :8080). The API shares the
 # exact in-memory `state` with the polling loop (STATE_LOCK), so HTML
 # moves and Telegram moves can never diverge. Deck order is never exposed.
-def board_json(g):
+def board_json(g, viewer_id=None):
     return {
         "chat_id": g["chat_id"], "phase": g["phase"], "round": g["round"],
         "created_by": g["created_by"],
+        "is_player": viewer_id is not None and any(p["user_id"] == viewer_id for p in g["players"]),
         "dealer": g["players"][g["dealer_index"]]["name"],
         "deck_count": len(g["deck"]), "current_index": g["current_index"],
         "winner_id": g["winner_id"],
@@ -1259,12 +1260,14 @@ def api_move(state, chat_id, user_id, action, target_index=None, name=""):
 def rg_board_json(g, viewer_id=None):
     """Regicide board; only the viewer's own hand is included (private hands)."""
     me = next((p for p in g["players"] if p["user_id"] == viewer_id), None)
+    is_player = me is not None
     next_rank = g["castle"][-1]["rank"] if g["castle"] else None
     next_suits = sorted({c["suit"] for c in g["castle"] if c["rank"] == next_rank},
                         key="♠♥♦♣".find) if next_rank else []
     return {
         "chat_id": g["chat_id"], "phase": g["phase"], "kills": g["kills"],
         "current_index": g["current_index"], "created_by": g["created_by"],
+        "is_player": is_player,
         "tavern_count": len(g["tavern"]), "castle_count": len(g["castle"]),
         "discard_count": len(g["discard"]),
         "enemy": g["enemy"], "enemy_damage": g["enemy_damage"],
@@ -1350,6 +1353,7 @@ def odin_board_json(g, viewer_id=None):
         "chat_id": g["chat_id"], "phase": g["phase"], "hand_no": g.get("hand_no", 0),
         "current_index": g["current_index"], "pickup_player": g.get("pickup_player"),
         "created_by": g["created_by"], "hand_starter": g.get("hand_starter", 0),
+        "is_player": me is not None,
         "table": g["table"], "table_value": g.get("table_value"),
         "pending_play": g.get("pending_play", []),
         "passes": g.get("passes", 0),
@@ -1475,7 +1479,7 @@ def start_web_server(state):
                 if uid is None:
                     return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
                 with STATE_LOCK:
-                    games = [board_json(g) for g in state["games"].values()
+                    games = [board_json(g, uid) for g in state["games"].values()
                              if any(p["user_id"] == uid for p in g["players"])]
                 return self._send(200, {"ok": True, "games": games})
             if u.path == "/api/odin/mygames":
@@ -1495,8 +1499,6 @@ def start_web_server(state):
                 chat_id = q.get("chat_id", [""])[0]
                 with STATE_LOCK:
                     g = odin_get(state, chat_id)
-                    if g and not any(p["user_id"] == uid for p in g["players"]):
-                        g = None
                     board = odin_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/regicide/mygames":
@@ -1516,8 +1518,6 @@ def start_web_server(state):
                 chat_id = q.get("chat_id", [""])[0]
                 with STATE_LOCK:
                     g = rg_get(state, chat_id)
-                    if g and not any(p["user_id"] == uid for p in g["players"]):
-                        g = None
                     board = rg_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/games":
@@ -1530,9 +1530,7 @@ def start_web_server(state):
                 chat_id = q.get("chat_id", [""])[0]
                 with STATE_LOCK:
                     g = state["games"].get(str(chat_id))
-                    if g and not any(p["user_id"] == uid for p in g["players"]):
-                        g = None
-                    board = board_json(g) if g else None
+                    board = board_json(g, uid) if g else None
                 return self._send(200 if board else 404,
                                   {"ok": bool(board), "game": board})
             return self._send(404, {"ok": False, "error": "not found"})
@@ -1655,14 +1653,14 @@ def start_web_server(state):
                 with STATE_LOCK:
                     g = state["games"].get(str(chat_id))
                     if g and g["phase"] != "game_end":
-                        return self._send(200, {"ok": True, "game": board_json(g), "created": False})
+                        return self._send(200, {"ok": True, "game": board_json(g, uid), "created": False})
                     g = G.new_game(chat_id, uid, name)
                     g["chat_type"] = "supergroup" if chat_id < 0 else "private"
                     state["games"][str(chat_id)] = g
                     events = [f"🎴 Flip 7 game created by {name} via Mini App! Friends tap Join, anyone taps Start."]
                     render(g, events)
                     save_state(state)
-                    board = board_json(g)
+                    board = board_json(g, uid)
                 return self._send(200, {"ok": True, "game": board, "created": True})
             if path != "/api/move":
                 return self._send(404, {"ok": False, "error": "not found"})
@@ -1680,7 +1678,7 @@ def start_web_server(state):
                                        body.get("action"), body.get("target_index"),
                                        body.get("name") or (iu[1] if iu else ""))
                 g = state["games"].get(str(body.get("chat_id")))
-                board = board_json(g) if g else None
+                board = board_json(g, user_id) if g else None
                 save_state(state)
             return self._send(200 if not err else 400,
                               {"ok": not err, "error": err, "events": events, "game": board})

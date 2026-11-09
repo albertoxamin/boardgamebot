@@ -22,7 +22,9 @@ async function rgLoad(){
  if(tg.start && String(tg.start).startsWith('regicide')) pref=parseInt(String(tg.start).slice(8),10)||pref;
  let pick=mine.find(g=>g.chat_id===pref) || mine.find(g=>!['won','lost'].includes(g.phase)) || mine[0];
  if(pick) rgSelect(pick.chat_id);
- else if(pref){let cr=await rgApi('/api/regicide/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init,chat_id:pref})});
+ else if(pref){let spec=await rgApi('/api/regicide/game?chat_id='+encodeURIComponent(pref)+'&init_data='+encodeURIComponent(tg.init));
+  if(spec.ok){rgSelect(pref); return;}
+  let cr=await rgApi('/api/regicide/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init,chat_id:pref})});
   if(cr.game) rgSelect(cr.game.chat_id); else rgLog('⛔ '+(cr.error||'create failed'));}
  else document.getElementById('rgBoard').innerHTML='<div class="table lobby-note">No Regicide game for you yet — send /regicide in a chat, then open its Mini App link.</div>';
 }
@@ -37,6 +39,7 @@ async function rgMove(action,extra){
  if(r.events)r.events.forEach(e=>rgLog(e)); if(r.error)rgLog('⛔ '+r.error);
  if(r.game){RG.board=r.game; RG.selected=[]; rgRender();}}
 function rgRender(){let b=RG.board; if(!b)return;
+ RG.spectating=b.is_player===false;
  let e=b.enemy, atk=e?(e.rank==='K'?20:e.rank==='Q'?15:10):0, hp=e?(e.rank==='K'?40:e.rank==='Q'?30:20):0;
  let enemyKey=e?e.rank+e.suit:'';
  let enemyAnim=enemyKey!==RG.prevEnemyKey?'card-in':(e&&b.enemy_damage>RG.prevDamage?'hit-shake':'');
@@ -48,7 +51,7 @@ function rgRender(){let b=RG.board; if(!b)return;
    let grew=p.hand_count>(RG.prevCounts[p.name]||0); let backs='<div class="handbacks">'+Array.from({length:Math.min(p.hand_count,10)},(_,bi)=>'<div class="rcimg'+(grew&&bi===Math.min(p.hand_count,10)-1?' card-in':'')+'" title="hand" style="background-position:0 -67px"></div>').join('')+'</div>';
    return '<div class="seat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score">'+p.hand_count+'</span></div>'+backs+(isTurn?'<div class="small"><b>▶ Turn</b></div>':'')+'</div>';}).join('')+'</div>';
  let playedKeys=(b.played||[]).map(c=>c.rank+c.suit), newPlayed=rgNew(RG.prevPlayed,playedKeys);
- document.getElementById('rgBoard').innerHTML='<div class="table" style="position:relative">'+head
+ document.getElementById('rgBoard').innerHTML='<div class="table" style="position:relative">'+(RG.spectating?'<div class="lobby-note">👁 Spectating — view only (join in Telegram to play)</div>':'')+head
   +castleBack
   +((b.played||[]).length?'<div class="small">Played:</div><div class="pile">'+b.played.map((c,i)=>rgSprite(c,false,newPlayed.has(i)?'card-in':'')).join('')+'</div>':'')+seats+'</div>';
  RG.prevPlayed=playedKeys; RG.prevEnemyKey=enemyKey; RG.prevDamage=b.enemy_damage||0; RG.prevCounts=Object.fromEntries(b.players.map(p=>[p.name,p.hand_count]));
@@ -56,7 +59,8 @@ function rgRender(){let b=RG.board; if(!b)return;
  let hand=b.my_hand||[];
  let mh=document.getElementById('rgHand');
  let handKeys=hand.map(c=>c.rank+c.suit), newHand=rgNew(RG.prevHand,handKeys); RG.prevHand=handKeys;
- mh.innerHTML='<b>My hand ('+hand.length+'/'+b.hand_limit+')</b><div class="pile">'
+ mh.innerHTML=RG.spectating?'<div class="small">👁 Spectating — hands are private</div>'
+  : '<b>My hand ('+hand.length+'/'+b.hand_limit+')</b><div class="pile">'
   + hand.map((c,i)=>rgCard(c, RG.selected.includes(i), newHand.has(i)?'card-in':'')).join('') + '</div>';
  mh.querySelectorAll('.rcimg').forEach(el=>el.addEventListener('click',()=>{
    let i=hand.findIndex(c=>c.suit===el.dataset.suit&&c.rank===el.dataset.rank);

@@ -128,7 +128,9 @@ async function loadGames(){
  let pref=parseInt(tg.start,10)||0; if(!pref && tg.chat_instance) pref=parseInt(tg.chat_instance,10)||0;
  let pick=mine.find(g=>g.chat_id===pref) || mine.find(g=>g.phase!=='game_end') || mine[0];
  if(pick) selectGame(pick.chat_id);
- else if(pref){ // no game in this chat yet: create it automatically (you are creator)
+ else if(pref){ // spectate the chat's game if one exists, else create it (you are creator)
+  let spec=await api('/api/game?chat_id='+encodeURIComponent(pref)+'&init_data='+encodeURIComponent(tg.init));
+  if(spec.ok){selectGame(pref); return;}
   let cr=await api('/api/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init})});
   if(cr.game) selectGame(cr.game.chat_id); else syncLog('⛔ '+(cr.error||'create failed'));
  } else document.getElementById('syncBoard').innerHTML='<div class="table lobby-note">No game for you yet — create one in Telegram with /newgame, then open /web here.</div>';
@@ -178,12 +180,14 @@ function seatHtml(p,i,b){
   +(p.last_round!==null&&p.last_round!==undefined?'<div class="small">last round: +'+p.last_round+'</div>':'')
   +'</div>';}
 function renderSync(){let b=SYNC.board; if(!b)return;
+ SYNC.spectating=b.is_player===false;
  let deckAnim=(SYNC.prevDeck>=0&&b.deck_count<SYNC.prevDeck)?'card-in':''; SYNC.prevDeck=b.deck_count;
  let seats='<div class="seats">'+b.players.map((p,i)=>seatHtml(p,i,b)).join('')+'</div>';
+ let specBar=SYNC.spectating?'<div class="lobby-note">👁 Spectating — view only (join in Telegram to play)</div>':'';
  if(b.phase==='lobby'){
-  document.getElementById('syncBoard').innerHTML='<div class="table"><div class="lobby-note"><b>🎴 Lobby</b> — '+b.players.length+' player(s) seated<br><span class="small">Anyone can tap Start (or send <b>/startgame</b> in Telegram).</span></div>'+seats+'</div>';
+  document.getElementById('syncBoard').innerHTML='<div class="table">'+specBar+'<div class="lobby-note"><b>🎴 Lobby</b> — '+b.players.length+' player(s) seated<br><span class="small">Anyone can tap Start (or send <b>/startgame</b> in Telegram).</span></div>'+seats+'</div>';
  } else {
-  document.getElementById('syncBoard').innerHTML='<div class="table"><div class="deckpile"><div class="fcard" title="deck" style="background-position:-44px -138px"></div><div><b>Deck</b> ×'+b.deck_count+'<br><span class="small">Round '+b.round+' · Dealer '+escapeHtml(b.dealer)+'</span></div></div>'+seats+'</div>';
+  document.getElementById('syncBoard').innerHTML='<div class="table">'+specBar+'<div class="deckpile"><div class="fcard" title="deck" style="background-position:-44px -138px"></div><div><b>Deck</b> ×'+b.deck_count+'<br><span class="small">Round '+b.round+' · Dealer '+escapeHtml(b.dealer)+'</span></div></div>'+seats+'</div>';
  }
  let me=b.players.find(p=>p.user_id===SYNC.user_id); let myTurn=b.phase==='playing'&&!b.pending_action&&b.players[b.current_index]&&b.players[b.current_index].user_id===SYNC.user_id;
  document.getElementById('syncHit').classList.toggle('hidden',!myTurn);

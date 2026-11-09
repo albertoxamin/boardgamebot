@@ -21,7 +21,9 @@ async function odLoad(){
  if(tg.start && String(tg.start).startsWith('odin')) pref=parseInt(String(tg.start).slice(4),10)||pref;
  let pick=mine.find(g=>g.chat_id===pref) || mine.find(g=>g.phase!=='game_end') || mine[0];
  if(pick) odSelect(pick.chat_id);
- else if(pref){let cr=await odApi('/api/odin/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init,chat_id:pref})});
+ else if(pref){let spec=await odApi('/api/odin/game?chat_id='+encodeURIComponent(pref)+'&init_data='+encodeURIComponent(tg.init));
+  if(spec.ok){odSelect(pref); return;}
+  let cr=await odApi('/api/odin/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init,chat_id:pref})});
   if(cr.game) odSelect(cr.game.chat_id); else odLog('⛔ '+(cr.error||'create failed'));}
  else document.getElementById('odBoard').innerHTML='<div class="table lobby-note">No Odin game for you yet — send /odin in a chat, then open its Mini App link.</div>';
 }
@@ -36,6 +38,7 @@ async function odMove(action,extra){
  if(r.events)r.events.forEach(e=>odLog(e)); if(r.error)odLog('⛔ '+r.error);
  if(r.game){OD.board=r.game; OD.selected=[]; OD.pickupSel=null; odRender();}}
 function odRender(){let b=OD.board; if(!b)return;
+ OD.spectating=b.is_player===false;
  let tableKeys=(b.table||[]).map(c=>c.rank+c.suit), newTable=odNew(OD.prevTable,tableKeys); OD.prevTable=tableKeys;
  let tableHtml=b.table&&b.table.length
   ? '<div class="odtable">'+b.table.map((c,i)=>odCard(c,false,newTable.has(i)?'card-in':'',true)).join('')
@@ -48,14 +51,15 @@ function odRender(){let b=OD.board; if(!b)return;
    let backs='<div class="handbacks">'+Array.from({length:Math.min(p.hand_count,10)},()=>'<img class="ocard" src="cards/odin_back.svg" alt="hand">').join('')+'</div>';
    return '<div class="seat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score">'+p.score+'</span></div>'+backs
     +(isTurn?'<div class="small"><b>▶ Turn</b></div>':'')+'</div>';}).join('')+'</div>';
- document.getElementById('odBoard').innerHTML='<div class="table" style="position:relative">'+tableHtml+pendingHtml+seats+'</div>';
+ document.getElementById('odBoard').innerHTML='<div class="table" style="position:relative">'+(OD.spectating?'<div class="lobby-note">👁 Spectating — view only (join in Telegram to play)</div>':'')+tableHtml+pendingHtml+seats+'</div>';
  // My hand (only mine, private), sorted by suit then rank for grouping sets
  let hand=[...(b.my_hand||[])].sort((x,y)=>((OD_SUIT_ORDER[x.suit]??99)-(OD_SUIT_ORDER[y.suit]??99))||(x.rank-y.rank));
  OD.handSorted=hand;
  let handKeys=hand.map(c=>c.rank+c.suit), newHand=odNew(OD.prevHand,handKeys); OD.prevHand=handKeys;
  OD.selected=OD.selected.filter(k=>handKeys.includes(k)); // prune stale picks (hand changed)
  let mh=document.getElementById('odHand');
- mh.innerHTML='<b>My hand ('+hand.length+')</b><div class="pile">'
+ mh.innerHTML=OD.spectating?'<div class="small">👁 Spectating — hands are private</div>'
+  : '<b>My hand ('+hand.length+')</b><div class="pile">'
   + hand.map((c,i)=>odCard(c,OD.selected.includes(c.rank+c.suit),newHand.has(i)?'card-in':'')).join('') + '</div>';
  mh.querySelectorAll('.ocard').forEach(el=>el.addEventListener('click',()=>{
    let k=el.dataset.rank+el.dataset.suit;

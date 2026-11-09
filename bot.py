@@ -588,7 +588,7 @@ def handle_regicide(state, msg, cmd, text, uid, name):
         send(chat_id, "No Regicide game here yet - send /regicide to create one.")
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
-    if cmd in ("/join-npc", "/npc-join"):
+    if cmd == "/regicide-join-npc":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
         elif any(p.get("npc") for p in g["players"]):
@@ -806,7 +806,7 @@ def handle_odin(state, msg, cmd, text, uid, name):
         send(chat_id, "No Odin game here yet - send /odin to create one.")
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
-    if cmd in ("/join-npc", "/npc-join"):
+    if cmd == "/odin-join-npc":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
         elif any(p.get("npc") for p in g["players"]):
@@ -1083,7 +1083,7 @@ def handle_lsd(state, msg, cmd, text, uid, name):
         send(chat_id, "No Summon Demons game here yet - send /lsd to create one.")
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
-    if cmd in ("/join-npc", "/npc-join"):
+    if cmd == "/lsd-join-npc":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
         elif any(p.get("npc") for p in g["players"]):
@@ -1353,7 +1353,7 @@ def handle_spots(state, msg, cmd, text, uid, name):
         send(chat_id, "No Spots game here yet - send /spots to create one.")
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
-    if cmd in ("/join-npc", "/npc-join"):
+    if cmd == "/spots-join-npc":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
         elif any(p.get("npc") for p in g["players"]):
@@ -1549,14 +1549,6 @@ def handle_command(state, msg):
     if g:
         g["chat_type"] = msg.get("chat", {}).get("type", g.get("chat_type", "private"))
 
-    if cmd in ("/join-npc", "/npc-join"):
-        for _getter, _handler in ((rg_get, handle_regicide), (odin_get, handle_odin),
-                                  (lsd_get, handle_lsd), (spots_get, handle_spots)):
-            _gg = _getter(state, chat_id)
-            if _gg and _gg["phase"] == "lobby":
-                _handler(state, msg, cmd, text, uid, name)
-                return
-        # else fall through to the Flip 7 section below
     if cmd == "/games":
         _catalog = (
             ("games", "🎴 Flip 7", "/newgame", "/join", "press-your-luck dice, first to 200"),

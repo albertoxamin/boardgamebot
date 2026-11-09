@@ -20,11 +20,13 @@ async function rgLoad(){
  let mine=r.games||[];
  let pref=parseInt(tg.start,10)||0; if(!pref && tg.chat_instance) pref=parseInt(tg.chat_instance,10)||0;
  if(tg.start && String(tg.start).startsWith('regicide')) pref=parseInt(String(tg.start).slice(8),10)||pref;
- let pick=mine.find(g=>g.chat_id===pref) || mine.find(g=>!['won','lost'].includes(g.phase)) || mine[0];
+ let pick=mine.find(g=>g.chat_id===pref);
+ if(!pick && pref){ // spectate the chat's game if one exists
+  let spec=await rgApi('/api/regicide/game?chat_id='+encodeURIComponent(pref)+'&init_data='+encodeURIComponent(tg.init));
+  if(spec.ok) pick={chat_id:pref};}
+ if(!pick) pick=mine.find(g=>!['won','lost'].includes(g.phase)) || mine[0];
  if(pick) rgSelect(pick.chat_id);
- else if(pref){let spec=await rgApi('/api/regicide/game?chat_id='+encodeURIComponent(pref)+'&init_data='+encodeURIComponent(tg.init));
-  if(spec.ok){rgSelect(pref); return;}
-  let cr=await rgApi('/api/regicide/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init,chat_id:pref})});
+ else if(pref){let cr=await rgApi('/api/regicide/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init,chat_id:pref})});
   if(cr.game) rgSelect(cr.game.chat_id); else rgLog('⛔ '+(cr.error||'create failed'));}
  else document.getElementById('rgBoard').innerHTML='<div class="table lobby-note">No Regicide game for you yet — send /regicide in a chat, then open its Mini App link.</div>';
 }

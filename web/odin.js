@@ -19,11 +19,13 @@ async function odLoad(){
  let mine=r.games||[];
  let pref=parseInt(tg.start,10)||0; if(!pref && tg.chat_instance) pref=parseInt(tg.chat_instance,10)||0;
  if(tg.start && String(tg.start).startsWith('odin')) pref=parseInt(String(tg.start).slice(4),10)||pref;
- let pick=mine.find(g=>g.chat_id===pref) || mine.find(g=>g.phase!=='game_end') || mine[0];
+ let pick=mine.find(g=>g.chat_id===pref);
+ if(!pick && pref){ // spectate the chat's game if one exists
+  let spec=await odApi('/api/odin/game?chat_id='+encodeURIComponent(pref)+'&init_data='+encodeURIComponent(tg.init));
+  if(spec.ok) pick={chat_id:pref};}
+ if(!pick) pick=mine.find(g=>g.phase!=='game_end') || mine[0];
  if(pick) odSelect(pick.chat_id);
- else if(pref){let spec=await odApi('/api/odin/game?chat_id='+encodeURIComponent(pref)+'&init_data='+encodeURIComponent(tg.init));
-  if(spec.ok){odSelect(pref); return;}
-  let cr=await odApi('/api/odin/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init,chat_id:pref})});
+ else if(pref){let cr=await odApi('/api/odin/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init,chat_id:pref})});
   if(cr.game) odSelect(cr.game.chat_id); else odLog('⛔ '+(cr.error||'create failed'));}
  else document.getElementById('odBoard').innerHTML='<div class="table lobby-note">No Odin game for you yet — send /odin in a chat, then open its Mini App link.</div>';
 }

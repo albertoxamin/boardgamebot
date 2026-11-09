@@ -126,11 +126,13 @@ async function loadGames(){
  let r=await api('/api/mygames?init_data='+encodeURIComponent(tg.init));
  let mine=r.games||[];
  let pref=parseInt(tg.start,10)||0; if(!pref && tg.chat_instance) pref=parseInt(tg.chat_instance,10)||0;
- let pick=mine.find(g=>g.chat_id===pref) || mine.find(g=>g.phase!=='game_end') || mine[0];
- if(pick) selectGame(pick.chat_id);
- else if(pref){ // spectate the chat's game if one exists, else create it (you are creator)
+ let pick=mine.find(g=>g.chat_id===pref);
+ if(!pick && pref){ // spectate the chat's game if one exists
   let spec=await api('/api/game?chat_id='+encodeURIComponent(pref)+'&init_data='+encodeURIComponent(tg.init));
-  if(spec.ok){selectGame(pref); return;}
+  if(spec.ok) pick={chat_id:pref};}
+ if(!pick) pick=mine.find(g=>g.phase!=='game_end') || mine[0];
+ if(pick) selectGame(pick.chat_id);
+ else if(pref){ // no game in this chat yet: create it automatically (you are creator)
   let cr=await api('/api/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init})});
   if(cr.game) selectGame(cr.game.chat_id); else syncLog('⛔ '+(cr.error||'create failed'));
  } else document.getElementById('syncBoard').innerHTML='<div class="table lobby-note">No game for you yet — create one in Telegram with /newgame, then open /web here.</div>';

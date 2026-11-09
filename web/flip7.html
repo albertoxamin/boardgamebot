@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flip 7</title>
+<script data-cfasync="false" src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+body{font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;background:#0f172a;color:#e2e8f0;margin:0;padding:12px}
+h1{font-size:22px;margin:6px 0} .card{background:#1e293b;border-radius:12px;padding:10px;margin:8px 0}
+.player{border:2px solid #334155;border-radius:10px;padding:8px;margin:6px 0}
+.player.current{border-color:#f59e0b;background:#292524}
+.chip{display:inline-block;background:#334155;border-radius:8px;padding:4px 8px;margin:2px;font-weight:700}
+.chip.mod{background:#065f46}.chip.act{background:#7c3aed}.chip.sc{background:#b45309}
+.table{background:radial-gradient(circle at 50% 40%,#14532d 0%,#052e16 70%);border-radius:16px;padding:12px;margin:8px 0;border:2px solid #166534}
+.seats{display:flex;flex-direction:column;gap:8px}
+.seat{background:rgba(15,23,42,.85);border:2px solid #334155;border-radius:12px;padding:8px;min-height:86px}
+.seat.flip3{border-color:#a78bfa;box-shadow:0 0 10px #7c3aed66}
+.seat.current{border-color:#f59e0b;box-shadow:0 0 12px #f59e0b88}
+.seat.busted{opacity:.55;border-color:#991b1b;filter:grayscale(100%)}.seat.stayed{opacity:.8;border-color:#065f46}.seat.frozen{opacity:.8;border-color:#065f46;filter:grayscale(100%)}
+.seat-head{display:flex;justify-content:space-between;align-items:center;font-weight:800}
+.avatar{display:inline-flex;width:28px;height:28px;border-radius:50%;background:#f59e0b;color:#111;align-items:center;justify-content:center;font-weight:900;margin-right:6px}
+.score{background:#f59e0b;color:#111;border-radius:999px;padding:2px 8px;font-weight:900}
+.badge{font-size:11px;border-radius:999px;padding:2px 7px;background:#475569;margin-left:4px}
+.badge.dealer{background:#f8fafc;color:#111}.badge.turn{background:#f59e0b;color:#111}.badge.flip3{background:#7c3aed;color:#fff}
+.fcard.f3card{outline:3px dashed #a78bfa;outline-offset:1px}
+.pile{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;min-height:38px}
+.pcard{width:32px;height:44px;border-radius:5px;background:#f8fafc;color:#111;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:1px 2px 3px #0008;border:1px solid #cbd5e1}
+.cardimg{height:44px;width:auto;border-radius:5px;box-shadow:1px 2px 3px #0008}
+.cardimg.back{width:32px}
+/* Flip 7 sprite sheet: 7 cols x 4 rows, cell 130x204 */
+.fcard{width:44px;height:69px;border-radius:5px;background-image:url(flip7-cards.webp);background-size:308px 276px;box-shadow:1px 2px 3px #0008;flex:none}
+.fcard.back{width:44px}
+.rcard{width:36px;height:50px;border-radius:6px;background:#f8fafc;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:1px 2px 3px #0008;border:2px solid #cbd5e1;cursor:pointer}
+.rcard.big{width:54px;height:74px;font-size:24px;margin:0 auto}
+.rcard.sel{outline:3px solid #f59e0b;transform:translateY(-4px)}
+/* Regicide sprite sheet: 14 cols (Jester/back, A..K) x 4 rows (spade,heart,club,diamond), cell 240x336 */
+.rcimg{width:48px;height:67px;border-radius:6px;background-image:url(regicide-cards.webp);background-size:672px 268px;box-shadow:1px 2px 3px #0008;cursor:pointer;flex:none}
+.seats.reg-row{flex-direction:row;flex-wrap:wrap}.seats.reg-row .seat{flex:1 1 140px;min-height:0}
+.handbacks{display:flex;margin-top:6px}.handbacks .rcimg{width:24px;height:34px;background-size:336px 134px;margin-right:-14px;cursor:default}
+.rcimg.big{width:72px;height:101px;background-size:1008px 404px}
+.rcimg.small{width:36px;height:50px;background-size:504px 202px}
+.castle-tr{position:absolute;top:8px;right:8px;display:flex;gap:6px;align-items:flex-start}
+.vstack{display:flex;flex-direction:column;gap:2px;text-align:left}
+.rcimg.sel{outline:3px solid #f59e0b;transform:translateY(-4px)}
+/* Card animations: .card-in is added by JS only to newly-appearing cards (diffed against previous board), so the 3s poll re-render does not replay them */
+@keyframes cardIn{from{opacity:0;transform:translateY(-14px) scale(.7) rotateY(70deg)}to{opacity:1;transform:none}}
+@keyframes hitShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px)}40%{transform:translateX(5px)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
+@keyframes selPop{0%{transform:translateY(-4px) scale(1)}40%{transform:translateY(-10px) scale(1.08)}100%{transform:translateY(-4px) scale(1)}}
+.card-in{animation:cardIn .35s ease-out}
+.hit-shake{animation:hitShake .4s ease}
+#rgHand .rcimg{transition:transform .15s ease}
+#rgHand .rcimg:active{transform:scale(.92)}
+.rcimg.sel{animation:selPop .3s ease}
+@media (prefers-reduced-motion:reduce){.card-in,.hit-shake,.rcimg.sel{animation:none}#rgHand .rcimg{transition:none}}
+.deckpile{display:flex;align-items:center;gap:10px;justify-content:center;margin:8px 0}
+.lobby-note{text-align:center;padding:10px}
+button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;cursor:pointer}
+.hit{background:#f59e0b;color:#111;font-weight:800}.stay{background:#334155;color:#fff}
+.log{white-space:pre-wrap;font-size:14px;max-height:220px;overflow:auto}
+.small{font-size:13px;color:#94a3b8} .hidden{display:none}
+.targetbtn{display:block;width:100%;background:#475569;color:#fff}
+/* Odin cards: BGA sprite sheet 10 cols x 6 rows (cell = display size) */
+.ocard{width:44px;height:83px;border-radius:6px;background-image:url(odin-cards.webp);background-size:440px 498px;box-shadow:1px 2px 3px #0008;flex:none;cursor:pointer;transition:transform .15s ease}
+.ocard.big{width:54px;height:101px;background-size:540px 606px}
+.ocard:active{transform:scale(.92)}
+.ocard.sel{outline:3px solid #f59e0b;transform:translateY(-4px);animation:selPop .3s ease}
+.handbacks .ocard{width:24px;height:34px;background-image:none;cursor:default}
+.odtable{display:flex;align-items:center;gap:10px;justify-content:flex-start;margin:8px 0}
+.odvalue{background:#f59e0b;color:#111;border-radius:999px;padding:4px 12px;font-weight:900;font-size:18px}
+</style></head><body>
+<h1>🎴 Flip 7</h1>
+<div id="regicide" class="hidden">
+<div id="rgBoard"></div>
+<div id="rgTurn" style="font-size:18px;font-weight:700"></div>
+<div id="rgActions"></div>
+<div id="rgHand"></div>
+<div id="rgPreview" class="card" style="display:none"></div>
+<button class="hit hidden" id="rgPlay">⚔️ Play selected</button>
+<button class="stay hidden" id="rgYield">⏭ Yield</button>
+<button class="primary hidden" id="rgStart">🎮 Start game</button>
+<button class="hit hidden" id="rgDiscard">🗑 Discard selected</button>
+<div class="log" id="rgLog"></div>
+</div>
+<div id="odin" class="hidden">
+<div id="odBoard"></div>
+<div id="odTurn" style="font-size:18px;font-weight:700"></div>
+<div id="odActions"></div>
+<div id="odHand"></div>
+<div id="odPreview" class="card" style="display:none"></div>
+<button class="hit hidden" id="odPlay">⚔️ Play selected</button>
+<button class="stay hidden" id="odPass">⏭ Pass</button>
+<button class="hit hidden" id="odPickup">✋ Take selected</button>
+<button class="primary hidden" id="odStart">🎮 Start game</button>
+<div class="log" id="odLog"></div>
+</div>
+<div id="synced">
+<div id="syncBoard"></div>
+<div id="syncTurn" style="font-size:18px;font-weight:700"></div>
+<div id="syncActions"></div>
+<button class="hit hidden" id="syncHit">🎴 Hit</button>
+<button class="stay hidden" id="syncStay">✅ Stay</button>
+<button class="primary hidden" id="syncStart">🎮 Start game</button>
+<div class="log" id="syncLog"></div>
+</div>
+<script data-cfasync="false" src="flip7.js?v=16"></script>
+<script data-cfasync="false" src="regicide.js?v=13"></script>
+<script data-cfasync="false" src="odin.js?v=3"></script>
+</body></html>

@@ -1,0 +1,12 @@
+.env
+.login.json
+*.session
+state.json
+state.json.bak
+state.json.tmp
+*.tmp
+bot.log
+web/server.log
+tunnel.log
+cloudflared-bin
+__pycache__/

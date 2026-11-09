@@ -1,0 +1,3 @@
+# bot.py and game.py: stdlib only, nothing to install.
+# create_bot.py (optional, BotFather self-creation via MTProto):
+telethon>=1.36

@@ -43,11 +43,12 @@ HELP = """🎴 <b>Boardgame bot</b>
 /web - play the HTML5 version (Mini App if FLIP7_WEB_URL set, else file)
 /play - play via Telegram HTML5 Game (sendGame) or the HTML file
 /score - show board &amp; scores   /rules - how to play   /cancel - creator cancels
-/regicide - co-op Regicide (also: -join -start -play <cards> -yield -discard <cards> -rules -cancel)
-/odin - card-shedding Odin (also: -join -start -play <cards> -pass -pickup <card> -score -cancel -rules)
-/spots - push-your-luck dog dice (also: -join -start -trick <tile> -place <die> <dog> <spot>|yard -reroll -score -cancel -rules)
+/regicide - co-op Regicide (also /regicide_join /regicide_start /regicide_play /regicide_yield /regicide_discard /regicide_rules /regicide_cancel)
+/odin - card-shedding Odin (also /odin_join /odin_start /odin_play /odin_pass /odin_pickup /odin_score /odin_cancel /odin_rules)
+/spots - push-your-luck dog dice (also /spots_join /spots_start /spots_trick /spots_place /spots_reroll /spots_score /spots_cancel /spots_rules)
 /games - list the games you can start (and what's running here)
-/lsd - dice game Let's Summon Demons (also: -join -start -roll -buy <n> -summon <demon> <sacrifices> -end -score -cancel -rules)
+🤖 /join_npc (or /<game>_join_npc) - add a mock player anyone can control, in the lobby
+/lsd - dice game Let's Summon Demons (also /lsd_join /lsd_start /lsd_roll /lsd_buy /lsd_summon /lsd_end /lsd_score /lsd_cancel /lsd_rules)
 Play: on your turn tap <b>Hit</b> to flip a card or <b>Stay</b> to bank.
 Duplicate number = bust (0 pts). 7 unique numbers = Flip 7 (+15), round ends.
 First to 200 wins. Cards are face-up/public, just like the physical game."""
@@ -1569,6 +1570,7 @@ def handle_command(state, msg):
             else:
                 _st = "in progress"
             lines.append(f"• {_name} — {_new} ({_desc}) · {_st}")
+        lines.append("🤖 Add a mock player anyone can control: /join_npc (Flip 7) or /regicide_join_npc, /odin_join_npc, /lsd_join_npc, /spots_join_npc")
         send(chat_id, "\n".join(lines))
         return
     if cmd == "/cancel" and msg.get("reply_to_message"):

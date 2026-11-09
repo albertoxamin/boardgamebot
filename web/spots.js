@@ -64,13 +64,26 @@ function spRender(){let b=SP.board; if(!b)return;
     + (b.trick&&b.trick.tile==='search'?'<button class="lsdchoice" id="spDone">✅ Done (discard rest)</button>':'')+'</div>';
  }
  let lastRollHtml=b.last_roll?'<div class="small"><b>Last roll:</b> '+b.last_roll.map(v=>'<img class="sdice" src="spots-dice/'+v+'.png" alt="die '+v+'" style="width:30px;height:32px">').join('')+'</div>':'';
- let scoreBtn=(myTurn&&!b.trick&&(me?me.dogs.some(d=>Object.keys(d.placed||{}).length===d.spots.length):false))
+ let scoreBtnHtml=(myTurn&&!b.trick&&(me?me.dogs.some(d=>Object.keys(d.placed||{}).length===d.spots.length):false))
    ?'<button class="hit" id="spScoreDyn" style="margin:6px 0">🏅 Score dogs</button>':'';
+ let choiceHtml='';
+ if(pend&&pend.kind!=='place'){
+   let pendPlayer=b.players[pend.player];
+   choiceHtml='<div class="card"><b>⏳ '+(pendPlayer?escapeHtml(pendPlayer.name):'')+' to choose:</b>'
+    +(pend.options_detail||[]).map(o=>'<button class="lsdchoice" data-choice="'+escapeHtml(JSON.stringify(o.choice))+'">'
+      +(pend.kind==='choose_number'&&Number.isInteger(o.choice)&&o.choice>=1&&o.choice<=6
+         ?'<img class="sdice" src="spots-dice/'+o.choice+'.png" alt="die '+o.choice+'" style="width:34px;height:36px;vertical-align:middle"> '+o.label
+         :escapeHtml(o.label))+'</button>').join('')+'</div>';
+ }
+ let actionsBar=(poolHtml||choiceHtml||scoreBtnHtml)?'<div class="spots-actions">'+poolHtml+choiceHtml+scoreBtnHtml+'</div>':'';
  document.getElementById('spotsBoard').innerHTML='<div class="table" style="position:relative">'
   +(SP.spectating?'<div class="lobby-note">👁 Spectating — view only (join in Telegram to play)</div>':'')
-  +poolHtml+lastRollHtml+scoreBtn+tiles+seats+'</div>';
+  +actionsBar+lastRollHtml+tiles+seats+'</div>';
  let sdBtn=document.getElementById('spScoreDyn');
  if(sdBtn)sdBtn.addEventListener('click',()=>spMove('score'));
+ document.querySelectorAll('.spots-actions [data-choice]').forEach(btn=>btn.addEventListener('click',()=>{
+   let c=btn.dataset.choice; try{c=JSON.parse(c);}catch(e){}
+   spMove('choice',{choice:c});}));
  // Trick tiles tap (choose a trick)
  if(myTurn && !b.trick){
    document.querySelectorAll('#spotsBoard .tiley').forEach(el=>{
@@ -98,27 +111,18 @@ function spRender(){let b=SP.board; if(!b)return;
    }));
    // dog spot taps
    document.querySelectorAll('#spotsBoard .spotbox').forEach(el=>el.addEventListener('click',()=>{
-     if(SP.dieSel===null){spLog('Select a die first');return;}
-     spMove('place',{die_pos:SP.dieSel,target:['dog',parseInt(el.dataset.dog),parseInt(el.dataset.spot)]});
+     let diePos=SP.dieSel;
+     if(diePos===null||(b.trick?b.trick.dice:[])[diePos]===undefined){
+       let dog=b.players.flatMap(p=>p.dogs).find(d=>d.iid===parseInt(el.dataset.dog));
+       let need=dog?dog.spots[parseInt(el.dataset.spot)]:null;
+       diePos=(b.trick?b.trick.dice:[]).findIndex(v=>v===need);
+       if(diePos<0){spLog('No rolled die matches that spot ('+need+')');return;}
+     }
+     spMove('place',{die_pos:diePos,target:['dog',parseInt(el.dataset.dog),parseInt(el.dataset.spot)]});
    }));
  }
  document.getElementById('spotsScore').classList.add('hidden'); // score action lives in the top strip now
  document.getElementById('spotsStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.players.some(p=>p.user_id===SP.user_id)));
- // Pending choices (non-place)
- let ch=document.getElementById('spotsChoice'); ch.innerHTML=''; ch.style.display='none';
- if(pend&&pend.kind!=='place'){
-   let pendPlayer=b.players[pend.player];
-   let box=document.createElement('div'); box.className='card';
-   box.innerHTML='<b>⏳ '+(pendPlayer?escapeHtml(pendPlayer.name):'')+' to choose:</b>';
-   (pend.options_detail||[]).forEach(o=>{let btn=document.createElement('button'); btn.className='lsdchoice';
-     if(pend.kind==='choose_number'&&Number.isInteger(o.choice)&&o.choice>=1&&o.choice<=6){
-       btn.innerHTML='<img class="sdice" src="spots-dice/'+o.choice+'.png" alt="die '+o.choice+'" style="width:34px;height:36px;vertical-align:middle"> '+o.label;
-     } else btn.textContent=o.label;
-     btn.addEventListener('click',()=>spMove('choice',{choice:o.choice})); box.appendChild(btn);});
-   ch.appendChild(box);
-   let boardEl2=document.getElementById('spotsBoard');
-   boardEl2.querySelector('.table').prepend(box);
- }
  let t=document.getElementById('spotsTurn');
  if(b.phase==='playing') t.textContent=pend? '👉 '+nameOf(b,pend.player)+' to choose' : (myTurn?'👉 Your turn - choose a trick or Score':'👉 '+b.players[b.current_index].name+"'s turn");
  else if(b.phase==='lobby') t.textContent='🪑 Lobby - anyone taps Start';

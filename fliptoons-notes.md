@@ -106,8 +106,9 @@ Toon deck (ranks 1-25, 47 cards total): see counts below. Counts sum to 47: 3+2+
 
 ## Implementation decisions (documented approximations)
 
-- Cards are ints: starters -1..-5 = caterpillar/skunk/dragonfly/bee/snail; toons 1..25 = rank.
-  Instances are dicts {"id": n, "r": rank, "fd": face_down}.
+- Cards are instances: {"id": n, "r": rank, "s": starter index 0-4 or None, "fd": face_down}.
+  Starters are rank 0 (caterpillar=0/skunk=1/dragonfly=2/bee=3/snail=4); toons 1..25 = rank.
+  Starting deck per player: caterpillar x2, skunk, dragonfly, bee, snail (no pig).
 - deck = list, deck[-1] = top. Grid = 6 slots (0-2 top row, 3-5 bottom) + cell 6 = monkey row
   (adjacent to 0,1,2). Adjacency orthogonal.
 - Market prices [3,4,7,10,15] by sorted position; < 5 cards -> right-aligned (use last n prices).
@@ -121,7 +122,24 @@ Toon deck (ranks 1-25, 47 cards total): see counts below. Counts sum to 47: 3+2+
 - Butterfly (NPC): auto-dismiss a face-up caterpillar if present.
 - Fame computation order: all non-cow cards first, then cow (only 1 cow in deck, no recursion).
 - NPC auto-play: greedy — hire the most expensive affordable non-pig card; resolve pendings inline.
-- 2-player cleanup: discard leftmost+rightmost, refill, re-sort. 3+ players: no discard.
+
+## Engine API (implemented in fliptoons.py)
+
+- new_game(chat_id, creator_id, creator_name) / start_game(g, events) (2-4 players) /
+  advance(g, events) / apply_choice(g, idx, choice, events) / do_market(g, idx, act, arg, events).
+- Pendings: dict {"kind", "player", "options": [{"v","label"}], "prompt"} in g["pending"];
+  overflow via g["pending_q"] (apply_choice promotes the queue head and returns without
+  advancing). Kinds: skunk (mandatory dismissal), butterfly (dismiss caterpillar/skip),
+  pig (own/toon/p<i> deck placement), horse (incremental market discard, "done").
+- Instances {"id","r","s","fd"}; grid_fame(g, p), card_name(inst), _label(inst) helpers.
+- Fame target 30; prices [3,4,7,10,15]; dismiss cost 5 (starters 3); tie cap 10 -> draw.
+- 2-player cleanup: after the last player's market phase, discard the leftmost+rightmost market
+  cards (1 remaining card counts as both -> discard it), refill, re-sort. 3+ players: no discard.
+- End triggers: fame >= 30 at Check Fame; toon deck AND market both empty; degenerate-state
+  stall breaker (engine house rule): toon deck empty and no market hire for 8 consecutive
+  rounds -> Final Flip (prevents rules-legal deadlocks like empty decks + unaffordable market).
+- Skunk check: owner's fame strictly the least among all players (tie -> nobody), mandatory
+  free dismissal at the start of the owner's Market phase, no action cost.
 - End triggers as above; critic's choice +3 to unique most-fame player at first 30+ check.
 
 ## Assets

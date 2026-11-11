@@ -2742,10 +2742,11 @@ def yahtzee_board_json(g, viewer_id=None):
     t = g.get("turn")
     turn_out = None
     dice_scores = None
-    if t and t["dice"]:
-        dice_scores = {key: Y.score_for(key, t["dice"]) for key, _ in Y.CATEGORIES}
+    if t:
         turn_out = {"rolls": t["rolls"], "dice": list(t["dice"]),
                     "keep": list(t["keep"]), "current_index": g["current_index"]}
+        if t["dice"]:
+            dice_scores = {key: Y.score_for(key, t["dice"]) for key, _ in Y.CATEGORIES}
     return {
         "chat_id": g["chat_id"], "phase": g["phase"],
         "current_index": g["current_index"], "created_by": g["created_by"],

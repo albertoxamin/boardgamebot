@@ -48,7 +48,8 @@ function yzRender(){
  } else if(myTurn){ diceHtml='<div class="small">Tap Roll to start your turn.</div>'; }
  let cards=b.players.map((p,i)=>yzScorecard(p,i,b)).join('');
  let specBar=spect?'<div class="lobby-note">👁 Spectating — view only (join in Telegram to play)</div>':'';
- document.getElementById('yzBoard').innerHTML='<div class="table">'+specBar+diceHtml+cards+'</div>';
+ document.getElementById('yzDice').innerHTML=diceHtml;
+ document.getElementById('yzBoard').innerHTML='<div class="table">'+specBar+cards+'</div>';
  // Action buttons
  let roll=document.getElementById('yzRoll'), start=document.getElementById('yzStart'), rem=document.getElementById('yzRematch');
  roll.classList.toggle('hidden',!(myTurn&&t&&t.rolls<3));
@@ -62,7 +63,7 @@ function yzRender(){
  else if(b.phase==='game_end') turn.textContent='🏆 Game over!';
  else turn.textContent='';
  // Dice keep toggles
- document.querySelectorAll('#yzBoard .ydie').forEach(el=>el.addEventListener('click',()=>{
+ document.querySelectorAll('#yzDice .ydie').forEach(el=>el.addEventListener('click',()=>{
   if(!myTurn||!t||t.rolls===0||t.rolls>=3)return;
   let i=parseInt(el.dataset.i); YZ.keep[i]=!YZ.keep[i]; yzRender();}));
  // Score taps on current player's open boxes

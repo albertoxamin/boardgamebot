@@ -112,6 +112,8 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 .yscore.used{opacity:.65}
 .yscore.free{cursor:pointer;border-color:#f59e0b66;color:#e2e8f0}
 .yscore .pts{color:#f59e0b;font-weight:800}
+.yzbar{position:sticky;top:0;z-index:30;background:rgba(15,23,42,.97);border:1px solid #334155;border-radius:12px;padding:8px;margin-bottom:8px;box-shadow:0 4px 14px #000a}
+#yzRoll:not(.hidden){display:block;width:100%;margin:8px 0 0}
 </style></head><body>
 <h1>🎴 Flip 7</h1>
 <div id="regicide" class="hidden">
@@ -163,10 +165,12 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <div class="log" id="spotsLog"></div>
 </div>
 <div id="yahtzee" class="hidden">
+<div class="yzbar">
 <div id="yzTurn" style="font-size:18px;font-weight:700"></div>
-<div id="yzBoard"></div>
-<div id="yzActions"></div>
+<div id="yzDice"></div>
 <button class="hit hidden" id="yzRoll">🎲 Roll dice</button>
+</div>
+<div id="yzBoard"></div>
 <button class="primary hidden" id="yzStart">🎮 Start game</button>
 <button class="primary hidden" id="yzRematch">🔄 Rematch!</button>
 <div class="log" id="yzLog"></div>
@@ -187,5 +191,5 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <script data-cfasync="false" src="odin.js?v=9"></script>
 <script data-cfasync="false" src="lsd.js?v=4"></script>
 <script data-cfasync="false" src="spots.js?v=14"></script>
-<script data-cfasync="false" src="yahtzee.js?v=1"></script>
+<script data-cfasync="false" src="yahtzee.js?v=2"></script>
 </body></html>

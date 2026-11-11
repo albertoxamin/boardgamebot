@@ -102,7 +102,7 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 /* Yahtzee: dice + scorecards */
 .ydice{display:flex;justify-content:center;gap:6px;margin:8px 0;flex-wrap:wrap}
 .ydie{width:52px;height:52px;border-radius:10px;background:#f8fafc;color:#111;font-weight:900;font-size:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:1px 2px 3px #0008;border:2px solid #cbd5e1}
-.ydie.kept{outline:3px solid #f59e0b;transform:translateY(-3px)}
+.ydie.reroll{outline:3px solid #ef4444;background:#fee2e2;transform:translateY(-3px);opacity:.85}
 .yscard{background:rgba(15,23,42,.85);border:2px solid #334155;border-radius:12px;padding:8px;margin:6px 0}
 .yscard.current{border-color:#f59e0b}
 .yshead{display:flex;justify-content:space-between;font-weight:800;margin-bottom:6px}
@@ -114,6 +114,7 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 .yscore .pts{color:#f59e0b;font-weight:800}
 .yzbar{position:sticky;top:0;z-index:30;background:rgba(15,23,42,.97);border:1px solid #334155;border-radius:12px;padding:8px;margin-bottom:8px;box-shadow:0 4px 14px #000a}
 #yzRoll:not(.hidden){display:block;width:100%;margin:8px 0 0}
+#yzRoll:disabled{opacity:.5}
 </style></head><body>
 <h1>🎴 Flip 7</h1>
 <div id="regicide" class="hidden">
@@ -191,5 +192,5 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <script data-cfasync="false" src="odin.js?v=9"></script>
 <script data-cfasync="false" src="lsd.js?v=4"></script>
 <script data-cfasync="false" src="spots.js?v=14"></script>
-<script data-cfasync="false" src="yahtzee.js?v=2"></script>
+<script data-cfasync="false" src="yahtzee.js?v=3"></script>
 </body></html>

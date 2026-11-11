@@ -1,5 +1,5 @@
 // Yahtzee Mini App (synced, initData auto-login). Loaded by flip7.html router.
-const YZ={user_id:0,chat_id:null,board:null,timer:null,init:'',keep:[false,false,false,false,false],prevDice:[]};
+const YZ={user_id:0,chat_id:null,board:null,timer:null,init:'',reroll:[false,false,false,false,false],prevDice:[]};
 const YZ_UPPER=['ones','twos','threes','fours','fives','sixes'];
 function yzLog(s){let e=document.getElementById('yzLog');if(e)e.textContent+=s+'\n';}
 function yzApi(path,opts){return fetch(path,opts).then(r=>r.json());}
@@ -26,14 +26,14 @@ async function yzSelect(chat_id){YZ.chat_id=chat_id; await yzRefresh();
 async function yzRefresh(){ if(!YZ.chat_id)return;
  let r=await yzApi('/api/yahtzee/game?chat_id='+encodeURIComponent(YZ.chat_id)+'&init_data='+encodeURIComponent(YZ.init));
  if(r.ok){let prev=YZ.board; YZ.board=r.game;
-  if(!prev || !prev.turn || !r.game.turn || r.game.turn.rolls===0) YZ.keep=[false,false,false,false,false];
-  else YZ.keep=YZ.keep.slice(0,5).concat([false,false,false,false,false]).slice(0,5);
+  let a=prev&&prev.turn, c=r.game.turn;
+  if(!a||!c||a.rolls!==c.rolls||prev.current_index!==r.game.current_index) YZ.reroll=[false,false,false,false,false];
   yzRender();}}
 async function yzMove(action,extra){
  let body=Object.assign({chat_id:YZ.chat_id,action:action,init_data:YZ.init},extra||{});
  let r=await yzApi('/api/yahtzee/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
  if(r.events)r.events.forEach(e=>yzLog(e)); if(r.error)yzLog('⛔ '+r.error);
- if(r.game){YZ.board=r.game; if(r.game.turn&&r.game.turn.keep)YZ.keep=r.game.turn.keep.slice(); yzRender();}}
+ if(r.game){YZ.board=r.game; YZ.reroll=[false,false,false,false,false]; yzRender();}}
 function yzRender(){
  let b=YZ.board; if(!b)return;
  let t=b.turn||null, cur=b.players[b.current_index]||null;
@@ -43,8 +43,8 @@ function yzRender(){
  let diceHtml='';
  if(t&&t.dice&&t.dice.length){
   diceHtml='<div class="ydice">'+t.dice.map((d,i)=>
-    '<div class="ydie'+(YZ.keep[i]?' kept':'')+(newDice.has(i)?' card-in':'')+'" data-i="'+i+'">'+d+'</div>').join('')+'</div>'
-    +'<div class="small">'+(t.rolls>=3?'No rolls left — score a box.':'Roll '+t.rolls+'/3 · tap dice to keep')+'</div>';
+    '<div class="ydie'+(YZ.reroll[i]?' reroll':'')+(newDice.has(i)?' card-in':'')+'" data-i="'+i+'">'+d+'</div>').join('')+'</div>'
+    +'<div class="small">'+(t.rolls>=3?'No rolls left — score a box.':'Tap dice to reroll · the rest are kept')+'</div>';
  } else if(myTurn){ diceHtml='<div class="small">Tap Roll to start your turn.</div>'; }
  let cards=b.players.map((p,i)=>yzScorecard(p,i,b)).join('');
  let specBar=spect?'<div class="lobby-note">👁 Spectating — view only (join in Telegram to play)</div>':'';
@@ -53,7 +53,11 @@ function yzRender(){
  // Action buttons
  let roll=document.getElementById('yzRoll'), start=document.getElementById('yzStart'), rem=document.getElementById('yzRematch');
  roll.classList.toggle('hidden',!(myTurn&&t&&t.rolls<3));
- roll.textContent=t&&t.rolls>0?('🎲 Reroll ('+(3-t.rolls)+' left)'):'🎲 Roll dice';
+ if(t&&t.rolls>0){
+  let n=YZ.reroll.filter(Boolean).length;
+  roll.textContent='🎲 Reroll selected ('+n+')';
+  roll.disabled=(n===0);
+ } else { roll.textContent='🎲 Roll dice'; roll.disabled=false; }
  start.classList.toggle('hidden',!(b.phase==='lobby'&&b.players.some(p=>p.user_id===YZ.user_id)));
  rem.classList.toggle('hidden',!(b.phase==='game_end'&&b.is_player));
  // Turn line
@@ -62,10 +66,10 @@ function yzRender(){
  else if(b.phase==='lobby') turn.textContent='🪑 Lobby - anyone taps Start';
  else if(b.phase==='game_end') turn.textContent='🏆 Game over!';
  else turn.textContent='';
- // Dice keep toggles
+ // Tap a die to mark it for reroll (unmarked dice are kept)
  document.querySelectorAll('#yzDice .ydie').forEach(el=>el.addEventListener('click',()=>{
   if(!myTurn||!t||t.rolls===0||t.rolls>=3)return;
-  let i=parseInt(el.dataset.i); YZ.keep[i]=!YZ.keep[i]; yzRender();}));
+  let i=parseInt(el.dataset.i); YZ.reroll[i]=!YZ.reroll[i]; yzRender();}));
  // Score taps on current player's open boxes
  if(myTurn&&t&&t.rolls>=1){
   document.querySelectorAll('#yzBoard .yscore.free').forEach(el=>el.addEventListener('click',()=>{
@@ -89,7 +93,7 @@ function yzScorecard(p,i,b){
   +'<div class="ysgrid">'+b.categories.map(cell).join('')+'</div>'
   +'<div class="small">Upper '+upper+'/63'+(upper>=63?' · +35 ✓':'')+' · Yahtzee bonus +'+(p.yahtzee_bonus||0)+' · '+p.filled+'/13 filled</div></div>';
 }
-document.getElementById('yzRoll').addEventListener('click',()=>yzMove('roll',{keep:YZ.keep}));
+document.getElementById('yzRoll').addEventListener('click',()=>yzMove('roll',{keep:YZ.reroll.map(x=>!x)}));
 document.getElementById('yzStart').addEventListener('click',()=>yzMove('start'));
 document.getElementById('yzRematch').addEventListener('click',()=>yzMove('rematch'));
 // Self-start when router (flip7.js) selected Yahtzee mode.

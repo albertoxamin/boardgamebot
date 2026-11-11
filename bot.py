@@ -14,6 +14,7 @@ import regicide as R
 import odin as O
 import lsd as D
 import spots as SP
+import yahtzee as Y
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT_TOKEN", "")
 API = f"https://api.telegram.org/bot{TOKEN}" if TOKEN else ""
@@ -40,6 +41,7 @@ HELP = """🎴 <b>Boardgame bot</b>
 /regicide - co-op Regicide (also /regicide_join /regicide_start /regicide_play /regicide_yield /regicide_discard /regicide_rules /regicide_cancel)
 /odin - card-shedding Odin (also /odin_join /odin_start /odin_play /odin_pass /odin_pickup /odin_score /odin_cancel /odin_rules)
 /spots - push-your-luck dog dice (also /spots_join /spots_start /spots_trick /spots_place /spots_reroll /spots_score /spots_cancel /spots_rules)
+/yahtzee - dice scorecard classic (also /yahtzee_join /yahtzee_start /yahtzee_roll /yahtzee_score /yahtzee_cancel /yahtzee_rules)
 /games - list the games you can start (and what's running here)
 🤖 /join_npc (or /<game>_join_npc) - add a mock player anyone can control, in the lobby
 /lsd - dice game Let's Summon Demons (also /lsd_join /lsd_start /lsd_roll /lsd_buy /lsd_summon /lsd_end /lsd_score /lsd_cancel /lsd_rules)
@@ -134,23 +136,23 @@ def web_keyboard(chat_type="private", chat_id=None, game="flip7"):
     startapp=<game><chat_id> (no second BotFather app needed)."""
     if not WEB_URL:
         return None
-    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "lsd": "🎮 Play Summon Demons (HTML)", "spots": "🎮 Play Spots (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
+    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "lsd": "🎮 Play Summon Demons (HTML)", "spots": "🎮 Play Spots (HTML)", "yahtzee": "🎮 Play Yahtzee (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
     if chat_type in ("group", "supergroup", "channel"):
         if chat_id:
-            start = f"{game}{chat_id}" if game in ("regicide", "odin", "lsd", "spots") else str(chat_id)
+            start = f"{game}{chat_id}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee") else str(chat_id)
             url = f"https://t.me/flip7groupbot?startapp={start}"
         else:
             url = WEB_URL
         btn = {"text": label, "url": url}
     else:
-        url = WEB_URL + (f"?app={game}" if game in ("regicide", "odin", "lsd", "spots") else "")
+        url = WEB_URL + (f"?app={game}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee") else "")
         btn = {"text": label, "web_app": {"url": url}}
     return [[btn]]
 
 
 # ---------- State ----------
 def load_state():
-    s = {"games": {}, "regicide": {}, "odin": {}, "lsd": {}, "spots": {}}
+    s = {"games": {}, "regicide": {}, "odin": {}, "lsd": {}, "spots": {}, "yahtzee": {}}
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE) as f:
@@ -162,6 +164,7 @@ def load_state():
     s.setdefault("odin", {})
     s.setdefault("lsd", {})
     s.setdefault("spots", {})
+    s.setdefault("yahtzee", {})
     return s
 
 
@@ -1468,8 +1471,222 @@ def handle_spots(state, msg, cmd, text, uid, name):
     return False
 
 
+# ---------- Yahtzee (dice scorecard) ----------
+YAHTZEE_RULES = """🎲 <b>Yahtzee rules</b> (2-6 players): fill all 13 boxes on your scorecard; highest total wins.
+• Each turn roll 5 dice, then reroll any you don't want to keep (up to <b>3 rolls</b> total), then score one open box.
+• Upper: Ones…Sixes = sum of those dice. Score <b>63+</b> in the upper section for a <b>+35</b> bonus.
+• Three/Four of a Kind = sum of all dice (need 3/4 alike). Full House = 25. Small Straight = 30. Large Straight = 40. Yahtzee = 50. Chance = sum.
+• Extra Yahtzee (after the Yahtzee box is filled with 50): <b>+100</b> each.
+• Game ends when every player has filled all 13 boxes."""
+
+
+def yahtzee_get(state, chat_id):
+    return state.setdefault("yahtzee", {}).get(str(chat_id))
+
+
+def yahtzee_board_text(g):
+    if g["phase"] == "lobby":
+        return (f"🎲 <b>Yahtzee lobby</b> - {len(g['players'])} player(s). "
+                f"Friends: /yahtzee_join, anyone: /yahtzee_start")
+    if g["phase"] == "game_end":
+        if g.get("winners"):
+            names = ", ".join(g["players"][i]["name"] for i in g["winners"])
+        else:
+            names = "nobody"
+        scores = " · ".join(f"{p['name']} {Y.total_score(p)}" for p in g["players"])
+        return f"🏆 <b>Yahtzee game over</b> - winner: <b>{html.escape(names)}</b>\n{scores}"
+    lines = ["🎲 <b>Yahtzee</b>"]
+    for i, p in enumerate(g["players"]):
+        turn = " 👈" if i == g["current_index"] else ""
+        upper = Y.upper_subtotal(p)
+        bonus = " · upper bonus ✓" if Y.has_upper_bonus(p) else f" · upper {upper}/63"
+        lines.append(f"• {html.escape(p['name'])}: <b>{Y.total_score(p)}</b> pts "
+                     f"({Y.filled_count(p)}/{len(Y.CATEGORIES)}){bonus}{turn}")
+    t = g.get("turn")
+    if t and t["dice"]:
+        dice = " ".join(str(d) for d in t["dice"])
+        kept = [str(i + 1) for i, k in enumerate(t["keep"]) if k]
+        extra = f" · kept {', '.join(kept)}" if kept else ""
+        lines.append(f"🎲 Dice: [{dice}] · roll {t['rolls']}/{Y.MAX_ROLLS}{extra}")
+    return "\n".join(lines)
+
+
+def yahtzee_keyboard(g):
+    if g["phase"] == "game_end":
+        return [[{"text": "🔄 Rematch!", "callback_data": "yz:rematch"}]]
+    ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
+    wk = web_keyboard(ct, g["chat_id"], game="yahtzee")
+    if g["phase"] == "lobby":
+        return [[{"text": "🙋 Join Yahtzee", "callback_data": "yz:join"}]] + (wk or [])
+    kb = []
+    t = g.get("turn")
+    if t and t["dice"]:
+        kb.append([{"text": f"{'✅' if t['keep'][i] else ''}{d}",
+                    "callback_data": f"yz:keep:{i}"}
+                   for i, d in enumerate(t["dice"])])
+    if t and t["rolls"] < Y.MAX_ROLLS:
+        label = ("🎲 Roll dice" if t["rolls"] == 0
+                 else f"🎲 Reroll ({Y.MAX_ROLLS - t['rolls']} left)")
+        kb.append([{"text": label, "callback_data": "yz:roll"}])
+    if t and t["rolls"] >= 1:
+        cur = g["players"][g["current_index"]]
+        avail = [(k, lbl) for k, lbl in Y.CATEGORIES if cur["scores"][k] is None]
+        for j in range(0, len(avail), 2):
+            kb.append([{"text": lbl, "callback_data": f"yz:score:{k}"}
+                       for k, lbl in avail[j:j + 2]])
+    if wk:
+        kb.extend(wk)
+    return kb or None
+
+
+def yahtzee_render(g, events=None):
+    chat_id = g["chat_id"]
+    if events is None:
+        events = []
+    lines = [html.escape(e) for e in events]
+    if g["phase"] == "playing" and g["players"]:
+        p = g["players"][g["current_index"]]
+        ping = ("👉 🤖 NPC's turn - anyone can play for it!" if p.get("npc")
+                else f"👉 {yahtzee_mention(g, p['user_id'])} - your turn")
+        lines.append(ping)
+    text = "\n".join(lines + [yahtzee_board_text(g)]) if lines else yahtzee_board_text(g)
+    kb = yahtzee_keyboard(g)
+    r = send(chat_id, text, kb)
+    if r.get("ok"):
+        old = g.get("board_message_id")
+        g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=chat_id, message_id=old)
+
+
+def yahtzee_mention(g, user_id):
+    return f'<a href="tg://user?id={user_id}">{html.escape(Y.name_of(g, user_id))}</a>'
+
+
+def parse_yahtzee_category(token):
+    token = token.strip().lower()
+    if token in Y.CAT_KEY:
+        return Y.CAT_KEY[token]
+    if token in Y.CAT_LABEL:
+        return token
+    for key, label in Y.CATEGORIES:
+        if label.lower().replace(" ", "_").replace("-", "_") == token:
+            return key
+    return None
+
+
+def handle_yahtzee(state, msg, cmd, text, uid, name):
+    chat_id = msg["chat"]["id"]
+    g = yahtzee_get(state, chat_id)
+    if cmd == "/yahtzee_rules":
+        send(chat_id, YAHTZEE_RULES)
+        return True
+    if cmd == "/yahtzee":
+        if not g:
+            g = Y.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state.setdefault("yahtzee", {})[str(chat_id)] = g
+            send(chat_id, "🎲 Yahtzee game created! Friends: /yahtzee_join, anyone: /yahtzee_start")
+            yahtzee_render(g)
+        else:
+            yahtzee_render(g)
+        return True
+    if not g:
+        send(chat_id, "No Yahtzee game here yet - send /yahtzee to create one.")
+        return True
+    g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd == "/yahtzee_join_npc":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p.get("npc") for p in g["players"]):
+            send(chat_id, "🤖 NPC is already in this game.")
+        elif len(g["players"]) >= Y.MAX_PLAYERS:
+            send(chat_id, f"⛔ Yahtzee is 2-{Y.MAX_PLAYERS} players (full).")
+        else:
+            g["players"].append({**_npc_player(), **Y.new_player(NPC_ID, "🤖 NPC")})
+            send(chat_id, "🤖 NPC joined - anyone can play for it!")
+            yahtzee_render(g)
+        return True
+    if cmd == "/yahtzee_join":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p["user_id"] == uid for p in g["players"]):
+            send(chat_id, "You're already in!")
+        elif len(g["players"]) >= Y.MAX_PLAYERS:
+            send(chat_id, f"⛔ Yahtzee is 2-{Y.MAX_PLAYERS} players (full).")
+        else:
+            g["players"].append(Y.new_player(uid, msg.get("from", {}).get("first_name") or "Player"))
+            send(chat_id, f"🙋 <b>{name}</b> joined Yahtzee ({len(g['players'])} players).")
+            yahtzee_render(g)
+        return True
+    if cmd == "/yahtzee_start":
+        if g["phase"] != "lobby":
+            send(chat_id, "Already started.")
+        elif len(g["players"]) < 2:
+            send(chat_id, "⛔ Need at least 2 players.")
+        else:
+            ev = []
+            err = Y.start_game(g, ev)
+            if err:
+                send(chat_id, f"⛔ {err}")
+            else:
+                yahtzee_render(g, ev)
+        return True
+    if cmd == "/yahtzee_cancel":
+        if uid != g["created_by"]:
+            send(chat_id, "⛔ Only the creator can cancel.")
+        else:
+            del state["yahtzee"][str(chat_id)]
+            send(chat_id, "🗑 Yahtzee game cancelled.")
+        return True
+    if cmd == "/yahtzee_score":
+        parts = text.split()[1:]
+        if not parts:
+            yahtzee_render(g)
+            return True
+        idx = _actor_idx(g, uid, g["current_index"])
+        if idx is None:
+            send(chat_id, "⛔ You're not in this Yahtzee game - /yahtzee_join in lobby.")
+            return True
+        cat = parse_yahtzee_category(parts[0])
+        if not cat:
+            send(chat_id, "⛔ Unknown category. Try: ones twos threes fours fives sixes "
+                          "three_kind four_kind full_house small_straight large_straight yahtzee chance")
+            return True
+        ev = []
+        err = Y.score_category(g, idx, cat, ev)
+        if err:
+            send(chat_id, f"⛔ {err}")
+        else:
+            yahtzee_render(g, ev)
+        return True
+    if cmd in ("/yahtzee_roll", "/yahtzee_keep"):
+        idx = _actor_idx(g, uid, g["current_index"])
+        if idx is None:
+            send(chat_id, "⛔ You're not in this Yahtzee game - /yahtzee_join in lobby.")
+            return True
+        parts = [p for p in text.split()[1:] if p.isdigit()]
+        keep = [False] * Y.DICE_COUNT
+        for p in parts:
+            i = int(p) - 1
+            if 0 <= i < Y.DICE_COUNT:
+                keep[i] = True
+        ev = []
+        err = Y.roll_dice(g, idx, keep, ev)
+        if err:
+            send(chat_id, f"⛔ {err}")
+        else:
+            yahtzee_render(g, ev)
+        return True
+    if cmd == "/yahtzee_put":
+        send(chat_id, "Use /yahtzee_score &lt;category&gt; to fill a box.")
+        return True
+    return False
+
+
 REMATCH_END_PHASES = {"games": ("game_end",), "regicide": ("won", "lost"),
-                    "odin": ("game_end",), "lsd": ("game_end",), "spots": ("game_end",)}
+                     "odin": ("game_end",), "lsd": ("game_end",), "spots": ("game_end",),
+                     "yahtzee": ("game_end",)}
 
 
 def rematch_game(state, key, chat_id, uid):
@@ -1492,9 +1709,10 @@ def rematch_game(state, key, chat_id, uid):
                              "in_play": [], "demons": [], "demon_hand": []},
         "spots": lambda u, n: {"user_id": u, "name": n, "dogs": [], "scored": [],
                                "yard": [], "treats": 1},
+        "yahtzee": lambda u, n: Y.new_player(u, n),
     }
     news = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
-            "lsd": D.new_game, "spots": SP.new_game}
+            "lsd": D.new_game, "spots": SP.new_game, "yahtzee": Y.new_game}
     chat_type = g.get("chat_type", "private")
     board_id = g.get("board_message_id")
     g.clear()
@@ -1508,7 +1726,7 @@ def rematch_game(state, key, chat_id, uid):
         g["players"].append(pm)
     ev = [f"🔄 Rematch! {len(keep)} player(s) - anyone taps Start."]
     {"games": render, "regicide": rg_render, "odin": odin_render,
-     "lsd": lsd_render, "spots": spots_render}[key](g, ev)
+     "lsd": lsd_render, "spots": spots_render, "yahtzee": yahtzee_render}[key](g, ev)
     return ev, None
 
 
@@ -1551,6 +1769,7 @@ def handle_command(state, msg):
             ("odin", "🛡️ Odin", "/odin", "/odin_join", "card shedding, fewest points wins"),
             ("lsd", "😈 Let's Summon Demons", "/lsd", "/lsd_join", "dice activations, 3 demons + 10 souls"),
             ("spots", "🐶 Spots", "/spots", "/spots_join", "dog dice push-your-luck, 6 scored wins"),
+            ("yahtzee", "🎲 Yahtzee", "/yahtzee", "/yahtzee_join", "dice scorecard, 13 boxes"),
         )
         lines = ["🎮 <b>Games you can start:</b>"]
         for _key, _name, _new, _join, _desc in _catalog:
@@ -1564,14 +1783,14 @@ def handle_command(state, msg):
             else:
                 _st = "in progress"
             lines.append(f"• {_name} — {_new} ({_desc}) · {_st}")
-        lines.append("🤖 Add a mock player anyone can control: /join_npc (Flip 7) or /regicide_join_npc, /odin_join_npc, /lsd_join_npc, /spots_join_npc")
+        lines.append("🤖 Add a mock player anyone can control: /join_npc (Flip 7) or /regicide_join_npc, /odin_join_npc, /lsd_join_npc, /spots_join_npc, /yahtzee_join_npc")
         send(chat_id, "\n".join(lines))
         return
     if cmd == "/cancel" and msg.get("reply_to_message"):
         # Reply-targeted cancel: cancels the one game whose board message
         # was replied to (searches every game type in this chat).
         _mid = msg["reply_to_message"].get("message_id")
-        for _key in ("games", "regicide", "odin", "lsd", "spots"):
+        for _key in ("games", "regicide", "odin", "lsd", "spots", "yahtzee"):
             _gg = state.get(_key, {}).get(str(chat_id))
             if _gg is not None and _gg.get("board_message_id") == _mid:
                 del state[_key][str(chat_id)]
@@ -1591,6 +1810,9 @@ def handle_command(state, msg):
     if cmd.startswith("/spots"):
         handle_spots(state, msg, cmd, text, uid, name)
         return
+    if cmd.startswith("/yahtzee"):
+        handle_yahtzee(state, msg, cmd, text, uid, name)
+        return
     if cmd in ("/start", "/help", "/commands"):
         send(chat_id, HELP)
         return
@@ -1603,7 +1825,7 @@ def handle_command(state, msg):
         # (Flip 7 rules as the default when there are none).
         _mid = (msg.get("reply_to_message") or {}).get("message_id") if msg.get("reply_to_message") else None
         _by_key = (("games", RULES), ("regicide", REGICIDE_RULES), ("odin", ODIN_RULES),
-                   ("lsd", LSD_RULES), ("spots", SPOTS_RULES))
+                   ("lsd", LSD_RULES), ("spots", SPOTS_RULES), ("yahtzee", YAHTZEE_RULES))
         if _mid:
             for _key, _rules in _by_key:
                 _gg = state.get(_key, {}).get(str(chat_id))
@@ -1835,6 +2057,61 @@ def handle_callback(state, cb):
             answer_cb(cb["id"], err or "Done")
             if not err:
                 lsd_render(ls, ev)
+        else:
+            answer_cb(cb["id"], "Unknown button.")
+        return
+    if data.startswith("yz:"):
+        yz = yahtzee_get(state, chat_id)
+        if not yz:
+            return answer_cb(cb["id"], "No Yahtzee game here.")
+        parts = data.split(":")
+        idx = next((i for i, p in enumerate(yz["players"]) if p["user_id"] == uid), None)
+        if idx is None:
+            idx = _actor_idx(yz, uid, yz["current_index"])
+        ev = []
+        if parts == ["yz", "join"]:
+            if yz["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            if idx is not None:
+                return answer_cb(cb["id"], "Already in!")
+            yz["players"].append(Y.new_player(uid, cb["from"].get("first_name") or "Player"))
+            answer_cb(cb["id"], "Joined!")
+            yahtzee_render(yz, [f"🙋 {cb['from'].get('first_name')} joined Yahtzee."])
+        elif parts == ["yz", "start"]:
+            err = Y.start_game(yz, ev) if yz["phase"] == "lobby" else "already started"
+            answer_cb(cb["id"], err or "Started")
+            if not err:
+                yahtzee_render(yz, ev)
+        elif parts == ["yz", "roll"]:
+            if idx is None:
+                return answer_cb(cb["id"], "not in game")
+            keep = yz["turn"]["keep"] if yz.get("turn") else None
+            err = Y.roll_dice(yz, idx, keep, ev)
+            answer_cb(cb["id"], err or "Rolled")
+            if not err:
+                yahtzee_render(yz, ev)
+        elif len(parts) == 3 and parts[1] == "keep":
+            if idx is None or idx != yz["current_index"]:
+                return answer_cb(cb["id"], "Not your turn.")
+            t = yz.get("turn")
+            if not t or t["rolls"] == 0 or t["rolls"] >= Y.MAX_ROLLS:
+                return answer_cb(cb["id"], "Can't keep dice now.")
+            i = int(parts[2])
+            t["keep"][i] = not t["keep"][i]
+            answer_cb(cb["id"], "Kept" if t["keep"][i] else "Released")
+            yahtzee_render(yz)
+        elif len(parts) == 3 and parts[1] == "score":
+            if idx is None:
+                return answer_cb(cb["id"], "not in game")
+            err = Y.score_category(yz, idx, parts[2], ev)
+            answer_cb(cb["id"], err or "Scored")
+            if not err:
+                yahtzee_render(yz, ev)
+        elif parts == ["yz", "rematch"]:
+            ev, err = rematch_game(state, "yahtzee", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
         else:
             answer_cb(cb["id"], "Unknown button.")
         return
@@ -2459,6 +2736,98 @@ def spots_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
+def yahtzee_board_json(g, viewer_id=None):
+    """Yahtzee board; all scorecards are public."""
+    me = next((p for p in g["players"] if p["user_id"] == viewer_id), None)
+    t = g.get("turn")
+    turn_out = None
+    dice_scores = None
+    if t and t["dice"]:
+        dice_scores = {key: Y.score_for(key, t["dice"]) for key, _ in Y.CATEGORIES}
+        turn_out = {"rolls": t["rolls"], "dice": list(t["dice"]),
+                    "keep": list(t["keep"]), "current_index": g["current_index"]}
+    return {
+        "chat_id": g["chat_id"], "phase": g["phase"],
+        "current_index": g["current_index"], "created_by": g["created_by"],
+        "is_player": me is not None,
+        "turn": turn_out, "dice_scores": dice_scores,
+        "winner_id": g.get("winner_id"), "winners": g.get("winners", []),
+        "categories": [{"key": k, "label": lbl} for k, lbl in Y.CATEGORIES],
+        "players": [{"user_id": p["user_id"], "name": p["name"], "npc": bool(p.get("npc")),
+                     "scores": p["scores"], "yahtzee_bonus": p.get("yahtzee_bonus", 0),
+                     "total": Y.total_score(p), "filled": Y.filled_count(p)}
+                    for p in g["players"]],
+    }
+
+
+def _yahtzee_keep(body):
+    keep = body.get("keep")
+    if keep is None:
+        return [False] * Y.DICE_COUNT
+    if isinstance(keep, list) and all(isinstance(x, bool) for x in keep):
+        return list(keep) if len(keep) == Y.DICE_COUNT else None
+    if isinstance(keep, list):
+        out = [False] * Y.DICE_COUNT
+        for x in keep:
+            try:
+                i = int(x)
+            except (TypeError, ValueError):
+                return None
+            if 0 <= i < Y.DICE_COUNT:
+                out[i] = True
+        return out
+    return None
+
+
+def yahtzee_api_move(state, chat_id, user_id, body):
+    g = yahtzee_get(state, chat_id)
+    if not g:
+        return [], "no yahtzee game in that chat"
+    idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
+    action = body.get("action")
+    if action not in ("join", "start"):
+        idx = _actor_idx(g, user_id, g["current_index"])
+    ev = []
+    if action == "join":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        if idx is not None:
+            return ev, None
+        if len(g["players"]) >= Y.MAX_PLAYERS:
+            return [], "full"
+        iu_name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
+        g["players"].append(Y.new_player(user_id, iu_name))
+        ev.append("🙋 joined Yahtzee.")
+    elif action == "start":
+        if g["phase"] != "lobby":
+            return [], "already started"
+        err = Y.start_game(g, ev)
+        if err:
+            return [], err
+    elif action == "roll":
+        if idx is None:
+            return [], "not in this game"
+        keep = _yahtzee_keep(body)
+        if keep is None:
+            return [], "bad keep selection"
+        err = Y.roll_dice(g, idx, keep, ev)
+        if err:
+            return [], err
+    elif action == "score":
+        if idx is None:
+            return [], "not in this game"
+        err = Y.score_category(g, idx, str(body.get("category", "")), ev)
+        if err:
+            return [], err
+    elif action == "rematch":
+        ev, err = rematch_game(state, "yahtzee", chat_id, user_id)
+        return ev, err
+    else:
+        return [], "unknown action"
+    yahtzee_render(g, ev)
+    return ev, None
+
+
 def start_web_server(state):
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -2498,6 +2867,9 @@ def start_web_server(state):
                 return self._send(200, open(p, "rb").read(), "text/javascript")
             if u.path == "/spots.js":
                 p = os.path.join(os.path.dirname(JS_PATH), "spots.js")
+                return self._send(200, open(p, "rb").read(), "text/javascript")
+            if u.path == "/yahtzee.js":
+                p = os.path.join(os.path.dirname(JS_PATH), "yahtzee.js")
                 return self._send(200, open(p, "rb").read(), "text/javascript")
             if u.path in ("/spots-dogs.webp", "/spots-dogs-scored.webp"):
                 p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
@@ -2573,6 +2945,25 @@ def start_web_server(state):
                         SP.advance(g, [])  # self-heal a stranded trick
                         save_state(state)
                     board = spots_board_json(g, uid) if g else None
+                return self._send(200 if board else 404, {"ok": bool(board), "game": board})
+            if u.path == "/api/yahtzee/mygames":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                with STATE_LOCK:
+                    games = [yahtzee_board_json(g, uid) for g in state.get("yahtzee", {}).values()
+                             if any(p["user_id"] == uid for p in g["players"])]
+                return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/yahtzee/game":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                chat_id = q.get("chat_id", [""])[0]
+                with STATE_LOCK:
+                    g = yahtzee_get(state, chat_id)
+                    board = yahtzee_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/lsd/mygames":
                 q = urllib.parse.parse_qs(u.query)
@@ -2691,6 +3082,52 @@ def start_web_server(state):
                     events, err = spots_api_move(state, chat_id, uid, body)
                     g = spots_get(state, chat_id)
                     board = spots_board_json(g, uid) if g else None
+                    save_state(state)
+                return self._send(200 if not err else 400,
+                                  {"ok": not err, "error": err, "events": events, "game": board})
+            if path in ("/api/yahtzee/create", "/api/yahtzee/move"):
+                try:
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                except Exception:
+                    return self._send(400, {"ok": False, "error": "bad json"})
+                iu = init_user(body.get("init_data", ""))
+                if iu is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                uid, name, start_param, chat_instance = iu
+                if path == "/api/yahtzee/create":
+                    chat_id = None
+                    for cand in (chat_instance, start_param, str(body.get("chat_id") or "")):
+                        cand = str(cand)
+                        if cand.startswith("yahtzee"):
+                            cand = cand[len("yahtzee"):]
+                        try:
+                            chat_id = int(cand)
+                            break
+                        except (TypeError, ValueError):
+                            continue
+                    if not chat_id:
+                        return self._send(400, {"ok": False, "error": "open the Mini App from a chat (startapp link)"})
+                    with STATE_LOCK:
+                        g = yahtzee_get(state, chat_id)
+                        if g and g["phase"] != "game_end":
+                            return self._send(200, {"ok": True, "game": yahtzee_board_json(g, uid), "created": False})
+                        g = Y.new_game(chat_id, uid, name)
+                        g["chat_type"] = "supergroup" if chat_id < 0 else "private"
+                        state.setdefault("yahtzee", {})[str(chat_id)] = g
+                        yahtzee_render(g, [f"🎲 Yahtzee game created by {name} via Mini App!"])
+                        save_state(state)
+                        board = yahtzee_board_json(g, uid)
+                    return self._send(200, {"ok": True, "game": board, "created": True})
+                chat_id = body.get("chat_id")
+                if not chat_id and start_param.startswith("yahtzee"):
+                    try:
+                        chat_id = int(start_param[len("yahtzee"):])
+                    except ValueError:
+                        pass
+                with STATE_LOCK:
+                    events, err = yahtzee_api_move(state, chat_id, uid, body)
+                    g = yahtzee_get(state, chat_id)
+                    board = yahtzee_board_json(g, uid) if g else None
                     save_state(state)
                 return self._send(200 if not err else 400,
                                   {"ok": not err, "error": err, "events": events, "game": board})

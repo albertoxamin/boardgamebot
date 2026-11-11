@@ -181,13 +181,30 @@ Mini App: Flip 7 board button = `?startapp=<chat>` (Flip 7 view), Regicide board
 `regicide.py` + `test_regicide.py` (setup counts, combo validation, exact-kill, discard/lose,
 jester/yield).
 
+## Yahtzee (same bot, dice scorecard)
+
+Classic Yahtzee, 2–6 players: roll 5 dice up to 3 times (keep any dice
+between rolls), then fill one of 13 boxes. Upper section 63+ earns a +35
+bonus; Yahtzee is 50 and each extra Yahtzee after that is +100. Game ends
+when everyone has filled all 13 boxes; highest total wins.
+Text commands: `/yahtzee` (create), `/yahtzee_join`, `/yahtzee_start`,
+`/yahtzee_roll [positions to keep]` (e.g. `/yahtzee_roll 1 3 5`),
+`/yahtzee_score <category>` (or tap the buttons), `/yahtzee_rules`,
+`/yahtzee_cancel` (creator), `/yahtzee_join_npc`.
+Mini App: board button = `?startapp=yahtzee<chat>` (same Main Mini App,
+routed by `start_param`). Engine: `yahtzee.py` + `test_yahtzee.py` (score
+table, upper bonus, extra-Yahtzee bonus, full game to end).
+
 ## Files
 
 - `game.py` – pure engine: deck, scoring, bust/Flip 7, actions, rounds.
+- `yahtzee.py` – pure engine: dice, scorecard, turns, scoring.
 - `bot.py` – Telegram polling, inline keyboards, commands, JSON state.
 - `create_bot.py` – BotFather self-creation (MTProto, see above).
 - `test_game.py` – unit tests: `python3 test_game.py`
+- `test_yahtzee.py` – Yahtzee unit tests: `python3 test_yahtzee.py`
 - `web/flip7.html` – standalone HTML5 Flip 7 game (hot-seat, Mini App-ready)
+- `web/yahtzee.js` – Yahtzee Mini App view (synced)
 - `web/server.py` – static server for the HTML game (needs HTTPS tunnel for in-Telegram use)
 - `state.json` – created at runtime (per-chat games, decks, scores).
 
@@ -195,6 +212,7 @@ jester/yield).
 
 ```bash
 python3 test_game.py        # 8 engine tests
+python3 test_yahtzee.py     # 6 Yahtzee tests
 ```
 A full 3-player game was also simulated end-to-end (hits/stays/actions/
 round rotation → a winner at 200+ in 13 rounds) with the Telegram layer

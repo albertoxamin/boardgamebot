@@ -99,6 +99,19 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 .sdice.sel{outline:3px solid #f59e0b;transform:translateY(-3px)}
 .spotsdie{display:inline-block;background:#f8fafc;color:#111;border-radius:8px;padding:6px 10px;margin:2px;font-weight:900;font-size:18px;cursor:pointer}
 .spotsdie.sel{outline:3px solid #f59e0b;transform:translateY(-3px)}
+/* Yahtzee: dice + scorecards */
+.ydice{display:flex;justify-content:center;gap:6px;margin:8px 0;flex-wrap:wrap}
+.ydie{width:52px;height:52px;border-radius:10px;background:#f8fafc;color:#111;font-weight:900;font-size:26px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:1px 2px 3px #0008;border:2px solid #cbd5e1}
+.ydie.kept{outline:3px solid #f59e0b;transform:translateY(-3px)}
+.yscard{background:rgba(15,23,42,.85);border:2px solid #334155;border-radius:12px;padding:8px;margin:6px 0}
+.yscard.current{border-color:#f59e0b}
+.yshead{display:flex;justify-content:space-between;font-weight:800;margin-bottom:6px}
+.ysgrid{display:grid;grid-template-columns:1fr 1fr;gap:3px}
+.yscore{background:#1e293b;border:1px solid #334155;border-radius:8px;padding:6px 8px;font-size:12px;color:#94a3b8;display:flex;justify-content:space-between;align-items:center}
+.yscore b{color:#e2e8f0;margin-left:6px}
+.yscore.used{opacity:.65}
+.yscore.free{cursor:pointer;border-color:#f59e0b66;color:#e2e8f0}
+.yscore .pts{color:#f59e0b;font-weight:800}
 </style></head><body>
 <h1>🎴 Flip 7</h1>
 <div id="regicide" class="hidden">
@@ -149,6 +162,15 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <button class="primary hidden" id="spotsRematch">🔄 Rematch!</button>
 <div class="log" id="spotsLog"></div>
 </div>
+<div id="yahtzee" class="hidden">
+<div id="yzTurn" style="font-size:18px;font-weight:700"></div>
+<div id="yzBoard"></div>
+<div id="yzActions"></div>
+<button class="hit hidden" id="yzRoll">🎲 Roll dice</button>
+<button class="primary hidden" id="yzStart">🎮 Start game</button>
+<button class="primary hidden" id="yzRematch">🔄 Rematch!</button>
+<div class="log" id="yzLog"></div>
+</div>
 <div id="synced">
 <div id="syncBoard"></div>
 <div id="syncTurn" style="font-size:18px;font-weight:700"></div>
@@ -165,4 +187,5 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <script data-cfasync="false" src="odin.js?v=9"></script>
 <script data-cfasync="false" src="lsd.js?v=4"></script>
 <script data-cfasync="false" src="spots.js?v=14"></script>
+<script data-cfasync="false" src="yahtzee.js?v=1"></script>
 </body></html>

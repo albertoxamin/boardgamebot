@@ -71,14 +71,29 @@ name → username (must end in `bot`) → copy token. Then set it in `.env`.
 
 ## 2. Run
 
+Start the bot:
+
 ```bash
 set -a; . ./.env; set +a     # or: export TELEGRAM_BOT_TOKEN=...
 python3 bot.py
 ```
 
-Long-polls `getUpdates` (no webhook/server needed). Only one process per
-token. State: `state.json` next to `bot.py` (override `FLIP7_STATE`),
-written atomically after every update; restart-safe.
+Then start the Cloudflare tunnel in a second process so the Mini App is
+reachable over HTTPS (the bot serves the page/API on `:8080`):
+
+```bash
+# Live/named tunnel — TUNNEL_TOKEN from .env (hostname configured in Cloudflare)
+set -a; . ./.env; set +a
+./cloudflared-bin tunnel run --token "$TUNNEL_TOKEN"
+
+# or a throwaway quick tunnel (prints a https://<random>.trycloudflare.com URL)
+./cloudflared-bin tunnel --url http://localhost:8080
+```
+
+Keep both processes running (e.g. `watch.sh`, which restarts the bot and the
+tunnel on new commits or crashes). Long-polls `getUpdates` (no webhook/server
+needed). Only one process per token. State: `state.json` next to `bot.py`
+(override `FLIP7_STATE`), written atomically after every update; restart-safe.
 
 ## 3. Play in a group
 

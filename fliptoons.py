@@ -588,6 +588,7 @@ def do_market(g, idx, act, arg, events):
         if r == 19:
             p["fame_bonus"] += 2
             p["bonus_actions"] += 1
+            p["actions"] += 1
             events.append("🦚 Peacock: +2 fame and a bonus market action.")
         elif r == 4 and any(c["s"] == CATERPILLAR and not c["fd"]
                             for c in _all_grid_cards(p)):
@@ -713,16 +714,7 @@ def _horse_refill(g, n, events):
     take = min(n, len(g["toon_deck"]))
     cards += [g["toon_deck"].pop() for _ in range(take)]
     cards.sort(key=lambda i: i["r"])
-    if len(cards) == 5 or not g["toon_deck"]:
-        g["market"] = [None] * (5 - len(cards)) + cards
-    else:
-        slots = [None] * 5
-        pos = 0
-        for c in cards:
-            while pos < 5 and slots[pos] is not None:
-                pos += 1
-            slots[pos] = c
-        g["market"] = slots
+    g["market"] = [None] * (5 - len(cards)) + cards
     events.append(f"🐴 Horse refill: {take} new card(s) revealed.")
 
 

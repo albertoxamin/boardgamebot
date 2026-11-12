@@ -676,13 +676,13 @@ def handle_regicide(state, msg, cmd, text, uid, name):
 
 
 # ---------- Odin (ladder-climbing card shedding, private hands) ----------
-ODIN_RULES = """🛡️ <b>Odin rules</b> (Helvetiq, 2-6 players): shed your hand fastest, fewest points wins.
+ODIN_RULES = """🛡️ <b>Odin rules</b> (Helvetiq, 2-6 players): shed your hand fastest, first to 0 wins.
 Deck 54 = numbers 1-9 in 6 colours (blue/red/pink/green/black/orange); with 2 players 2 colours are removed. Deal 9 each.
 • <b>Lead</b> a round with 1 card — or all your hand if it is a single colour/number (that ends the hand).
 • <b>Respond</b> with the same number of cards as the table, or one more, as a same-colour or same-number set. The set's digits sorted high→low form its number (6+3 blue = 63) and must beat the table.
 • After playing (unless you go out), <b>take 1 card</b> from the previous set; the rest are discarded.
 • <b>Pass</b> any time (you can play again next turn). When everyone else has passed, the table is discarded and the last player leads a new round.
-• Going out ends the hand immediately (no pickup). Everyone else scores 1 per card left in hand. First to 15+ points ends the game — lowest score wins.
+• Going out ends the hand immediately (no pickup). Everyone starts at 15 points and subtracts 1 per card left in hand at the end of each hand — first to 0 wins (ties share victory).
 Card notation: <code>6b</code> = 6 blue, <code>3o</code> = 3 orange, <code>8k</code> = 8 black (b/r/p/g/k/o)."""
 
 
@@ -697,7 +697,7 @@ def odin_board_text(g):
     if g["phase"] == "game_end":
         w = ", ".join(g["players"][i]["name"] for i in g["winners"])
         scores = " · ".join(f"{p['name']} {p['score']}" for p in g["players"])
-        return f"🏆 <b>Odin game over</b> - fewest points wins: <b>{html.escape(w)}</b>\nScores: {scores}"
+        return f"🏆 <b>Odin game over</b> - first to 0 wins: <b>{html.escape(w)}</b>\nScores: {scores}"
     lines = [f"🛡️ <b>Odin</b> - Hand {g.get('hand_no', 1)} · Table: "
              + (f"{g['table_value']} ({' '.join(O.card_str(c) for c in g['table'])})"
                 if g["table"] else "- (lead)")]
@@ -815,7 +815,7 @@ def handle_odin(state, msg, cmd, text, uid, name):
         elif len(g["players"]) >= 6:
             send(chat_id, "⛔ Odin is 2-6 players (full).")
         else:
-            g["players"].append({**_npc_player(), "hand": [], "score": 0})
+            g["players"].append({**_npc_player(), "hand": [], "score": O.START_SCORE})
             send(chat_id, "🤖 NPC joined - anyone can play for it!")
             odin_render(g)
         return True
@@ -827,7 +827,7 @@ def handle_odin(state, msg, cmd, text, uid, name):
         elif len(g["players"]) >= 6:
             send(chat_id, "⛔ Odin is 2-6 players (full).")
         else:
-            g["players"].append({"user_id": uid, "name": msg.get("from", {}).get("first_name") or "Player", "hand": [], "score": 0})
+            g["players"].append({"user_id": uid, "name": msg.get("from", {}).get("first_name") or "Player", "hand": [], "score": O.START_SCORE})
             send(chat_id, f"🙋 <b>{name}</b> joined Odin ({len(g['players'])} players).")
             odin_render(g)
         return True
@@ -2084,7 +2084,7 @@ def rematch_game(state, key, chat_id, uid):
     makers = {
         "games": lambda u, n: G.new_player(u, n),
         "regicide": lambda u, n: {"user_id": u, "name": n, "hand": []},
-        "odin": lambda u, n: {"user_id": u, "name": n, "hand": [], "score": 0},
+        "odin": lambda u, n: {"user_id": u, "name": n, "hand": [], "score": O.START_SCORE},
         "lsd": lambda u, n: {"user_id": u, "name": n, "souls": 5, "candle": None,
                              "in_play": [], "demons": [], "demon_hand": []},
         "spots": lambda u, n: {"user_id": u, "name": n, "dogs": [], "scored": [],
@@ -2568,7 +2568,7 @@ def handle_callback(state, cb):
                 return answer_cb(cb["id"], "Game already started.")
             if idx is not None:
                 return answer_cb(cb["id"], "Already in!")
-            od["players"].append({"user_id": uid, "name": cb["from"].get("first_name") or "Player", "hand": [], "score": 0})
+            od["players"].append({"user_id": uid, "name": cb["from"].get("first_name") or "Player", "hand": [], "score": O.START_SCORE})
             answer_cb(cb["id"], "Joined!")
             odin_render(od, [f"🙋 {cb['from'].get('first_name')} joined Odin."])
         elif parts == ["od", "pass"]:
@@ -2947,7 +2947,7 @@ def odin_api_move(state, chat_id, user_id, body):
         if len(g["players"]) >= 6:
             return [], "full"
         iu_name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
-        g["players"].append({"user_id": user_id, "name": iu_name, "hand": [], "score": 0})
+        g["players"].append({"user_id": user_id, "name": iu_name, "hand": [], "score": O.START_SCORE})
         ev.append("🙋 joined Odin.")
     elif action == "start":
         if g["phase"] != "lobby":

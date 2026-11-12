@@ -12,7 +12,7 @@ def mk(n=3, seed=1):
     random.seed(seed)
     g = O.new_game(1, 1, "A")
     for i in range(2, n + 1):
-        g["players"].append({"user_id": i, "name": chr(64 + i), "hand": [], "score": 0})
+        g["players"].append({"user_id": i, "name": chr(64 + i), "hand": [], "score": O.START_SCORE})
     assert O.start_game(g, []) is None
     return g
 
@@ -89,8 +89,8 @@ def test_go_out_and_scoring():
     g["players"][1]["hand"] = [C(3, "blue"), C(4, "blue")]
     ev = []
     assert play(g, 0, [C(9, "red")]) is None  # leads last card, goes out
-    assert g["players"][0]["score"] == 0 and g["players"][1]["score"] == 2
-    # no one at 15 -> new hand auto-dealt, starter rotates to player 1
+    assert g["players"][0]["score"] == O.START_SCORE and g["players"][1]["score"] == O.START_SCORE - 2
+    # no one at 0 -> new hand auto-dealt, starter rotates to player 1
     assert g["phase"] == "playing" and g["hand_starter"] == 1 and g["current_index"] == 1
     assert all(len(p["hand"]) == 9 for p in g["players"])
 
@@ -103,17 +103,17 @@ def test_lead_mono_dump_ends_hand():
     cards = list(g["players"][0]["hand"])
     g["players"][0]["hand"] = []
     assert O.play_cards(g, 0, cards, ev) is None
-    assert g["players"][1]["score"] == 2 and g["hand_starter"] == 1
+    assert g["players"][1]["score"] == O.START_SCORE - 2 and g["hand_starter"] == 1
 
 
-def test_game_end_lowest_wins():
+def test_game_end_first_to_zero():
     g = mk(2)
-    g["players"][0]["score"] = 15
-    g["players"][1]["score"] = 10
+    g["players"][0]["score"] = 3
+    g["players"][1]["score"] = 2
     g["players"][0]["hand"] = [C(9, "red")]
     g["players"][1]["hand"] = [C(3, "blue"), C(4, "blue")]
     assert play(g, 0, [C(9, "red")]) is None
-    # player0: 15+0=15 (triggers end), player1: 10+2=12 -> winner is player 1
+    # player0: 3-0=3, player1: 2-2=0 (reaches 0) -> winner is player 1
     assert g["phase"] == "game_end" and g["winners"] == [1]
 
 

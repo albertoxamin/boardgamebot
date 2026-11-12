@@ -8,8 +8,9 @@ same-number set whose digits, sorted high-to-low, form a higher number
 than the table. After playing you take 1 card from the previous set
 (rest discarded). Pass freely; when everyone else has passed, the last
 player discards the table and leads a new round. Going out ends the
-hand at once (no pickup); everyone else scores 1 per card left in
-hand. First to 15 points loses the race - lowest score wins.
+hand at once (no pickup); everyone else scores 1 fewer per card left
+in hand: each player starts at 15 and subtracts their hand size at
+the end of every hand. First to reach 0 wins (ties share victory).
 
 Hands are private: this module never serialises other players' hands
 for display; bot.py filters board JSON per viewer.
@@ -22,7 +23,7 @@ SUIT_HEX = {"blue": "#2563eb", "red": "#dc2626", "pink": "#ec4899",
             "green": "#16a34a", "black": "#111827", "orange": "#f97316"}
 RANKS = list(range(1, 10))
 HAND_SIZE = 9
-WIN_SCORE = 15
+START_SCORE = 15
 MAX_PLAYERS = 6
 
 
@@ -54,7 +55,7 @@ def new_game(chat_id, creator_id, creator_name):
     return {
         "chat_id": int(chat_id), "created_by": int(creator_id),
         "players": [{"user_id": int(creator_id), "name": creator_name,
-                     "hand": [], "score": 0}],
+                     "hand": [], "score": START_SCORE}],
         "phase": "lobby",  # lobby|playing|pickup|game_end
         "deck": [], "discard": [], "table": [], "pending_play": [],
         "table_value": None, "current_index": 0, "last_player": None,
@@ -124,15 +125,14 @@ def validate_play(g, idx, cards):
 
 def end_hand(g, events, winner_idx):
     for p in g["players"]:
-        p["score"] += len(p["hand"])
+        p["score"] = max(0, p["score"] - len(p["hand"]))
     events.append(f"🏁 {g['players'][winner_idx]['name']} goes out! "
-                  + " · ".join(f"{p['name']} +{len(p['hand'])} = {p['score']}"
+                  + " · ".join(f"{p['name']} -{len(p['hand'])} = {p['score']}"
                                for p in g["players"]))
-    if any(p["score"] >= WIN_SCORE for p in g["players"]):
-        low = min(p["score"] for p in g["players"])
-        g["winners"] = [i for i, p in enumerate(g["players"]) if p["score"] == low]
+    if any(p["score"] <= 0 for p in g["players"]):
+        g["winners"] = [i for i, p in enumerate(g["players"]) if p["score"] <= 0]
         g["phase"] = "game_end"
-        events.append("🏆 Game over - fewest points wins: "
+        events.append("🏆 Game over - first to 0 wins: "
                       + ", ".join(g["players"][i]["name"] for i in g["winners"]) + "!")
         return
     start_hand(g, events, (g["hand_starter"] + 1) % len(g["players"]))

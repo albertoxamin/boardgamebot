@@ -84,7 +84,7 @@ function odRender(){let b=OD.board; if(!b)return;
  if(b.phase==='playing') t.textContent=myTurn?'👉 Your turn - select card(s) and Play, or Pass':'👉 '+b.players[b.current_index].name+"'s turn";
  else if(b.phase==='pickup') t.textContent=myPickup? '✋ You played - tap 1 card from the previous set to take' : '✋ '+b.players[b.pickup_player].name+' is taking a card';
  else if(b.phase==='lobby') t.textContent='🪑 Lobby - anyone taps Start';
- else if(b.phase==='game_end') t.textContent='🏆 Game over - fewest points wins';
+ else if(b.phase==='game_end') t.textContent='🏆 Game over - first to 0 wins';
  else t.textContent='';
 }
 function odPreview(){

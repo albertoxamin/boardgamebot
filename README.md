@@ -195,16 +195,34 @@ Mini App: board button = `?startapp=yahtzee<chat>` (same Main Mini App,
 routed by `start_param`). Engine: `yahtzee.py` + `test_yahtzee.py` (score
 table, upper bonus, extra-Yahtzee bonus, full game to end).
 
+## Fliptoons (same bot, grid-building card market)
+
+Fliptoons Season 1, 2–4 players. Each round you flip cards into a 3×2
+grid, score its fame, then take 2 market actions (hire a market card, or
+dismiss one of your own face-up cards). Hired cards go on top of your deck
+for the next round. Reaching 30 fame triggers the Final Flip; most fame at
+the end wins (Critic's Choice gives +3 to the leader).
+Text commands: `/fliptoons` (create), `/fliptoons_join`,
+`/fliptoons_start`, `/fliptoons_hire <1-5>`, `/fliptoons_dismiss <card>`,
+`/fliptoons_skip`, `/fliptoons_choose <option>` (for pending abilities),
+`/fliptoons_rules`, `/fliptoons_cancel` (creator), `/fliptoons_join_npc`.
+Mini App: board button = `?startapp=fliptoons<chat>` (same Main Mini App,
+routed by `start_param`). Engine: `fliptoons.py` + `test_fliptoons.py`
+(full card abilities, market, final flip).
+
 ## Files
 
 - `game.py` – pure engine: deck, scoring, bust/Flip 7, actions, rounds.
 - `yahtzee.py` – pure engine: dice, scorecard, turns, scoring.
+- `fliptoons.py` – pure engine: deck, grid, abilities, market, final flip.
 - `bot.py` – Telegram polling, inline keyboards, commands, JSON state.
 - `create_bot.py` – BotFather self-creation (MTProto, see above).
 - `test_game.py` – unit tests: `python3 test_game.py`
 - `test_yahtzee.py` – Yahtzee unit tests: `python3 test_yahtzee.py`
+- `test_fliptoons.py` – Fliptoons unit tests: `python3 test_fliptoons.py`
 - `web/flip7.html` – standalone HTML5 Flip 7 game (hot-seat, Mini App-ready)
 - `web/yahtzee.js` – Yahtzee Mini App view (synced)
+- `web/fliptoons.js` – Fliptoons Mini App view (synced)
 - `web/server.py` – static server for the HTML game (needs HTTPS tunnel for in-Telegram use)
 - `state.json` – created at runtime (per-chat games, decks, scores).
 
@@ -213,6 +231,7 @@ table, upper bonus, extra-Yahtzee bonus, full game to end).
 ```bash
 python3 test_game.py        # 8 engine tests
 python3 test_yahtzee.py     # 6 Yahtzee tests
+python3 test_fliptoons.py   # Fliptoons engine/ability tests
 ```
 A full 3-player game was also simulated end-to-end (hits/stays/actions/
 round rotation → a winner at 200+ in 13 rounds) with the Telegram layer

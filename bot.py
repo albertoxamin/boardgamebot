@@ -15,6 +15,7 @@ import odin as O
 import lsd as D
 import spots as SP
 import yahtzee as Y
+import fliptoons as FT
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT_TOKEN", "")
 API = f"https://api.telegram.org/bot{TOKEN}" if TOKEN else ""
@@ -42,6 +43,7 @@ HELP = """🎴 <b>Boardgame bot</b>
 /odin - card-shedding Odin (also /odin_join /odin_start /odin_play /odin_pass /odin_pickup /odin_score /odin_cancel /odin_rules)
 /spots - push-your-luck dog dice (also /spots_join /spots_start /spots_trick /spots_place /spots_reroll /spots_score /spots_cancel /spots_rules)
 /yahtzee - dice scorecard classic (also /yahtzee_join /yahtzee_start /yahtzee_roll /yahtzee_score /yahtzee_cancel /yahtzee_rules)
+/fliptoons - grid-building card market (also /fliptoons_join /fliptoons_start /fliptoons_hire /fliptoons_dismiss /fliptoons_skip /fliptoons_choose /fliptoons_cancel /fliptoons_rules)
 /games - list the games you can start (and what's running here)
 🤖 /join_npc (or /<game>_join_npc) - add a mock player anyone can control, in the lobby
 /lsd - dice game Let's Summon Demons (also /lsd_join /lsd_start /lsd_roll /lsd_buy /lsd_summon /lsd_end /lsd_score /lsd_cancel /lsd_rules)
@@ -136,23 +138,23 @@ def web_keyboard(chat_type="private", chat_id=None, game="flip7"):
     startapp=<game><chat_id> (no second BotFather app needed)."""
     if not WEB_URL:
         return None
-    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "lsd": "🎮 Play Summon Demons (HTML)", "spots": "🎮 Play Spots (HTML)", "yahtzee": "🎮 Play Yahtzee (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
+    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "lsd": "🎮 Play Summon Demons (HTML)", "spots": "🎮 Play Spots (HTML)", "yahtzee": "🎮 Play Yahtzee (HTML)", "fliptoons": "🎮 Play Fliptoons (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
     if chat_type in ("group", "supergroup", "channel"):
         if chat_id:
-            start = f"{game}{chat_id}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee") else str(chat_id)
+            start = f"{game}{chat_id}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons") else str(chat_id)
             url = f"https://t.me/flip7groupbot?startapp={start}"
         else:
             url = WEB_URL
         btn = {"text": label, "url": url}
     else:
-        url = WEB_URL + (f"?app={game}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee") else "")
+        url = WEB_URL + (f"?app={game}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons") else "")
         btn = {"text": label, "web_app": {"url": url}}
     return [[btn]]
 
 
 # ---------- State ----------
 def load_state():
-    s = {"games": {}, "regicide": {}, "odin": {}, "lsd": {}, "spots": {}, "yahtzee": {}}
+    s = {"games": {}, "regicide": {}, "odin": {}, "lsd": {}, "spots": {}, "yahtzee": {}, "fliptoons": {}}
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE) as f:
@@ -165,6 +167,7 @@ def load_state():
     s.setdefault("lsd", {})
     s.setdefault("spots", {})
     s.setdefault("yahtzee", {})
+    s.setdefault("fliptoons", {})
     return s
 
 
@@ -1684,9 +1687,385 @@ def handle_yahtzee(state, msg, cmd, text, uid, name):
     return False
 
 
+FLIPTOONS_RULES = """🦋 <b>Fliptoons rules</b> (2-4 players): build a 3×2 grid of toon cards each round and earn fame; the first player to reach <b>30</b> fame triggers the Final Flip.
+• <b>Flip</b>: each player automatically reveals cards into their grid (abilities resolve).
+• <b>Check Fame</b>: add up the fame of every face-up card in your grid.
+• <b>Market</b> (clockwise): <b>2 actions</b> each — hire a market card (cost = slot: 3/4/7/10/15) or dismiss one of your own face-up cards (5 fame; Caterpillar 3). Hired cards go on top of your deck for next round.
+• <b>Cleanup</b>: grids return to decks; the first-player marker rotates. At <b>30+</b> fame the leader takes Critic's Choice (+3 at the Final Flip) and one final round is played.
+• Most fame at the Final Flip wins. If the toon deck and market run out, the Final Flip also triggers."""
+
+
+def fliptoons_get(state, chat_id):
+    return state.setdefault("fliptoons", {}).get(str(chat_id))
+
+
+def _ft_player(user_id, name):
+    return {"user_id": int(user_id), "name": name, "deck": [], "grid": [], "extra": [],
+            "discarded": [], "fame": 0, "fame_bonus": 0, "bonus_actions": 0,
+            "actions": 0, "last_placed": None, "ostrich_queue": [],
+            "eagle_pending": False, "after_flip": [], "in_flip": False}
+
+
+def fliptoons_actor(g):
+    """Index of the player who must act now, or None (auto flip/end)."""
+    if g.get("pending"):
+        return g["pending"]["player"]
+    if g["phase"] == "playing" and g["stage"] == "market":
+        return g.get("market_idx")
+    return None
+
+
+def _ft_card_label(c):
+    return "?" if c["fd"] else FT.card_name(c)
+
+
+def _ft_stack_label(st):
+    if not st:
+        return "·"
+    s = _ft_card_label(st[-1])
+    if len(st) > 1:
+        s += f"×{len(st)}"
+    return s
+
+
+def fliptoons_board_text(g):
+    if g["phase"] == "lobby":
+        return (f"🦋 <b>Fliptoons lobby</b> - {len(g['players'])}/4 players. "
+                f"Friends: /fliptoons_join, anyone: /fliptoons_start")
+    if g["phase"] == "game_end":
+        if g.get("winner") is not None:
+            w = g["players"][g["winner"]]
+            return (f"🏆 <b>Fliptoons game over</b> - winner: "
+                    f"<b>{html.escape(w['name'])}</b> with {w['fame']} fame!")
+        return "🤝 <b>Fliptoons game over</b> - it's a draw!"
+    actor = fliptoons_actor(g)
+    lines = [f"🦋 <b>Fliptoons</b> · round {g['round']} · "
+             f"{g['stage'].replace('_', ' ')} · target {FT.FAME_TARGET} fame"]
+    for i, p in enumerate(g["players"]):
+        mark = " 👈" if i == actor else ""
+        cells = [_ft_stack_label(st) for st in p["grid"]]
+        while len(cells) < 6:
+            cells.append("·")
+        budget = ""
+        if g["stage"] == "market" and i == g.get("market_idx"):
+            budget = f" · budget {p['fame'] + p['fame_bonus']}"
+        lines.append(f"• <b>{html.escape(p['name'])}</b> - fame {FT.grid_fame(g, p)} · "
+                     f"deck {len(p['deck'])}{budget}{mark}")
+        for r in range(2):
+            lines.append("  " + " ".join(f"[{cells[r * 3 + c]}]" for c in range(3)))
+        for e in p["extra"]:
+            lines.append("  + " + " ".join(f"[{_ft_stack_label([c])}]" for c in e["cards"]))
+    market = " · ".join(
+        (f"{FT.PRICES[i]}:{_ft_card_label(c)}" if c else f"{FT.PRICES[i]}:—")
+        for i, c in enumerate(g["market"]))
+    lines.append(f"🛒 Market: {market}")
+    if g.get("pending"):
+        lines.append(f"❓ {html.escape(g['pending']['prompt'])}")
+    return "\n".join(lines)
+
+
+def fliptoons_keyboard(g):
+    if g["phase"] == "game_end":
+        return [[{"text": "🔄 Rematch!", "callback_data": "ft:rematch"}]]
+    ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
+    wk = web_keyboard(ct, g["chat_id"], game="fliptoons")
+    if g["phase"] == "lobby":
+        return [[{"text": "🙋 Join Fliptoons", "callback_data": "ft:join"}]] + (wk or [])
+    kb = []
+    pend = g.get("pending")
+    if pend:
+        opts = pend["options"]
+        for j in range(0, len(opts), 2):
+            kb.append([{"text": o["label"][:60], "callback_data": f"ft:ch:{o['v']}"}
+                       for o in opts[j:j + 2]])
+    elif g["stage"] == "market" and g.get("market_idx") is not None:
+        for slot, card in enumerate(g["market"]):
+            if card:
+                kb.append([{"text": f"{FT.PRICES[slot]}💰 {_ft_card_label(card)}",
+                            "callback_data": f"ft:hire:{slot}"}])
+        p = g["players"][g["market_idx"]]
+        dismiss = []
+        for cell in FT._reading_cells(p):
+            for c in FT._stack_at(p, cell):
+                if c["fd"] or c["r"] in FT.UNDISMISSABLE:
+                    continue
+                cost = 3 if c["s"] == FT.CATERPILLAR else FT.DISMISS_COST
+                dismiss.append((c, cost))
+        for j in range(0, len(dismiss), 2):
+            kb.append([{"text": f"🗑 {_ft_card_label(c)} ({cost})",
+                        "callback_data": f"ft:dismiss:{c['id']}"}
+                       for c, cost in dismiss[j:j + 2]])
+        kb.append([{"text": "⏭ Skip / end market", "callback_data": "ft:skip"}])
+    if wk:
+        kb.extend(wk)
+    return kb or None
+
+
+def fliptoons_render(g, events=None):
+    chat_id = g["chat_id"]
+    if events is None:
+        events = []
+    lines = [html.escape(e) for e in events]
+    if g["phase"] == "playing":
+        idx = fliptoons_actor(g)
+        if idx is not None:
+            p = g["players"][idx]
+            if g.get("pending"):
+                lines.append(f"👉 {fliptoons_mention(g, p['user_id'])} - "
+                             f"{html.escape(g['pending']['prompt'])}")
+            else:
+                ping = ("👉 🤖 NPC's turn - anyone can play for it!" if p.get("npc")
+                        else f"👉 {fliptoons_mention(g, p['user_id'])} - market turn")
+                lines.append(ping)
+    text = "\n".join(lines + [fliptoons_board_text(g)]) if lines else fliptoons_board_text(g)
+    kb = fliptoons_keyboard(g)
+    r = send(chat_id, text, kb)
+    if r.get("ok"):
+        old = g.get("board_message_id")
+        g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=chat_id, message_id=old)
+
+
+def fliptoons_mention(g, user_id):
+    return f'<a href="tg://user?id={user_id}">{html.escape(FT.name_of(g, user_id))}</a>'
+
+
+def _ft_dismissables(p):
+    out = []
+    for cell in FT._reading_cells(p):
+        for c in FT._stack_at(p, cell):
+            if not c["fd"] and c["r"] not in FT.UNDISMISSABLE:
+                out.append(c)
+    return out
+
+
+def handle_fliptoons(state, msg, cmd, text, uid, name):
+    chat_id = msg["chat"]["id"]
+    g = fliptoons_get(state, chat_id)
+    if cmd == "/fliptoons_rules":
+        send(chat_id, FLIPTOONS_RULES)
+        return True
+    if cmd == "/fliptoons":
+        if not g:
+            g = FT.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state.setdefault("fliptoons", {})[str(chat_id)] = g
+            send(chat_id, "🦋 Fliptoons game created! Friends: /fliptoons_join, "
+                          "anyone: /fliptoons_start")
+            fliptoons_render(g)
+        else:
+            fliptoons_render(g)
+        return True
+    if not g:
+        send(chat_id, "No Fliptoons game here yet - send /fliptoons to create one.")
+        return True
+    g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd == "/fliptoons_join_npc":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p.get("npc") for p in g["players"]):
+            send(chat_id, "🤖 NPC is already in this game.")
+        elif len(g["players"]) >= 4:
+            send(chat_id, "⛔ Fliptoons is 2-4 players (full).")
+        else:
+            p = _ft_player(NPC_ID, "🤖 NPC")
+            p["npc"] = True
+            g["players"].append(p)
+            send(chat_id, "🤖 NPC joined - anyone can play for it!")
+            fliptoons_render(g)
+        return True
+    if cmd == "/fliptoons_join":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p["user_id"] == uid for p in g["players"]):
+            send(chat_id, "You're already in!")
+        elif len(g["players"]) >= 4:
+            send(chat_id, "⛔ Fliptoons is 2-4 players (full).")
+        else:
+            g["players"].append(_ft_player(
+                uid, msg.get("from", {}).get("first_name") or "Player"))
+            send(chat_id, f"🙋 <b>{name}</b> joined Fliptoons ({len(g['players'])} players).")
+            fliptoons_render(g)
+        return True
+    if cmd == "/fliptoons_start":
+        if g["phase"] != "lobby":
+            send(chat_id, "Already started.")
+        elif len(g["players"]) < 2:
+            send(chat_id, "⛔ Need at least 2 players.")
+        else:
+            ev = []
+            err = FT.start_game(g, ev)
+            if err:
+                send(chat_id, f"⛔ {err}")
+            else:
+                fliptoons_render(g, ev)
+        return True
+    if cmd == "/fliptoons_cancel":
+        if uid != g["created_by"]:
+            send(chat_id, "⛔ Only the creator can cancel.")
+        else:
+            del state["fliptoons"][str(chat_id)]
+            send(chat_id, "🗑 Fliptoons game cancelled.")
+        return True
+    if cmd in ("/fliptoons_hire", "/fliptoons_dismiss", "/fliptoons_skip",
+               "/fliptoons_choose"):
+        ref = fliptoons_actor(g)
+        if ref is None:
+            send(chat_id, "⛔ Nothing to do right now (flip phase).")
+            return True
+        idx = _actor_idx(g, uid, ref)
+        if idx is None:
+            send(chat_id, "⛔ You're not in this Fliptoons game - /fliptoons_join in lobby.")
+            return True
+        parts = text.split()[1:]
+        ev = []
+        if cmd == "/fliptoons_hire":
+            if not parts or not parts[0].isdigit():
+                send(chat_id, "Usage: /fliptoons_hire &lt;1-5&gt; (market slot)")
+                return True
+            err = FT.do_market(g, idx, "hire", int(parts[0]) - 1, ev)
+        elif cmd == "/fliptoons_dismiss":
+            want = " ".join(parts).lower()
+            card = next((c for c in _ft_dismissables(g["players"][idx])
+                         if FT.card_name(c).lower() == want), None)
+            if card is None and want.isdigit():
+                card = next((c for c in _ft_dismissables(g["players"][idx])
+                             if c["id"] == int(want)), None)
+            if card is None:
+                send(chat_id, "Usage: /fliptoons_dismiss &lt;card name&gt; "
+                              "(or use the dismiss buttons)")
+                return True
+            err = FT.do_market(g, idx, "dismiss", card["id"], ev)
+        elif cmd == "/fliptoons_skip":
+            err = FT.do_market(g, idx, "skip", None, ev)
+        else:
+            pend = g.get("pending")
+            if not pend:
+                send(chat_id, "No pending choice right now.")
+                return True
+            want = " ".join(parts).lower()
+            opt = next((o for o in pend["options"]
+                        if str(o["v"]).lower() == want or o["label"].lower() == want), None)
+            if opt is None:
+                send(chat_id, "⛔ Unknown choice. Options: " +
+                     ", ".join(str(o["v"]) for o in pend["options"]))
+                return True
+            err = FT.apply_choice(g, idx, str(opt["v"]), ev)
+        if err:
+            send(chat_id, f"⛔ {err}")
+        else:
+            fliptoons_render(g, ev)
+        return True
+    return False
+
+
+def _ft_card_json(c):
+    return {"id": c["id"],
+            "name": "?" if c["fd"] else FT.card_name(c),
+            "fame": 0 if c["fd"] else FT.base_fame(c),
+            "fd": c["fd"], "starter": c["s"] is not None,
+            "dismissable": (not c["fd"]) and c["r"] not in FT.UNDISMISSABLE,
+            "dismiss_cost": 3 if c["s"] == FT.CATERPILLAR else FT.DISMISS_COST}
+
+
+def fliptoons_board_json(g, viewer_id=None):
+    me = next((p for p in g["players"] if p["user_id"] == viewer_id), None)
+    actor = fliptoons_actor(g)
+    can_act = actor is not None and (
+        g["players"][actor]["user_id"] == viewer_id or g["players"][actor].get("npc"))
+    players = []
+    for i, p in enumerate(g["players"]):
+        players.append({
+            "user_id": p["user_id"], "name": p["name"], "npc": bool(p.get("npc")),
+            "fame": FT.grid_fame(g, p), "budget": p["fame"] + p["fame_bonus"],
+            "deck": len(p["deck"]), "discarded": len(p["discarded"]),
+            "grid": [[_ft_card_json(c) for c in st] for st in p["grid"]],
+            "extra": [{"below": e["below"],
+                       "cards": [_ft_card_json(c) for c in e["cards"]]}
+                      for e in p["extra"]],
+            "is_current": i == actor,
+        })
+    market = [{"slot": slot, "price": FT.PRICES[slot],
+               "card": _ft_card_json(c) if c else None}
+              for slot, c in enumerate(g["market"])]
+    pend = g.get("pending")
+    pending = None
+    if pend:
+        pending = {"kind": pend["kind"], "player": pend["player"],
+                   "prompt": pend["prompt"],
+                   "options": [{"v": o["v"], "label": o["label"]} for o in pend["options"]]}
+    return {
+        "chat_id": g["chat_id"], "phase": g["phase"], "stage": g["stage"],
+        "round": g["round"], "first": g["first"],
+        "critic_holder": g["critic_holder"],
+        "end_triggered": g.get("end_triggered", False),
+        "actor": actor, "can_act": can_act, "is_player": me is not None,
+        "winner": g.get("winner"), "market": market, "pending": pending,
+        "target": FT.FAME_TARGET,
+        "players": players,
+    }
+
+
+def fliptoons_api_move(state, chat_id, user_id, body):
+    g = fliptoons_get(state, chat_id)
+    if not g:
+        return [], "no fliptoons game in that chat"
+    idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
+    action = body.get("action")
+    ev = []
+    if action == "join":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        if idx is not None:
+            return ev, None
+        if len(g["players"]) >= 4:
+            return [], "full"
+        iu_name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
+        g["players"].append(_ft_player(user_id, iu_name))
+        ev.append("🙋 joined Fliptoons.")
+    elif action == "start":
+        if g["phase"] != "lobby":
+            return [], "already started"
+        err = FT.start_game(g, ev)
+        if err:
+            return [], err
+    elif action == "rematch":
+        return rematch_game(state, "fliptoons", chat_id, user_id)
+    else:
+        ref = fliptoons_actor(g)
+        if ref is None:
+            return [], "nothing to do right now"
+        idx = _actor_idx(g, user_id, ref)
+        if idx is None:
+            return [], "not in this game"
+        if action == "hire":
+            try:
+                slot = int(body.get("slot"))
+            except (TypeError, ValueError):
+                return [], "bad slot"
+            err = FT.do_market(g, idx, "hire", slot, ev)
+        elif action == "dismiss":
+            try:
+                iid = int(body.get("iid"))
+            except (TypeError, ValueError):
+                return [], "bad card"
+            err = FT.do_market(g, idx, "dismiss", iid, ev)
+        elif action == "skip":
+            err = FT.do_market(g, idx, "skip", None, ev)
+        elif action == "choose":
+            err = FT.apply_choice(g, idx, str(body.get("choice", "")), ev)
+        else:
+            return [], "unknown action"
+        if err:
+            return [], err
+    fliptoons_render(g, ev)
+    return ev, None
+
+
 REMATCH_END_PHASES = {"games": ("game_end",), "regicide": ("won", "lost"),
                      "odin": ("game_end",), "lsd": ("game_end",), "spots": ("game_end",),
-                     "yahtzee": ("game_end",)}
+                     "yahtzee": ("game_end",), "fliptoons": ("game_end",)}
 
 
 def rematch_game(state, key, chat_id, uid):
@@ -1710,9 +2089,11 @@ def rematch_game(state, key, chat_id, uid):
         "spots": lambda u, n: {"user_id": u, "name": n, "dogs": [], "scored": [],
                                "yard": [], "treats": 1},
         "yahtzee": lambda u, n: Y.new_player(u, n),
+        "fliptoons": lambda u, n: _ft_player(u, n),
     }
     news = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
-            "lsd": D.new_game, "spots": SP.new_game, "yahtzee": Y.new_game}
+            "lsd": D.new_game, "spots": SP.new_game, "yahtzee": Y.new_game,
+            "fliptoons": FT.new_game}
     chat_type = g.get("chat_type", "private")
     board_id = g.get("board_message_id")
     g.clear()
@@ -1726,7 +2107,8 @@ def rematch_game(state, key, chat_id, uid):
         g["players"].append(pm)
     ev = [f"🔄 Rematch! {len(keep)} player(s) - anyone taps Start."]
     {"games": render, "regicide": rg_render, "odin": odin_render,
-     "lsd": lsd_render, "spots": spots_render, "yahtzee": yahtzee_render}[key](g, ev)
+     "lsd": lsd_render, "spots": spots_render, "yahtzee": yahtzee_render,
+     "fliptoons": fliptoons_render}[key](g, ev)
     return ev, None
 
 
@@ -1770,6 +2152,7 @@ def handle_command(state, msg):
             ("lsd", "😈 Let's Summon Demons", "/lsd", "/lsd_join", "dice activations, 3 demons + 10 souls"),
             ("spots", "🐶 Spots", "/spots", "/spots_join", "dog dice push-your-luck, 6 scored wins"),
             ("yahtzee", "🎲 Yahtzee", "/yahtzee", "/yahtzee_join", "dice scorecard, 13 boxes"),
+            ("fliptoons", "🦋 Fliptoons", "/fliptoons", "/fliptoons_join", "grid-building card market, first to 30 fame"),
         )
         lines = ["🎮 <b>Games you can start:</b>"]
         for _key, _name, _new, _join, _desc in _catalog:
@@ -1783,14 +2166,14 @@ def handle_command(state, msg):
             else:
                 _st = "in progress"
             lines.append(f"• {_name} — {_new} ({_desc}) · {_st}")
-        lines.append("🤖 Add a mock player anyone can control: /join_npc (Flip 7) or /regicide_join_npc, /odin_join_npc, /lsd_join_npc, /spots_join_npc, /yahtzee_join_npc")
+        lines.append("🤖 Add a mock player anyone can control: /join_npc (Flip 7) or /regicide_join_npc, /odin_join_npc, /lsd_join_npc, /spots_join_npc, /yahtzee_join_npc, /fliptoons_join_npc")
         send(chat_id, "\n".join(lines))
         return
     if cmd == "/cancel" and msg.get("reply_to_message"):
         # Reply-targeted cancel: cancels the one game whose board message
         # was replied to (searches every game type in this chat).
         _mid = msg["reply_to_message"].get("message_id")
-        for _key in ("games", "regicide", "odin", "lsd", "spots", "yahtzee"):
+        for _key in ("games", "regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons"):
             _gg = state.get(_key, {}).get(str(chat_id))
             if _gg is not None and _gg.get("board_message_id") == _mid:
                 del state[_key][str(chat_id)]
@@ -1813,6 +2196,9 @@ def handle_command(state, msg):
     if cmd.startswith("/yahtzee"):
         handle_yahtzee(state, msg, cmd, text, uid, name)
         return
+    if cmd.startswith("/fliptoons"):
+        handle_fliptoons(state, msg, cmd, text, uid, name)
+        return
     if cmd in ("/start", "/help", "/commands"):
         send(chat_id, HELP)
         return
@@ -1825,7 +2211,8 @@ def handle_command(state, msg):
         # (Flip 7 rules as the default when there are none).
         _mid = (msg.get("reply_to_message") or {}).get("message_id") if msg.get("reply_to_message") else None
         _by_key = (("games", RULES), ("regicide", REGICIDE_RULES), ("odin", ODIN_RULES),
-                   ("lsd", LSD_RULES), ("spots", SPOTS_RULES), ("yahtzee", YAHTZEE_RULES))
+                   ("lsd", LSD_RULES), ("spots", SPOTS_RULES), ("yahtzee", YAHTZEE_RULES),
+                   ("fliptoons", FLIPTOONS_RULES))
         if _mid:
             for _key, _rules in _by_key:
                 _gg = state.get(_key, {}).get(str(chat_id))
@@ -2114,6 +2501,56 @@ def handle_callback(state, cb):
                 save_state(state)
         else:
             answer_cb(cb["id"], "Unknown button.")
+        return
+    if data.startswith("ft:"):
+        ft = fliptoons_get(state, chat_id)
+        if not ft:
+            return answer_cb(cb["id"], "No Fliptoons game here.")
+        parts = data.split(":")
+        idx = next((i for i, p in enumerate(ft["players"]) if p["user_id"] == uid), None)
+        ev = []
+        if parts == ["ft", "join"]:
+            if ft["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            if idx is not None:
+                return answer_cb(cb["id"], "Already in!")
+            if len(ft["players"]) >= 4:
+                return answer_cb(cb["id"], "Game is full.")
+            ft["players"].append(_ft_player(uid, cb["from"].get("first_name") or "Player"))
+            answer_cb(cb["id"], "Joined!")
+            fliptoons_render(ft, [f"🙋 {cb['from'].get('first_name')} joined Fliptoons."])
+        elif parts == ["ft", "start"]:
+            if ft["phase"] != "lobby":
+                return answer_cb(cb["id"], "Already started.")
+            err = FT.start_game(ft, ev)
+            answer_cb(cb["id"], err or "Started")
+            if not err:
+                fliptoons_render(ft, ev)
+        elif parts == ["ft", "rematch"]:
+            ev, err = rematch_game(state, "fliptoons", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
+        else:
+            ref = fliptoons_actor(ft)
+            if ref is None:
+                return answer_cb(cb["id"], "Nothing to do right now.")
+            idx = _actor_idx(ft, uid, ref)
+            if idx is None:
+                return answer_cb(cb["id"], "Not in this game.")
+            if len(parts) == 3 and parts[1] == "hire":
+                err = FT.do_market(ft, idx, "hire", int(parts[2]), ev)
+            elif len(parts) == 3 and parts[1] == "dismiss":
+                err = FT.do_market(ft, idx, "dismiss", int(parts[2]), ev)
+            elif parts == ["ft", "skip"]:
+                err = FT.do_market(ft, idx, "skip", None, ev)
+            elif len(parts) >= 3 and parts[1] == "ch":
+                err = FT.apply_choice(ft, idx, ":".join(parts[2:]), ev)
+            else:
+                return answer_cb(cb["id"], "Unknown button.")
+            answer_cb(cb["id"], err or "Done")
+            if not err:
+                fliptoons_render(ft, ev)
         return
     if data.startswith("od:"):
         od = odin_get(state, chat_id)
@@ -2872,6 +3309,9 @@ def start_web_server(state):
             if u.path == "/yahtzee.js":
                 p = os.path.join(os.path.dirname(JS_PATH), "yahtzee.js")
                 return self._send(200, open(p, "rb").read(), "text/javascript")
+            if u.path == "/fliptoons.js":
+                p = os.path.join(os.path.dirname(JS_PATH), "fliptoons.js")
+                return self._send(200, open(p, "rb").read(), "text/javascript")
             if u.path in ("/spots-dogs.webp", "/spots-dogs-scored.webp"):
                 p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
@@ -2965,6 +3405,25 @@ def start_web_server(state):
                 with STATE_LOCK:
                     g = yahtzee_get(state, chat_id)
                     board = yahtzee_board_json(g, uid) if g else None
+                return self._send(200 if board else 404, {"ok": bool(board), "game": board})
+            if u.path == "/api/fliptoons/mygames":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                with STATE_LOCK:
+                    games = [fliptoons_board_json(g, uid) for g in state.get("fliptoons", {}).values()
+                             if any(p["user_id"] == uid for p in g["players"])]
+                return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/fliptoons/game":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                chat_id = q.get("chat_id", [""])[0]
+                with STATE_LOCK:
+                    g = fliptoons_get(state, chat_id)
+                    board = fliptoons_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/lsd/mygames":
                 q = urllib.parse.parse_qs(u.query)
@@ -3129,6 +3588,52 @@ def start_web_server(state):
                     events, err = yahtzee_api_move(state, chat_id, uid, body)
                     g = yahtzee_get(state, chat_id)
                     board = yahtzee_board_json(g, uid) if g else None
+                    save_state(state)
+                return self._send(200 if not err else 400,
+                                  {"ok": not err, "error": err, "events": events, "game": board})
+            if path in ("/api/fliptoons/create", "/api/fliptoons/move"):
+                try:
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                except Exception:
+                    return self._send(400, {"ok": False, "error": "bad json"})
+                iu = init_user(body.get("init_data", ""))
+                if iu is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                uid, name, start_param, chat_instance = iu
+                if path == "/api/fliptoons/create":
+                    chat_id = None
+                    for cand in (chat_instance, start_param, str(body.get("chat_id") or "")):
+                        cand = str(cand)
+                        if cand.startswith("fliptoons"):
+                            cand = cand[len("fliptoons"):]
+                        try:
+                            chat_id = int(cand)
+                            break
+                        except (TypeError, ValueError):
+                            continue
+                    if not chat_id:
+                        return self._send(400, {"ok": False, "error": "open the Mini App from a chat (startapp link)"})
+                    with STATE_LOCK:
+                        g = fliptoons_get(state, chat_id)
+                        if g and g["phase"] != "game_end":
+                            return self._send(200, {"ok": True, "game": fliptoons_board_json(g, uid), "created": False})
+                        g = FT.new_game(chat_id, uid, name)
+                        g["chat_type"] = "supergroup" if chat_id < 0 else "private"
+                        state.setdefault("fliptoons", {})[str(chat_id)] = g
+                        fliptoons_render(g, [f"🦋 Fliptoons game created by {name} via Mini App!"])
+                        save_state(state)
+                        board = fliptoons_board_json(g, uid)
+                    return self._send(200, {"ok": True, "game": board, "created": True})
+                chat_id = body.get("chat_id")
+                if not chat_id and start_param.startswith("fliptoons"):
+                    try:
+                        chat_id = int(start_param[len("fliptoons"):])
+                    except ValueError:
+                        pass
+                with STATE_LOCK:
+                    events, err = fliptoons_api_move(state, chat_id, uid, body)
+                    g = fliptoons_get(state, chat_id)
+                    board = fliptoons_board_json(g, uid) if g else None
                     save_state(state)
                 return self._send(200 if not err else 400,
                                   {"ok": not err, "error": err, "events": events, "game": board})

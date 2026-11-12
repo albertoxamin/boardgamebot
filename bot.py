@@ -1534,6 +1534,8 @@ def yahtzee_keyboard(g):
     if t and t["rolls"] >= 1:
         cur = g["players"][g["current_index"]]
         avail = [(k, lbl) for k, lbl in Y.CATEGORIES if cur["scores"][k] is None]
+        if t["dice"]:  # preview: points the current dice would score there
+            avail = [(k, f"{lbl} · {Y.score_for(k, t['dice'])}") for k, lbl in avail]
         for j in range(0, len(avail), 2):
             kb.append([{"text": lbl, "callback_data": f"yz:score:{k}"}
                        for k, lbl in avail[j:j + 2]])

@@ -43,6 +43,21 @@ async function ftMove(action,extra){
 // BGA sprite sheet: 6 columns x 5 rows. Cells 0-4 are the starters in
 // STARTER_NAMES order; toon rank r (1-25) sits at cell r+4 (ostrich=5 .. cow=29).
 const FT_SHEET='/fliptoons/fl-toon-cards.webp', FT_BACK='/fliptoons/fl-toon-cards-back.webp';
+// Card faces (BGA paints name/rank/fame/ability over the sprite at runtime).
+// Text follows nickv2002/FlipToons beta cards.csv (Season 1): banner, bonus, body.
+const FT_CARDS={"snail":{"n":"Snail","r":0,"f":"2","d":""},"caterpillar":{"n":"Caterpillar","r":0,"f":"0","d":"COSTS 3 TO DISMISS INSTEAD OF 5"},"dragonfly":{"n":"Dragonfly","r":0,"f":"0","d":"+1 PER unique adjacent face-up card"},"skunk":{"n":"Skunk","r":0,"f":"0","d":"IF you have the least fame after the Check Fame phase, dismiss a card in your grid"},"bee":{"n":"Bee","r":0,"f":"1","d":""},"ostrich":{"n":"Ostrich","r":1,"f":"1","d":"Stack the next revealed card on this card"},"eagle":{"n":"Eagle","r":2,"f":"4","d":"CANNOT BE FLIPPED · Flip the next revealed card unless it [cannot-be-flipped icon] (its ability does not activate)"},"donkey":{"n":"Donkey","r":3,"f":"1","d":"+5 IF in the lower row · If so, dismiss this card after the Market phase"},"butterfly":{"n":"Butterfly","r":4,"f":"2","d":"WHEN HIRED, YOU MAY DISMISS A CATERPILLAR FOR 0"},"dog":{"n":"Dog","r":5,"f":"0","d":"+5 IF there is at least one DOG in the market or any other player's grid"},"goat":{"n":"Goat","r":6,"f":"1","d":"+3 IF in the upper row"},"sheep":{"n":"Sheep","r":7,"f":"1","d":"+4 IF in the middle column"},"camel":{"n":"Camel","r":8,"f":"2","d":"+2 IF no other player or the market has more CAMELS than you"},"rabbit":{"n":"Rabbit","r":9,"f":"3","d":"CANNOT BE FLIPPED · Stack this card on the first RABBIT or face-down card in your grid"},"horse":{"n":"Horse","r":10,"f":"4","d":"WHEN HIRED, DISCARD ANY NUMBER OF CARDS IN THE MARKET AND REFILL"},"snake":{"n":"Snake","r":11,"f":"1","d":"Dismiss the top card of your deck and stack the top card from the toon deck on this card"},"elephant":{"n":"Elephant","r":12,"f":"7","d":"CANNOT BE FLIPPED · Flip the previous placed card unless it [cannot-be-flipped icon]"},"rooster":{"n":"Rooster","r":13,"f":"0","d":"+1 PER card rank 13 or lower (including this card)"},"cat":{"n":"Cat","r":14,"f":"1","d":"CANNOT BE DISMISSED · +1 PER STARTING card in your dismissed cards"},"alligator":{"n":"Alligator","r":15,"f":"6","d":"After the Market phase, dismiss one card adjacent to the right of this card"},"lion":{"n":"Lion","r":16,"f":"3","d":"+4 IF all face-up adjacent cards are rank 16 or lower"},"monkey":{"n":"Monkey","r":17,"f":"3","d":"IF placed in the upper row, move this card to a row above"},"pig":{"n":"Pig","r":18,"f":"-1","d":"WHEN HIRED OR DISMISSED, PLACE THIS CARD IN ANY DECK"},"peacock":{"n":"Peacock","r":19,"f":"5","d":"WHEN HIRED, GAIN 2 AND TAKE A BONUS MARKET ACTION"},"turkey":{"n":"Turkey","r":20,"f":"5","d":"Stack this card on the previous placed card"},"bull":{"n":"Bull","r":21,"f":"3","d":"CANNOT BE FLIPPED · +7 IF one or more cards in your grid are face down"},"tiger":{"n":"Tiger","r":22,"f":"3","d":"CANNOT BE DISMISSED · +1 PER card in your dismissed cards"},"deer":{"n":"Deer","r":23,"f":"3","d":"+5 IF each face-up card in your grid is unique"},"bear":{"n":"Bear","r":24,"f":"1","d":"+1 PER face-up card in your grid"},"cow":{"n":"Cow","r":25,"f":"=","d":"Copy the fame of one adjacent card"}};
+function ftCardInfo(c){
+ if(!c||c.fd)return null;
+ return FT_CARDS[String(c.name||'').toLowerCase()]||null;
+}
+function ftOverlay(c,mini){
+ let i=ftCardInfo(c); if(!i)return '';
+ let desc=mini?'':'<div class="ftcdesc">'+escapeHtml(i.d)+'</div>';
+ return '<div class="ftctext'+(mini?' mini':'')+'">'+
+  '<div class="ftcrow"><span class="ftcrank">'+i.r+'</span>'+
+  '<span class="ftcname">'+escapeHtml(i.n)+'</span>'+
+  '<span class="ftcfame">'+escapeHtml(i.f)+'</span></div>'+desc+'</div>';
+}
 function ftCellIdx(c){
  if(!c)return -1;
  if(c.starter)return c.s;
@@ -57,8 +72,7 @@ function ftArt(c){
 function ftCell(st){
  if(!st||!st.length)return '<div class="ftcell empty">·</div>';
  let top=st[st.length-1], cls='ftcell'+(top.fd?' fd':''), stack=st.length>1?'<span class="ftstack">×'+st.length+'</span>':'';
- let fame=top.fd?'':'<span class="fm">'+top.fame+'</span>';
- return '<div class="'+cls+'" style="'+ftArt(top)+'" title="'+escapeHtml(top.name)+'">'+stack+fame+'</div>';
+ return '<div class="'+cls+'" style="'+ftArt(top)+'" title="'+escapeHtml(top.name)+'">'+ftOverlay(top)+stack+'</div>';
 }
 function ftGrid(p){
  let cells=p.grid.map(ftCell);
@@ -100,9 +114,11 @@ function ftRender(){
     '</div>');
   }
   parts.push('<div class="table"><div class="small">🛒 Market (cost = slot) · round '+b.round+' · target '+b.target+' fame</div><div class="ftmarket">'+
-   b.market.map(m=>'<div class="ftmcard"><div class="price">'+m.price+'💰</div>'+
-    (m.card?'<div class="ftmart" style="'+ftArt(m.card)+'"></div><div class="small">'+escapeHtml(m.card.name)+'</div>':'<div class="ftmart empty">—</div>')+
-    (m.card&&myMarket?'<button class="hit" data-hire="'+m.slot+'">Hire</button>':'')+'</div>').join('')+'</div></div>');
+   b.market.map(m=>{let i=ftCardInfo(m.card),d=i?i.d:'';
+    return '<div class="ftmcard"><div class="price">'+m.price+'💰</div>'+
+    (m.card?'<div class="ftmart" style="'+ftArt(m.card)+'">'+ftOverlay(m.card,true)+'</div>':'<div class="ftmart empty">—</div>')+
+    (d?'<div class="ftmdesc">'+escapeHtml(d)+'</div>':'')+
+    (m.card&&myMarket?'<button class="hit" data-hire="'+m.slot+'">Hire</button>':'')+'</div>';}).join('')+'</div></div>');
   let ph='<div class="table"><div class="ftplayers">';
   b.players.forEach((p,i)=>{
    let badges=(i===b.first?'<img class="ftbadge" src="/fliptoons/fl-first-player.webp" title="First player" alt="first player">':'')+

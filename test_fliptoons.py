@@ -92,6 +92,38 @@ def test_setup():
     assert g["phase"] == "playing" and g["round"] == 1
 
 
+def test_lobby_board():
+    random.seed(0)
+    g = F.new_game(1, 1, "A")
+    p = g["players"][0]
+    assert p["grid"] == [[] for _ in range(6)]
+    assert F.grid_fame(g, p) == 0
+    p["grid"] = []                    # legacy saved lobby state: no grid yet
+    assert F.grid_fame(g, p) == 0
+
+
+def test_stall_breaker():
+    g = mk(3)
+    g["stage"] = "cleanup"
+    g["toon_deck"] = [F._mk(g, 1)]     # deck not empty: covered by "no progress"
+    for _ in range(7):
+        g["acted"] = False
+        F._cleanup(g, [])
+        assert not g["end_triggered"]
+    g["acted"] = False
+    F._cleanup(g, [])
+    assert g["end_triggered"]
+    F._cleanup(g, [])                 # the triggered Final Flip starts next cleanup
+    assert g["stage"] == "final_flip"
+    # a round with a market action keeps resetting the counter
+    g2 = mk(3)
+    g2["stage"] = "cleanup"; g2["toon_deck"] = [F._mk(g2, 1)]
+    for _ in range(20):
+        g2["acted"] = True
+        F._cleanup(g2, [])
+        assert not g2["end_triggered"] and g2["stall"] == 0
+
+
 def test_renato_12_fame():
     g = mk(2)
     # Rulebook example: cat | sheep(top-mid) | cat / dragonfly | bee | camel = 12
@@ -429,8 +461,9 @@ def test_full_random_games():
                 tot = len(p["deck"]) + len(F._all_grid_cards(p))
                 for cell in F._reading_cells(p):
                     for c in F._stack_at(p, cell):
-                        if not c["fd"] and c["r"] not in F.UNDISMISSABLE and tot >= 8 \
-                           and (3 if c["s"] is not None else 5) <= p["fame"] + p["fame_bonus"]:
+                        cost = 3 if c["s"] == F.CATERPILLAR else 5
+                        if not c["fd"] and c["r"] not in F.UNDISMISSABLE and tot >= 4 \
+                           and cost <= p["fame"] + p["fame_bonus"]:
                             acts.append(("dismiss", str(c["id"])))
                 if acts and random.random() < 0.3:
                     assert F.do_market(g, idx, *random.choice(acts), ev) is None

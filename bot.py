@@ -1700,7 +1700,7 @@ def fliptoons_get(state, chat_id):
 
 
 def _ft_player(user_id, name):
-    return {"user_id": int(user_id), "name": name, "deck": [], "grid": [], "extra": [],
+    return {"user_id": int(user_id), "name": name, "deck": [], "grid": [[] for _ in range(6)], "extra": [],
             "discarded": [], "fame": 0, "fame_bonus": 0, "bonus_actions": 0,
             "actions": 0, "last_placed": None, "ostrich_queue": [],
             "eagle_pending": False, "after_flip": [], "in_flip": False}
@@ -1972,8 +1972,8 @@ def _ft_card_json(c):
 def fliptoons_board_json(g, viewer_id=None):
     me = next((p for p in g["players"] if p["user_id"] == viewer_id), None)
     actor = fliptoons_actor(g)
-    can_act = actor is not None and (
-        g["players"][actor]["user_id"] == viewer_id or g["players"][actor].get("npc"))
+    can_act = bool(actor is not None and (
+        g["players"][actor]["user_id"] == viewer_id or g["players"][actor].get("npc")))
     players = []
     for i, p in enumerate(g["players"]):
         players.append({

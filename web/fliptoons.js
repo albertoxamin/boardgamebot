@@ -58,7 +58,8 @@ function ftRender(){
  let parts=[];
  if(b.phase==='lobby'){
   t.textContent='🪑 Lobby - '+b.players.length+'/4 players';
-  parts.push('<div class="table lobby-note">Friends join in Telegram, then anyone taps Start.</div>');
+  parts.push('<div class="table"><div class="small">Players</div>'+b.players.map(p=>'<div>'+escapeHtml(p.name)+(p.npc?' 🤖':'')+(p.user_id===FLP.user_id?' (you)':'')+'</div>').join('')+
+   '<div class="lobby-note">Friends join in Telegram, then anyone taps Start.</div></div>');
  } else if(b.phase==='game_end'){
   t.textContent='🏆 Game over!';
   if(b.winner!=null){let w=b.players[b.winner]; parts.push('<div class="table lobby-note">Winner: <b>'+escapeHtml(w.name)+'</b> with '+w.fame+' fame!</div>');}
@@ -66,8 +67,12 @@ function ftRender(){
  } else {
   t.textContent=isActor?(b.pending?'👉 Your choice':(b.stage==='market'?'👉 Your market turn':'⏳ Resolving flips…')):(cur?'👉 '+escapeHtml(cur.name)+'\'s turn':'⏳ Resolving flips…');
   if(b.pending){
-   parts.push('<div class="table"><div class="lobby-note">'+escapeHtml(b.pending.prompt)+'</div><div class="ftopts">'+
-    b.pending.options.map(o=>'<button class="hit" data-choose="'+escapeHtml(String(o.v))+'">'+escapeHtml(o.label)+'</button>').join('')+'</div></div>');
+   let pp=b.players[b.pending.player];
+   let mine=b.pending.player!=null&&pp&&(pp.user_id===FLP.user_id||pp.npc);
+   parts.push('<div class="table"><div class="lobby-note">'+escapeHtml(b.pending.prompt)+
+    (!mine&&pp?' <i>(waiting for '+escapeHtml(pp.name)+')</i>':'')+'</div>'+
+    (mine?'<div class="ftopts">'+b.pending.options.map(o=>'<button class="hit" data-choose="'+escapeHtml(String(o.v))+'">'+escapeHtml(o.label)+'</button>').join('')+'</div>':'')+
+    '</div>');
   }
   parts.push('<div class="table"><div class="small">🛒 Market (cost = slot) · round '+b.round+' · target '+b.target+' fame</div><div class="ftmarket">'+
    b.market.map(m=>'<div class="ftmcard"><div class="price">'+m.price+'💰</div><div>'+(m.card?escapeHtml(m.card.name):'—')+'</div>'+

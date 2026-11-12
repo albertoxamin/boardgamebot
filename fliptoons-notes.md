@@ -136,8 +136,9 @@ Toon deck (ranks 1-25, 47 cards total): see counts below. Counts sum to 47: 3+2+
 - 2-player cleanup: after the last player's market phase, discard the leftmost+rightmost market
   cards (1 remaining card counts as both -> discard it), refill, re-sort. 3+ players: no discard.
 - End triggers: fame >= 30 at Check Fame; toon deck AND market both empty; degenerate-state
-  stall breaker (engine house rule): toon deck empty and no market hire for 8 consecutive
-  rounds -> Final Flip (prevents rules-legal deadlocks like empty decks + unaffordable market).
+  stall breaker (engine house rule): 8 consecutive rounds with no market progress (no hire and
+  no dismiss that round), or with an empty toon deck -> Final Flip. Prevents rules-legal
+  deadlocks where nobody can afford anything and the market never changes (deck never depletes).
 - Skunk check: owner's fame strictly the least among all players (tie -> nobody), mandatory
   free dismissal at the start of the owner's Market phase, no action cost.
 - End triggers as above; critic's choice +3 to unique most-fame player at first 30+ check.

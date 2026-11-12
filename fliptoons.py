@@ -75,7 +75,7 @@ def new_game(chat_id, creator_id, creator_name):
     return {
         "chat_id": int(chat_id), "created_by": int(creator_id),
         "players": [{"user_id": int(creator_id), "name": creator_name,
-                     "deck": [], "grid": [], "extra": [], "discarded": [],
+                     "deck": [], "grid": [[] for _ in range(6)], "extra": [], "discarded": [],
                      "fame": 0, "fame_bonus": 0, "bonus_actions": 0,
                      "actions": 0, "last_placed": None, "ostrich_queue": [],
                      "eagle_pending": False, "after_flip": [], "in_flip": False}],
@@ -84,7 +84,7 @@ def new_game(chat_id, creator_id, creator_name):
         "toon_deck": [], "toon_discard": [], "market": [None] * 5,
         "first": 0, "round": 0, "flip_list": [], "flip_pos": 0,
         "market_idx": 0, "end_triggered": False, "critic_holder": None,
-        "stall": 0, "active": [], "tie_players": None, "tie_count": 0, "winner": None,
+        "stall": 0, "acted": False, "active": [], "tie_players": None, "tie_count": 0, "winner": None,
         "iid": 0, "pending": None, "pending_q": [], "board_message_id": None,
     }
 
@@ -173,7 +173,7 @@ def _neighbor_cells(p, cell):
 
 
 def _reading_cells(p):
-    return [("slot", i) for i in range(6)] + \
+    return [("slot", i) for i in range(len(p["grid"]))] + \
            [("extra", j) for j in range(len(p["extra"]))]
 
 
@@ -583,6 +583,7 @@ def do_market(g, idx, act, arg, events):
             p["deck"].append(card)
         p["actions"] -= 1
         g["stall"] = 0
+        g["acted"] = True
         events.append(f"🛒 {p['name']} hires {_label(card)} for {cost} fame.")
         r = card["r"]
         if r == 19:
@@ -628,6 +629,8 @@ def do_market(g, idx, act, arg, events):
             return f"not enough fame (costs {cost})"
         _spend(p, cost)
         p["actions"] -= 1
+        g["stall"] = 0
+        g["acted"] = True
         _dismiss(g, idx, inst, events, f"{cost} fame")
         if g.get("pending"):
             return None
@@ -738,14 +741,19 @@ def _cleanup(g, events):
         g["flip_pos"] = 0
         events.append("🎬 FINAL FLIP!")
     else:
-        if not g["toon_deck"]:
+        # Stall breaker: count consecutive rounds with no market progress
+        # (no hire/dismiss, or the toon deck has run dry). Covers rules-legal
+        # deadlocks where nobody can afford anything and the market never
+        # changes, so the game would otherwise loop forever.
+        if not g.get("acted") or not g["toon_deck"]:
             g["stall"] += 1
             if g["stall"] >= 8:
                 g["end_triggered"] = True
-                events.append("📼 The toon deck is empty and nobody can buy "
-                              "anything - Final Flip triggered.")
+                events.append("📼 Nobody bought or dismissed anything for 8 "
+                              "rounds - Final Flip triggered.")
         else:
             g["stall"] = 0
+        g["acted"] = False
         g["first"] = (g["first"] + 1) % n
         g["round"] += 1
         g["stage"] = "flip"

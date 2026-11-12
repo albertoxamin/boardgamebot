@@ -40,17 +40,31 @@ async function ftMove(action,extra){
  FLP.err=r.error||''; if(r.error)ftLog('⛔ '+r.error);
  if(r.game)FLP.board=r.game;
  if(FLP.board)ftRender();}
+// BGA sprite sheet: 6 columns x 5 rows. Cells 0-4 are the starters in
+// STARTER_NAMES order; toon rank r (1-25) sits at cell r+4 (ostrich=5 .. cow=29).
+const FT_SHEET='/fliptoons/fl-toon-cards.webp', FT_BACK='/fliptoons/fl-toon-cards-back.webp';
+function ftCellIdx(c){
+ if(!c)return -1;
+ if(c.starter)return c.s;
+ return c.r>=1?c.r+4:-1;
+}
+function ftArt(c){
+ if(!c)return '';
+ if(c.fd)return "background-image:url('"+FT_BACK+"');background-size:cover;background-position:center";
+ let n=ftCellIdx(c); if(n<0)return '';
+ return "background-image:url('"+FT_SHEET+"');background-size:600% 500%;background-position:"+((n%6)*20)+'% '+(Math.floor(n/6)*25)+'%';
+}
 function ftCell(st){
  if(!st||!st.length)return '<div class="ftcell empty">·</div>';
- let top=st[st.length-1], cls='ftcell'+(top.fd?' fd':''), stack=st.length>1?' ×'+st.length:'';
+ let top=st[st.length-1], cls='ftcell'+(top.fd?' fd':''), stack=st.length>1?'<span class="ftstack">×'+st.length+'</span>':'';
  let fame=top.fd?'':'<span class="fm">'+top.fame+'</span>';
- return '<div class="'+cls+'"><span class="nm">'+escapeHtml(top.name)+stack+'</span>'+fame+'</div>';
+ return '<div class="'+cls+'" style="'+ftArt(top)+'" title="'+escapeHtml(top.name)+'">'+stack+fame+'</div>';
 }
 function ftGrid(p){
  let cells=p.grid.map(ftCell);
  while(cells.length<6)cells.push('<div class="ftcell empty">·</div>');
  let h='<div class="ftgrid">'+cells.join('')+'</div>';
- (p.extra||[]).forEach(e=>{h+='<div class="ftrow-extra">+ '+e.cards.map(c=>escapeHtml(c.fd?'?':c.name)+(c.fd?'':' ('+c.fame+')')).join(' · ')+'</div>';});
+ (p.extra||[]).forEach(e=>{h+='<div class="ftrow-extra">+ '+e.cards.map(c=>'<span class="ftmini" style="'+ftArt(c)+'" title="'+escapeHtml(c.name)+(c.fd?'':' ('+c.fame+')')+'"></span>').join('')+'</div>';});
  return h;
 }
 function ftDismissButtons(p){
@@ -86,11 +100,14 @@ function ftRender(){
     '</div>');
   }
   parts.push('<div class="table"><div class="small">🛒 Market (cost = slot) · round '+b.round+' · target '+b.target+' fame</div><div class="ftmarket">'+
-   b.market.map(m=>'<div class="ftmcard"><div class="price">'+m.price+'💰</div><div>'+(m.card?escapeHtml(m.card.name):'—')+'</div>'+
+   b.market.map(m=>'<div class="ftmcard"><div class="price">'+m.price+'💰</div>'+
+    (m.card?'<div class="ftmart" style="'+ftArt(m.card)+'"></div><div class="small">'+escapeHtml(m.card.name)+'</div>':'<div class="ftmart empty">—</div>')+
     (m.card&&myMarket?'<button class="hit" data-hire="'+m.slot+'">Hire</button>':'')+'</div>').join('')+'</div></div>');
   let ph='<div class="table"><div class="ftplayers">';
   b.players.forEach((p,i)=>{
-   ph+='<div class="ftpc'+(p.is_current?' current':'')+'"><div style="display:flex;justify-content:space-between"><b>'+escapeHtml(p.name)+(p.npc?' 🤖':'')+'</b><span class="score">'+p.fame+'</span></div>'+
+   let badges=(i===b.first?'<img class="ftbadge" src="/fliptoons/fl-first-player.webp" title="First player" alt="first player">':'')+
+    (b.critic_holder===i?'<img class="ftbadge" src="/fliptoons/fl-critics-choice.webp" title="Critics\' Choice" alt="critics choice">':'');
+   ph+='<div class="ftpc'+(p.is_current?' current':'')+'"><div style="display:flex;justify-content:space-between"><b>'+escapeHtml(p.name)+(p.npc?' 🤖':'')+'</b>'+badges+'<span class="score">'+p.fame+'</span></div>'+
     '<div class="small">deck '+p.deck+' · discarded '+p.discarded+(p.is_current&&b.stage==='market'?' · budget '+p.budget:'')+'</div>'+ftGrid(p)+
     (i===b.actor&&myMarket?ftDismissButtons(p):'')+'</div>';
   });

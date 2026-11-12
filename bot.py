@@ -1965,6 +1965,7 @@ def _ft_card_json(c):
             "name": "?" if c["fd"] else FT.card_name(c),
             "fame": 0 if c["fd"] else FT.base_fame(c),
             "fd": c["fd"], "starter": c["s"] is not None,
+            "s": c["s"], "r": c["r"],
             "dismissable": (not c["fd"]) and c["r"] not in FT.UNDISMISSABLE,
             "dismiss_cost": 3 if c["s"] == FT.CATERPILLAR else FT.DISMISS_COST}
 
@@ -3348,6 +3349,11 @@ def start_web_server(state):
             if u.path == "/odin-cards.webp":
                 p = os.path.join(os.path.dirname(JS_PATH), "odin-cards.webp")
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
+            if u.path.startswith("/fliptoons/") and u.path.endswith(".webp"):
+                p = os.path.join(os.path.dirname(JS_PATH), "fliptoons", os.path.basename(u.path))
+                if os.path.exists(p):
+                    return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
+                return self._send(404, {"ok": False})
             if u.path.startswith("/cards/") and u.path.endswith(".svg"):
                 p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
                 if os.path.exists(p):

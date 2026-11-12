@@ -3602,7 +3602,9 @@ def start_web_server(state):
                 uid, name, start_param, chat_instance = iu
                 if path == "/api/fliptoons/create":
                     chat_id = None
-                    for cand in (chat_instance, start_param, str(body.get("chat_id") or "")):
+                    # Prefer the explicit chat id (startapp param / Mini App URL);
+                    # chat_instance is NOT a chat id and only a last resort.
+                    for cand in (start_param, str(body.get("chat_id") or ""), chat_instance):
                         cand = str(cand)
                         if cand.startswith("fliptoons"):
                             cand = cand[len("fliptoons"):]

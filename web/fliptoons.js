@@ -1,34 +1,45 @@
 // Fliptoons Mini App (synced, initData auto-login). Loaded by flip7.html router.
-const FLP={user_id:0,chat_id:null,board:null,timer:null,init:''};
+const FLP={user_id:0,chat_id:null,board:null,timer:null,init:'',err:''};
 function ftLog(s){let e=document.getElementById('ftLog');if(e)e.textContent+=s+'\n';}
 function ftApi(path,opts){return fetch(path,opts).then(r=>r.json());}
+function ftChatId(raw){let s=String(raw||'');if(s.startsWith('fliptoons'))s=s.slice(9);
+ let n=parseInt(s,10);return isNaN(n)?0:n;}
 async function ftLoad(){
  let tg=tgInit();
- if(!tg.id){document.getElementById('ftBoard').innerHTML='<div class="table lobby-note">Open as Telegram Mini App via the bot\'s Fliptoons link.</div>';return;}
+ let board=document.getElementById('ftBoard');
+ if(!tg.id){board.innerHTML='<div class="table lobby-note">Open as Telegram Mini App via the bot\'s Fliptoons link.</div>';return;}
  FLP.user_id=tg.id; FLP.init=tg.init;
+ // Trusted chat id comes only from the startapp/URL param ("fliptoons<chat>"),
+ // never from chat_instance (that is not a chat id and used to spawn a stray
+ // lobby, leaving the Mini App stuck on "1/4" while the real game lived elsewhere).
+ let pref=ftChatId(tg.start)||ftChatId(new URLSearchParams(location.search).get('app'));
  let r=await ftApi('/api/fliptoons/mygames?init_data='+encodeURIComponent(tg.init));
  let mine=r.games||[];
- let pref=parseInt(tg.start,10)||0; if(!pref && tg.chat_instance) pref=parseInt(tg.chat_instance,10)||0;
- if(tg.start && String(tg.start).startsWith('fliptoons')) pref=parseInt(String(tg.start).slice(9),10)||pref;
- let pick=mine.find(g=>g.chat_id===pref);
- if(!pick && pref){let spec=await ftApi('/api/fliptoons/game?chat_id='+encodeURIComponent(pref)+'&init_data='+encodeURIComponent(tg.init));
-  if(spec.ok) pick={chat_id:pref};}
- if(!pick) pick=mine.find(g=>g.phase!=='game_end') || mine[0];
- if(pick) ftSelect(pick.chat_id);
- else if(pref){let cr=await ftApi('/api/fliptoons/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init,chat_id:pref})});
-  if(cr.game) ftSelect(cr.game.chat_id); else ftLog('⛔ '+(cr.error||'create failed'));}
- else document.getElementById('ftBoard').innerHTML='<div class="table lobby-note">No Fliptoons game for you yet — send /fliptoons in a chat, then open its Mini App link.</div>';
+ let cands=mine.slice().sort((a,b)=>((a.phase==='game_end')-(b.phase==='game_end')) ||
+   ((b.players?b.players.length:0)-(a.players?a.players.length:0)));
+ let pick=cands.find(g=>g.chat_id===pref)||cands[0];
+ if(pick){ftSelect(pick.chat_id);return;}
+ if(!pref){board.innerHTML='<div class="table lobby-note">No Fliptoons game for you yet — send /fliptoons in a chat, then open its Mini App link.</div>';return;}
+ let spec=await ftApi('/api/fliptoons/game?chat_id='+encodeURIComponent(pref)+'&init_data='+encodeURIComponent(tg.init));
+ if(spec.ok&&spec.game){ftSelect(pref);return;}
+ let cr=await ftApi('/api/fliptoons/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init,chat_id:pref})});
+ if(cr.game){ftSelect(cr.game.chat_id);return;}
+ FLP.err=cr.error||'could not create the game';
+ board.innerHTML='<div class="table lobby-note">⛔ '+escapeHtml(FLP.err)+'</div>';
 }
-async function ftSelect(chat_id){FLP.chat_id=chat_id; await ftRefresh();
+async function ftSelect(chat_id){FLP.chat_id=chat_id; FLP.err=''; await ftRefresh();
  if(FLP.timer)clearInterval(FLP.timer); FLP.timer=setInterval(ftRefresh,3000);}
 async function ftRefresh(){ if(!FLP.chat_id)return;
  let r=await ftApi('/api/fliptoons/game?chat_id='+encodeURIComponent(FLP.chat_id)+'&init_data='+encodeURIComponent(FLP.init));
- if(r.ok){FLP.board=r.game; ftRender();}}
+ if(r.ok){FLP.board=r.game; FLP.err=''; ftRender();}
+ else if(FLP.board){FLP.err=r.error||'game not found'; ftRender();}}
 async function ftMove(action,extra){
  let body=Object.assign({chat_id:FLP.chat_id,action:action,init_data:FLP.init},extra||{});
  let r=await ftApi('/api/fliptoons/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
- if(r.events)r.events.forEach(e=>ftLog(e)); if(r.error)ftLog('⛔ '+r.error);
- if(r.game){FLP.board=r.game; ftRender();}}
+ if(r.events)r.events.forEach(e=>ftLog(e));
+ FLP.err=r.error||''; if(r.error)ftLog('⛔ '+r.error);
+ if(r.game)FLP.board=r.game;
+ if(FLP.board)ftRender();}
 function ftCell(st){
  if(!st||!st.length)return '<div class="ftcell empty">·</div>';
  let top=st[st.length-1], cls='ftcell'+(top.fd?' fd':''), stack=st.length>1?' ×'+st.length:'';
@@ -85,6 +96,7 @@ function ftRender(){
   });
   ph+='</div></div>'; parts.push(ph);
  }
+ if(FLP.err)parts.unshift('<div class="table lobby-note">⛔ '+escapeHtml(FLP.err)+'</div>');
  board.innerHTML=parts.join('');
  document.getElementById('ftJoin').classList.toggle('hidden',!(b.phase==='lobby'&&!b.is_player));
  document.getElementById('ftStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.is_player));

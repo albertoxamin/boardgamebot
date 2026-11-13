@@ -115,13 +115,18 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 .yzbar{position:sticky;top:0;z-index:30;background:rgba(15,23,42,.97);border:1px solid #334155;border-radius:12px;padding:8px;margin-bottom:8px;box-shadow:0 4px 14px #000a}
 #yzRoll:not(.hidden){display:block;width:100%;margin:8px 0 0}
 #yzRoll:disabled{opacity:.5}
-.ftmarket{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:6px 0}
-.ftmcard{background:rgba(15,23,42,.85);border:2px solid #334155;border-radius:10px;padding:6px;min-width:76px;max-width:96px;text-align:center}
+.ftmarket{display:flex;gap:4px;flex-wrap:nowrap;justify-content:center;margin:6px 0}
+.ftmcard{background:rgba(15,23,42,.85);border:2px solid #334155;border-radius:10px;padding:4px;flex:1;min-width:0;max-width:96px;text-align:center}
 .ftmcard .price{color:#f59e0b;font-weight:900}
 .ftmart{position:relative;width:100%;aspect-ratio:558/779;background-size:600% 500%;background-repeat:no-repeat;background-color:#1e293b;border-radius:6px;margin:2px 0;overflow:hidden;container-type:inline-size}
+.ftmart[data-zoom]{cursor:pointer}
 .ftmart.empty{display:flex;align-items:center;justify-content:center;font-size:20px;opacity:.5}
-.ftmcard button{font-size:13px;padding:6px 8px;margin:4px 0 0;width:100%}
-.ftmdesc{font-size:9px;line-height:1.12;color:#94a3b8;font-weight:600;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;margin:2px 0}
+.ftmcard button{font-size:13px;padding:6px 4px;margin:4px 0 0;width:100%}
+.ftzoom{position:fixed;inset:0;background:rgba(2,6,12,.88);display:none;flex-direction:column;align-items:center;justify-content:center;padding:16px;z-index:60;text-align:center}
+.ftzoom.open{display:flex}
+.ftzcard{width:min(280px,78vw)}
+.ftzcard .ftmart{margin:0}
+.ftzdesc{margin-top:10px;font-size:13px;line-height:1.3;color:#cbd5e1;max-width:300px}
 .ftplayers{display:flex;flex-direction:column;gap:8px}
 .ftpc{background:rgba(15,23,42,.85);border:2px solid #334155;border-radius:12px;padding:8px}
 .ftpc.current{border-color:#f59e0b;box-shadow:0 0 10px #f59e0b55}
@@ -231,6 +236,7 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <button class="hit hidden" id="ftSkip">⏭ Skip / end market</button>
 <button class="primary hidden" id="ftRematch">🔄 Rematch!</button>
 <div class="log" id="ftLog"></div>
+<div id="ftZoom" class="ftzoom"></div>
 </div>
 <div id="synced">
 <div id="syncBoard"></div>
@@ -249,5 +255,5 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <script data-cfasync="false" src="lsd.js?v=4"></script>
 <script data-cfasync="false" src="spots.js?v=14"></script>
 <script data-cfasync="false" src="yahtzee.js?v=3"></script>
-<script data-cfasync="false" src="fliptoons.js?v=5"></script>
+<script data-cfasync="false" src="fliptoons.js?v=6"></script>
 </body></html>

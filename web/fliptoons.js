@@ -167,6 +167,21 @@ function ftDismissButtons(p){
  (p.extra||[]).forEach(e=>e.cards.forEach(add));
  return out.length?'<div class="ftopts">'+out.join('')+'</div>':'';
 }
+ // Full-size card view (market cards are small; tap to inspect + read the text).
+ function ftZoom(name){
+  let b=FT_BGA[String(name||'').toLowerCase()]; if(!b)return;
+  let info=FT_CARDS[String(name||'').toLowerCase()]||{d:''};
+  let c={name:b.n,r:b.r};
+  let si=['Caterpillar','Skunk','Dragonfly','Bee','Snail'].indexOf(b.n);
+  if(b.r===0&&si>=0){c.starter=true;c.s=si;}
+  let z=document.getElementById('ftZoom');
+  z.innerHTML='<div class="ftzcard"><div class="ftmart" style="'+ftArt(c)+'">'+ftFace(c)+'</div></div>'+
+   '<div class="ftzdesc">'+(info.d?'ℹ️ '+escapeHtml(info.d):'')+'</div>'+
+   '<div class="small" style="margin-top:8px">tap anywhere to close</div>';
+  z.classList.add('open');
+  ftFit(z);
+ }
+ function ftZoomClose(){let z=document.getElementById('ftZoom');if(z){z.classList.remove('open');z.innerHTML='';}}
 function ftRender(){
  let b=FLP.board; if(!b)return;
  let t=document.getElementById('ftTurn'), board=document.getElementById('ftBoard');
@@ -193,10 +208,9 @@ function ftRender(){
     '</div>');
   }
   parts.push('<div class="table"><div class="small">🛒 Market (cost = slot) · round '+b.round+' · target '+b.target+' fame</div><div class="ftmarket">'+
-   b.market.map(m=>{let i=ftCardInfo(m.card),d=i?i.d:'';
+   b.market.map(m=>{
     return '<div class="ftmcard"><div class="price">'+m.price+'💰</div>'+
-    (m.card?'<div class="ftmart" style="'+ftArt(m.card)+'" title="'+escapeHtml(m.card.name)+'">'+ftFace(m.card)+'</div>':'<div class="ftmart empty">—</div>')+
-    (d?'<div class="ftmdesc">'+escapeHtml(d)+'</div>':'')+
+    (m.card?'<div class="ftmart" style="'+ftArt(m.card)+'" data-zoom="'+escapeHtml(m.card.name)+'" title="'+escapeHtml(m.card.name)+'">'+ftFace(m.card)+'</div>':'<div class="ftmart empty">—</div>')+
     (m.card&&myMarket?'<button class="hit" data-hire="'+m.slot+'">Hire</button>':'')+'</div>';}).join('')+'</div></div>');
   let ph='<div class="table"><div class="ftplayers">';
   b.players.forEach((p,i)=>{
@@ -216,11 +230,13 @@ function ftRender(){
  document.getElementById('ftSkip').classList.toggle('hidden',!myMarket);
  document.getElementById('ftRematch').classList.toggle('hidden',!(b.phase==='game_end'&&b.is_player));
  board.querySelectorAll('[data-hire]').forEach(el=>el.addEventListener('click',()=>ftMove('hire',{slot:parseInt(el.dataset.hire)})));
+ board.querySelectorAll('[data-zoom]').forEach(el=>el.addEventListener('click',()=>ftZoom(el.dataset.zoom)));
  board.querySelectorAll('[data-choose]').forEach(el=>el.addEventListener('click',()=>ftMove('choose',{choice:el.dataset.choose})));
  board.querySelectorAll('[data-dismiss]').forEach(el=>el.addEventListener('click',()=>ftMove('dismiss',{iid:parseInt(el.dataset.dismiss)})));
 }
 document.getElementById('ftJoin').addEventListener('click',()=>ftMove('join'));
 document.getElementById('ftStart').addEventListener('click',()=>ftMove('start'));
 document.getElementById('ftSkip').addEventListener('click',()=>ftMove('skip'));
+document.getElementById('ftZoom').addEventListener('click',ftZoomClose);
 document.getElementById('ftRematch').addEventListener('click',()=>ftMove('rematch'));
 if(!document.getElementById('fliptoons').classList.contains('hidden')) ftLoad();

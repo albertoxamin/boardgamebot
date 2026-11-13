@@ -148,25 +148,35 @@ function ftArt(c){
  let n=ftCellIdx(c); if(n<0)return '';
  return "background-image:url('"+FT_SHEET+"');background-size:600% 500%;background-position:"+((n%6)*20)+'% '+(Math.floor(n/6)*25)+'%';
 }
-function ftCell(st){
- if(!st||!st.length)return '<div class="ftcell empty">·</div>';
- let top=st[st.length-1], cls='ftcell'+(top.fd?' fd':''), stack=st.length>1?'<span class="ftstack">×'+st.length+'</span>':'';
- return '<div class="'+cls+'" style="'+ftArt(top)+'" title="'+escapeHtml(top.name)+(top.fd?'':' ('+(FT_CARDS[String(top.name).toLowerCase()]||{}).d+')')+'">'+(top.fd?'':ftFace(top))+stack+'</div>';
-}
-function ftGrid(p){
- let cells=p.grid.map(ftCell);
- while(cells.length<6)cells.push('<div class="ftcell empty">·</div>');
- let h='<div class="ftgrid">'+cells.join('')+'</div>';
- (p.extra||[]).forEach(e=>{h+='<div class="ftrow-extra">+ '+e.cards.map(c=>'<span class="ftmini" style="'+ftArt(c)+'" title="'+escapeHtml(c.name)+(c.fd?'':' ('+c.fame+')')+'"></span>').join('')+'</div>';});
- return h;
-}
-function ftDismissButtons(p){
- let out=[];
- let add=c=>{if(c.dismissable)out.push('<button class="ftdismiss" data-dismiss="'+c.id+'">🗑 '+escapeHtml(c.name)+' ('+c.dismiss_cost+')</button>');};
- p.grid.forEach(st=>st.forEach(add));
- (p.extra||[]).forEach(e=>e.cards.forEach(add));
- return out.length?'<div class="ftopts">'+out.join('')+'</div>':'';
-}
+ function ftCellBtns(st,act){
+  // Buttons pinned under this stack: pending choose-options (skunk/butterfly,
+  // matched by card id) and/or the regular dismiss action. Buried stack cards
+  // are dismissable too, so list the whole stack (top card first).
+  if(!st||!st.length||!act)return '';
+  let out='';
+  for(let i=st.length-1;i>=0;i--){let c=st[i];if(c.fd)continue;
+   if(act.opt&&act.opt[String(c.id)]){let o=act.opt[String(c.id)];delete act.opt[String(c.id)];
+    out+='<button class="ftdismiss" data-choose="'+escapeHtml(String(o.v))+'">🗑 '+escapeHtml(o.label)+'</button>';}
+   else if(act.dis&&c.dismissable){
+    out+='<button class="ftdismiss" data-dismiss="'+c.id+'">🗑 '+((st.length>1)?escapeHtml(c.name)+' ':'')+'('+c.dismiss_cost+')</button>';}
+  }
+  return out;
+ }
+  function ftCell(st,act){
+  if(!st||!st.length)return '<div class="ftcellwrap"><div class="ftcell empty">·</div></div>';
+  let top=st[st.length-1], cls='ftcell'+(top.fd?' fd':''), stack=st.length>1?'<span class="ftstack">×'+st.length+'</span>':'';
+  return '<div class="ftcellwrap"><div class="'+cls+'" style="'+ftArt(top)+'" title="'+escapeHtml(top.name)+(top.fd?'':' ('+(FT_CARDS[String(top.name).toLowerCase()]||{}).d+')')+'">'+(top.fd?'':ftFace(top))+stack+'</div>'+ftCellBtns(st,act)+'</div>';
+ }
+ function ftGrid(p,act){
+  act=act||{};
+  let cells=p.grid.map(st=>ftCell(st,act));
+  while(cells.length<6)cells.push('<div class="ftcellwrap"><div class="ftcell empty">·</div></div>');
+  let h='<div class="ftgrid">'+cells.join('')+'</div>';
+  (p.extra||[]).forEach(e=>{h+='<div class="ftrow-extra">+ '+e.cards.map(c=>{
+   let btn=ftCellBtns([c],act);
+   return '<span class="ftminiwrap"><span class="ftmini" style="'+ftArt(c)+'" title="'+escapeHtml(c.name)+(c.fd?'':' ('+c.fame+')')+'"></span>'+btn+'</span>';}).join('')+'</div>';});
+  return h;
+ }
  // Full-size card view (market cards are small; tap to inspect + read the text).
  function ftZoom(name,zslot){
   let b=FT_BGA[String(name||'').toLowerCase()]; if(!b)return;
@@ -224,12 +234,18 @@ function ftRender(){
   b.players.forEach((p,i)=>{
    let badges=(i===b.first?'<img class="ftbadge" src="/fliptoons/fl-first-player.webp" title="First player" alt="first player">':'')+
     (b.critic_holder===i?'<img class="ftbadge" src="/fliptoons/fl-critics-choice.webp" title="Critics\' Choice" alt="critics choice">':'');
+   // Per-card actions: dismiss on my market turn; pending choose-options pinned
+   // under the matching card (skunk/butterfly), leftovers stay below the grid.
+   let minePend=b.pending&&b.pending.player===i&&(p.user_id===FLP.user_id||p.npc);
+   let act=null;
+   if(i===b.actor&&myMarket)act={dis:true};
+   if(minePend){act=act||{};act.opt={};b.pending.options.forEach(o=>{act.opt[String(o.v)]=o;});}
+   let grid=ftGrid(p,act);
+   let unmatched=minePend?b.pending.options.filter(o=>act.opt[String(o.v)]!==undefined):[];
    ph+='<div class="ftpc'+(p.is_current?' current':'')+'"><div style="display:flex;justify-content:space-between"><b>'+escapeHtml(p.name)+(p.npc?' 🤖':'')+'</b>'+badges+'<span class="score">'+p.fame+'</span></div>'+
-    '<div class="small">deck '+p.deck+' · discarded '+p.discarded+(p.is_current&&b.stage==='market'?' · budget '+p.budget:'')+'</div>'+ftGrid(p)+
-    (i===b.actor&&myMarket?ftDismissButtons(p):'')+
-    (b.pending&&b.pending.player===i&&p.user_id===FLP.user_id||(b.pending&&b.pending.player===i&&p.npc)?
-     '<div class="ftprompt">'+escapeHtml(b.pending.prompt)+'</div><div class="ftopts">'+
-     b.pending.options.map(o=>'<button class="hit" data-choose="'+escapeHtml(String(o.v))+'">'+escapeHtml(o.label)+'</button>').join('')+'</div>':'')+
+    '<div class="small">deck '+p.deck+' · discarded '+p.discarded+(p.is_current&&b.stage==='market'?' · budget '+p.budget:'')+'</div>'+grid+
+    (minePend?'<div class="ftprompt">'+escapeHtml(b.pending.prompt)+'</div>'+
+     (unmatched.length?'<div class="ftopts">'+unmatched.map(o=>'<button class="hit" data-choose="'+escapeHtml(String(o.v))+'">'+escapeHtml(o.label)+'</button>').join('')+'</div>':''):'')+
     '</div>';
   });
   ph+='</div></div>'; parts.push(ph);

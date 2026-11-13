@@ -168,7 +168,7 @@ function ftDismissButtons(p){
  return out.length?'<div class="ftopts">'+out.join('')+'</div>':'';
 }
  // Full-size card view (market cards are small; tap to inspect + read the text).
- function ftZoom(name){
+ function ftZoom(name,zslot){
   let b=FT_BGA[String(name||'').toLowerCase()]; if(!b)return;
   let info=FT_CARDS[String(name||'').toLowerCase()]||{d:''};
   let c={name:b.n,r:b.r};
@@ -177,9 +177,18 @@ function ftDismissButtons(p){
   let z=document.getElementById('ftZoom');
   z.innerHTML='<div class="ftzcard"><div class="ftmart" style="'+ftArt(c)+'">'+ftFace(c)+'</div></div>'+
    '<div class="ftzdesc">'+(info.d?'ℹ️ '+escapeHtml(info.d):'')+'</div>'+
-   '<div class="small" style="margin-top:8px">tap anywhere to close</div>';
+   '<div class="small" style="margin-top:8px">tap anywhere to dismiss</div>';
+  // Hire from inside the zoom when it's this player's market turn.
+  let g=FLP.board;
+  if(zslot!=null&&g&&g.can_act&&g.stage==='market'&&!g.pending){
+   let m=(g.market||[]).find(x=>x.slot===parseInt(zslot));
+   if(m&&m.card)z.insertAdjacentHTML('beforeend',
+    '<button class="hit" data-zhire="'+m.slot+'">Hire ('+m.price+'💰)</button>');
+  }
   z.classList.add('open');
   ftFit(z);
+  let hb=z.querySelector('[data-zhire]');
+  if(hb)hb.addEventListener('click',ev=>{ev.stopPropagation();ftZoomClose();ftMove('hire',{slot:parseInt(hb.dataset.zhire)});});
  }
  function ftZoomClose(){let z=document.getElementById('ftZoom');if(z){z.classList.remove('open');z.innerHTML='';}}
 function ftRender(){
@@ -199,18 +208,17 @@ function ftRender(){
   else parts.push('<div class="table lobby-note">It\'s a draw!</div>');
  } else {
   t.textContent=isActor?(b.pending?'👉 Your choice':(b.stage==='market'?'👉 Your market turn':'⏳ Resolving flips…')):(cur?'👉 '+escapeHtml(cur.name)+'\'s turn':'⏳ Resolving flips…');
-  if(b.pending){
-   let pp=b.players[b.pending.player];
-   let mine=b.pending.player!=null&&pp&&(pp.user_id===FLP.user_id||pp.npc);
-   parts.push('<div class="table"><div class="lobby-note">'+escapeHtml(b.pending.prompt)+
-    (!mine&&pp?' <i>(waiting for '+escapeHtml(pp.name)+')</i>':'')+'</div>'+
-    (mine?'<div class="ftopts">'+b.pending.options.map(o=>'<button class="hit" data-choose="'+escapeHtml(String(o.v))+'">'+escapeHtml(o.label)+'</button>').join('')+'</div>':'')+
-    '</div>');
-  }
+   if(b.pending){
+    let pp=b.pending.player!=null?b.players[b.pending.player]:null;
+    let mine=pp&&(pp.user_id===FLP.user_id||pp.npc);
+    if(!mine)parts.push('<div class="table"><div class="lobby-note">'+escapeHtml(b.pending.prompt)+
+     (pp?' <i>(waiting for '+escapeHtml(pp.name)+')</i>':'')+'</div></div>');
+    // mine: prompt + buttons move into that player's seat, below their cards
+   }
   parts.push('<div class="table"><div class="small">🛒 Market (cost = slot) · round '+b.round+' · target '+b.target+' fame</div><div class="ftmarket">'+
    b.market.map(m=>{
     return '<div class="ftmcard"><div class="price">'+m.price+'💰</div>'+
-    (m.card?'<div class="ftmart" style="'+ftArt(m.card)+'" data-zoom="'+escapeHtml(m.card.name)+'" title="'+escapeHtml(m.card.name)+'">'+ftFace(m.card)+'</div>':'<div class="ftmart empty">—</div>')+
+    (m.card?'<div class="ftmart" style="'+ftArt(m.card)+'" data-zoom="'+escapeHtml(m.card.name)+'" data-zslot="'+m.slot+'" title="'+escapeHtml(m.card.name)+'">'+ftFace(m.card)+'</div>':'<div class="ftmart empty">—</div>')+
     (m.card&&myMarket?'<button class="hit" data-hire="'+m.slot+'">Hire</button>':'')+'</div>';}).join('')+'</div></div>');
   let ph='<div class="table"><div class="ftplayers">';
   b.players.forEach((p,i)=>{
@@ -218,7 +226,11 @@ function ftRender(){
     (b.critic_holder===i?'<img class="ftbadge" src="/fliptoons/fl-critics-choice.webp" title="Critics\' Choice" alt="critics choice">':'');
    ph+='<div class="ftpc'+(p.is_current?' current':'')+'"><div style="display:flex;justify-content:space-between"><b>'+escapeHtml(p.name)+(p.npc?' 🤖':'')+'</b>'+badges+'<span class="score">'+p.fame+'</span></div>'+
     '<div class="small">deck '+p.deck+' · discarded '+p.discarded+(p.is_current&&b.stage==='market'?' · budget '+p.budget:'')+'</div>'+ftGrid(p)+
-    (i===b.actor&&myMarket?ftDismissButtons(p):'')+'</div>';
+    (i===b.actor&&myMarket?ftDismissButtons(p):'')+
+    (b.pending&&b.pending.player===i&&p.user_id===FLP.user_id||(b.pending&&b.pending.player===i&&p.npc)?
+     '<div class="ftprompt">'+escapeHtml(b.pending.prompt)+'</div><div class="ftopts">'+
+     b.pending.options.map(o=>'<button class="hit" data-choose="'+escapeHtml(String(o.v))+'">'+escapeHtml(o.label)+'</button>').join('')+'</div>':'')+
+    '</div>';
   });
   ph+='</div></div>'; parts.push(ph);
  }
@@ -230,7 +242,7 @@ function ftRender(){
  document.getElementById('ftSkip').classList.toggle('hidden',!myMarket);
  document.getElementById('ftRematch').classList.toggle('hidden',!(b.phase==='game_end'&&b.is_player));
  board.querySelectorAll('[data-hire]').forEach(el=>el.addEventListener('click',()=>ftMove('hire',{slot:parseInt(el.dataset.hire)})));
- board.querySelectorAll('[data-zoom]').forEach(el=>el.addEventListener('click',()=>ftZoom(el.dataset.zoom)));
+ board.querySelectorAll('[data-zoom]').forEach(el=>el.addEventListener('click',()=>ftZoom(el.dataset.zoom,el.dataset.zslot)));
  board.querySelectorAll('[data-choose]').forEach(el=>el.addEventListener('click',()=>ftMove('choose',{choice:el.dataset.choose})));
  board.querySelectorAll('[data-dismiss]').forEach(el=>el.addEventListener('click',()=>ftMove('dismiss',{iid:parseInt(el.dataset.dismiss)})));
 }

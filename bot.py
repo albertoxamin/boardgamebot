@@ -86,6 +86,68 @@ def send(chat_id, text, kb=None):
     return api("sendMessage", **p)
 
 
+COVERS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "covers")
+COVERS = {"games": "flip7.jpg", "flip7": "flip7.jpg", "regicide": "regicide.jpg",
+          "odin": "odin.jpg", "lsd": "lsd.jpg", "spots": "spots.jpg",
+          "yahtzee": "yahtzee.jpg", "fliptoons": "fliptoons.jpg",
+          "tornado": "tornado.jpg"}
+
+
+def cover_path(game):
+    """Local box-art file for a game, or None when it has not been added."""
+    name = COVERS.get(game)
+    if not name:
+        return None
+    path = os.path.join(COVERS_DIR, name)
+    return path if os.path.exists(path) else None
+
+
+def send_photo(chat_id, path, caption="", kb=None):
+    """sendPhoto via multipart/form-data (stdlib only)."""
+    import uuid
+    boundary = "----flip7" + uuid.uuid4().hex
+    with open(path, "rb") as f:
+        file_bytes = f.read()
+    name = os.path.basename(path)
+    ctype = "image/png" if name.lower().endswith(".png") else "image/jpeg"
+
+    def field(key, value):
+        return (f"--{boundary}\r\nContent-Disposition: form-data; "
+                f'name="{key}"\r\n\r\n{value}\r\n').encode()
+    body = field("chat_id", chat_id)
+    body += field("parse_mode", "HTML")
+    if caption:
+        body += field("caption", caption)
+    if kb:
+        body += field("reply_markup", json.dumps({"inline_keyboard": kb}))
+    body += (f"--{boundary}\r\nContent-Disposition: form-data; "
+             f'name="photo"; filename="{name}"\r\n'
+             f"Content-Type: {ctype}\r\n\r\n").encode() + file_bytes + b"\r\n"
+    body += f"--{boundary}--\r\n".encode()
+    req = urllib.request.Request(
+        f"{API}/sendPhoto", data=body,
+        headers={"Content-Type": f"multipart/form-data; boundary={boundary}"})
+    try:
+        with urllib.request.urlopen(req, timeout=35) as r:
+            return json.loads(r.read())
+    except urllib.error.HTTPError as e:
+        print(f"sendPhoto HTTP {e.code}: {e.read()[:300]}", file=sys.stderr)
+        return {"ok": False}
+
+
+def send_board(g, game, text, kb=None):
+    """Send the board. Lobbies show the game's box art as a photo with the
+    board text as caption; during play boards stay plain text messages."""
+    path = cover_path(game) if g.get("phase") == "lobby" else None
+    # Caption limit is 1024 chars and must stay valid HTML: fall back to a
+    # normal text message when the accumulated events would overflow it.
+    if path and len(text) <= 1024:
+        r = send_photo(g["chat_id"], path, text, kb)
+        if r.get("ok"):
+            return r
+    return send(g["chat_id"], text, kb)
+
+
 def edit(chat_id, msg_id, text, kb=None):
     p = {"chat_id": chat_id, "message_id": msg_id, "text": text,
          "parse_mode": "HTML", "disable_web_page_preview": True}
@@ -428,7 +490,7 @@ def render(g, events=None):
         ping = turn_ping(g)
         if ping:
             lines.append(ping)
-        r = send(chat_id, "\n".join(lines) + "\n\n" + text, kb)
+        r = send_board(g, "games", "\n".join(lines) + "\n\n" + text, kb)
         if r.get("ok"):
             old = g.get("board_message_id")
             g["board_message_id"] = r["result"]["message_id"]
@@ -439,7 +501,7 @@ def render(g, events=None):
         r = edit(chat_id, g["board_message_id"], text, kb)
         if r.get("ok"):
             return
-    r = send(chat_id, text, kb)
+    r = send_board(g, "games", text, kb)
     if r.get("ok"):
         g["board_message_id"] = r["result"]["message_id"]
 
@@ -531,7 +593,7 @@ def rg_render(g, events=None):
         lines.append(ping)
     text = "\n".join(lines + [rg_board_text(g)]) if lines else rg_board_text(g)
     kb = rg_keyboard(g)
-    r = send(chat_id, text, kb)
+    r = send_board(g, "regicide", text, kb)
     if r.get("ok"):
         old = g.get("board_message_id")
         g["board_message_id"] = r["result"]["message_id"]
@@ -580,11 +642,11 @@ def handle_regicide(state, msg, cmd, text, uid, name):
         return True
     if cmd == "/regicide":
         if not g:
-            g = R.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
+            name = msg.get("from", {}).get("first_name") or "Player"
+            g = R.new_game(chat_id, uid, name)
             g["chat_type"] = msg.get("chat", {}).get("type", "private")
             state.setdefault("regicide", {})[str(chat_id)] = g
-            send(chat_id, "⚔️ Regicide game created! Friends: /regicide_join, anyone: /regicide_start")
-            rg_render(g)
+            rg_render(g, [f"⚔️ Regicide game created by {name}!"])
         else:
             rg_render(g)
         return True
@@ -751,7 +813,7 @@ def odin_render(g, events=None):
         lines.append(ping)
     text = "\n".join(lines + [odin_board_text(g)]) if lines else odin_board_text(g)
     kb = odin_keyboard(g)
-    r = send(chat_id, text, kb)
+    r = send_board(g, "odin", text, kb)
     if r.get("ok"):
         old = g.get("board_message_id")
         g["board_message_id"] = r["result"]["message_id"]
@@ -798,11 +860,11 @@ def handle_odin(state, msg, cmd, text, uid, name):
         return True
     if cmd == "/odin":
         if not g:
-            g = O.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
+            name = msg.get("from", {}).get("first_name") or "Player"
+            g = O.new_game(chat_id, uid, name)
             g["chat_type"] = msg.get("chat", {}).get("type", "private")
             state.setdefault("odin", {})[str(chat_id)] = g
-            send(chat_id, "🛡️ Odin game created! Friends: /odin_join, anyone: /odin_start")
-            odin_render(g)
+            odin_render(g, [f"🛡️ Odin game created by {name}!"])
         else:
             odin_render(g)
         return True
@@ -1047,7 +1109,7 @@ def lsd_render(g, events=None):
         lines.append(ping)
     text = "\n".join(lines + [lsd_board_text(g)]) if lines else lsd_board_text(g)
     kb = lsd_keyboard(g)
-    r = send(chat_id, text, kb)
+    r = send_board(g, "lsd", text, kb)
     if r.get("ok"):
         old = g.get("board_message_id")
         g["board_message_id"] = r["result"]["message_id"]
@@ -1075,11 +1137,11 @@ def handle_lsd(state, msg, cmd, text, uid, name):
         return True
     if cmd == "/lsd":
         if not g:
-            g = D.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
+            name = msg.get("from", {}).get("first_name") or "Player"
+            g = D.new_game(chat_id, uid, name)
             g["chat_type"] = msg.get("chat", {}).get("type", "private")
             state.setdefault("lsd", {})[str(chat_id)] = g
-            send(chat_id, "😈 Let's Summon Demons game created! Friends: /lsd_join, anyone: /lsd_start")
-            lsd_render(g)
+            lsd_render(g, [f"😈 Let's Summon Demons game created by {name}!"])
         else:
             lsd_render(g)
         return True
@@ -1325,7 +1387,7 @@ def spots_render(g, events=None):
         lines.append(ping)
     text = "\n".join(lines + [spots_board_text(g)]) if lines else spots_board_text(g)
     kb = spots_keyboard(g)
-    r = send(chat_id, text, kb)
+    r = send_board(g, "spots", text, kb)
     if r.get("ok"):
         old = g.get("board_message_id")
         g["board_message_id"] = r["result"]["message_id"]
@@ -1345,11 +1407,11 @@ def handle_spots(state, msg, cmd, text, uid, name):
         return True
     if cmd == "/spots":
         if not g:
-            g = SP.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
+            name = msg.get("from", {}).get("first_name") or "Player"
+            g = SP.new_game(chat_id, uid, name)
             g["chat_type"] = msg.get("chat", {}).get("type", "private")
             state.setdefault("spots", {})[str(chat_id)] = g
-            send(chat_id, "🐶 Spots game created! Friends: /spots_join, anyone: /spots_start")
-            spots_render(g)
+            spots_render(g, [f"🐶 Spots game created by {name}!"])
         else:
             spots_render(g)
         return True
@@ -1559,7 +1621,7 @@ def yahtzee_render(g, events=None):
         lines.append(ping)
     text = "\n".join(lines + [yahtzee_board_text(g)]) if lines else yahtzee_board_text(g)
     kb = yahtzee_keyboard(g)
-    r = send(chat_id, text, kb)
+    r = send_board(g, "yahtzee", text, kb)
     if r.get("ok"):
         old = g.get("board_message_id")
         g["board_message_id"] = r["result"]["message_id"]
@@ -1591,11 +1653,11 @@ def handle_yahtzee(state, msg, cmd, text, uid, name):
         return True
     if cmd == "/yahtzee":
         if not g:
-            g = Y.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
+            name = msg.get("from", {}).get("first_name") or "Player"
+            g = Y.new_game(chat_id, uid, name)
             g["chat_type"] = msg.get("chat", {}).get("type", "private")
             state.setdefault("yahtzee", {})[str(chat_id)] = g
-            send(chat_id, "🎲 Yahtzee game created! Friends: /yahtzee_join, anyone: /yahtzee_start")
-            yahtzee_render(g)
+            yahtzee_render(g, [f"🎲 Yahtzee game created by {name}!"])
         else:
             yahtzee_render(g)
         return True
@@ -1805,7 +1867,7 @@ def tornado_render(g, events=None):
         lines.append(ping)
     text = "\n".join(lines + [tornado_board_text(g)]) if lines else tornado_board_text(g)
     kb = tornado_keyboard(g)
-    r = send(chat_id, text, kb)
+    r = send_board(g, "tornado", text, kb)
     if r.get("ok"):
         old = g.get("board_message_id")
         g["board_message_id"] = r["result"]["message_id"]
@@ -1843,11 +1905,11 @@ def handle_tornado(state, msg, cmd, text, uid, name):
         return True
     if cmd == "/tornado":
         if not g:
-            g = TS.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
+            name = msg.get("from", {}).get("first_name") or "Player"
+            g = TS.new_game(chat_id, uid, name)
             g["chat_type"] = msg.get("chat", {}).get("type", "private")
             state.setdefault("tornado", {})[str(chat_id)] = g
-            send(chat_id, "🛥️ Tornado Splash game created! Friends: /tornado_join, anyone: /tornado_start")
-            tornado_render(g)
+            tornado_render(g, [f"🛥️ Tornado Splash game created by {name}!"])
         else:
             tornado_render(g)
         return True
@@ -2102,7 +2164,7 @@ def fliptoons_render(g, events=None):
                 lines.append(ping)
     text = "\n".join(lines + [fliptoons_board_text(g)]) if lines else fliptoons_board_text(g)
     kb = fliptoons_keyboard(g)
-    r = send(chat_id, text, kb)
+    r = send_board(g, "fliptoons", text, kb)
     if r.get("ok"):
         old = g.get("board_message_id")
         g["board_message_id"] = r["result"]["message_id"]
@@ -2131,12 +2193,11 @@ def handle_fliptoons(state, msg, cmd, text, uid, name):
         return True
     if cmd == "/fliptoons":
         if not g:
-            g = FT.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
+            name = msg.get("from", {}).get("first_name") or "Player"
+            g = FT.new_game(chat_id, uid, name)
             g["chat_type"] = msg.get("chat", {}).get("type", "private")
             state.setdefault("fliptoons", {})[str(chat_id)] = g
-            send(chat_id, "🦋 Fliptoons game created! Friends: /fliptoons_join, "
-                          "anyone: /fliptoons_start")
-            fliptoons_render(g)
+            fliptoons_render(g, [f"🦋 Fliptoons game created by {name}!"])
         else:
             fliptoons_render(g)
         return True

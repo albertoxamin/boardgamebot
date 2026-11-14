@@ -246,6 +246,7 @@ routed by `start_param`). Engine: `tornado.py` + `test_tornado.py`.
 - `web/yahtzee.js` – Yahtzee Mini App view (synced)
 - `web/fliptoons.js` – Fliptoons Mini App view (synced)
 - `web/tornado.js` – Tornado Splash Mini App view (synced)
+- `web/covers/*.jpg` – box art shown as the lobby photo for each game
 - `web/server.py` – static server for the HTML game (needs HTTPS tunnel for in-Telegram use)
 - `state.json` – created at runtime (per-chat games, decks, scores).
 

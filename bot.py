@@ -6,7 +6,7 @@ Add the bot to a group, make it admin (or disable privacy via @BotFather
 /setprivacy) so it reads commands, then: /games.
 State file: state.json next to this script (override with FLIP7_STATE).
 """
-import hashlib, hmac, html, json, os, sys, threading, time, urllib.parse, urllib.request, urllib.error
+import hashlib, hmac, html, json, os, re, sys, threading, time, urllib.parse, urllib.request, urllib.error
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import game as G
@@ -48,7 +48,7 @@ HELP = """🎴 <b>Boardgame bot</b>
 /fliptoons - grid-building card market (also /fliptoons_join /fliptoons_start /fliptoons_hire /fliptoons_dismiss /fliptoons_skip /fliptoons_choose /fliptoons_cancel /fliptoons_rules)
 /tornado - jet-ski racing Tornado Splash (also /tornado_join /tornado_start /tornado_pick /tornado_play /tornado_wait /tornado_hand /tornado_next /tornado_cancel /tornado_rules)
 /games - list the games you can start (and what's running here)
-🤖 /join_npc (or /<game>_join_npc) - add a mock player anyone can control, in the lobby
+🤖 /join_npc (or /&lt;game&gt;_join_npc) - add a mock player anyone can control, in the lobby
 /lsd - dice game Let's Summon Demons (also /lsd_join /lsd_start /lsd_roll /lsd_buy /lsd_summon /lsd_end /lsd_score /lsd_cancel /lsd_rules)
 Play: on your turn tap <b>Hit</b> to flip a card or <b>Stay</b> to bank.
 Duplicate number = bust (0 pts). 7 unique numbers = Flip 7 (+15), round ends.
@@ -98,7 +98,14 @@ def send(chat_id, text, kb=None):
          "disable_web_page_preview": True}
     if kb:
         p["reply_markup"] = {"inline_keyboard": kb}
-    return api("sendMessage", **p)
+    r = api("sendMessage", **p)
+    if not r.get("ok"):
+        # Last-resort fallback: never drop a message because of an HTML
+        # entity/parse error. Send it as plain text with tags stripped.
+        p.pop("parse_mode", None)
+        p["text"] = html.unescape(re.sub(r"</?[^>]+>", "", text))
+        r = api("sendMessage", **p)
+    return r
 
 
 COVERS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "covers")
@@ -2578,7 +2585,7 @@ def handle_command(state, msg):
             else:
                 _st = "in progress"
             lines.append(f"• {_name} — {_new} ({_desc}) · {_st}")
-        lines.append("🤖 Add a mock player: tap Add NPC in a lobby, or use /join_npc (Flip 7) / /<game>_join_npc.")
+        lines.append("🤖 Add a mock player: tap Add NPC in a lobby, or use /join_npc (Flip 7) / /&lt;game&gt;_join_npc.")
         send(chat_id, "\n".join(lines))
         return
     if cmd == "/cancel" and msg.get("reply_to_message"):
@@ -4016,6 +4023,14 @@ def start_web_server(state):
                 p = os.path.join(os.path.dirname(JS_PATH), "fliptoons", os.path.basename(u.path))
                 if os.path.exists(p):
                     return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
+                return self._send(404, {"ok": False})
+            if u.path.startswith("/tornado_cards/") and u.path.endswith((".png", ".jpg", ".jpeg")):
+                _name = os.path.basename(u.path)
+                _ext = os.path.splitext(_name)[1].lower()
+                _ctype = "image/jpeg" if _ext in (".jpg", ".jpeg") else "image/png"
+                p = os.path.join(os.path.dirname(JS_PATH), "tornado_cards", _name)
+                if os.path.exists(p):
+                    return self._send(200, open(p, "rb").read(), _ctype, cache="public, max-age=86400")
                 return self._send(404, {"ok": False})
             if u.path.startswith("/cards/") and u.path.endswith(".svg"):
                 p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))

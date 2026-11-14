@@ -39,6 +39,7 @@ _STATE = {"state": None}
 
 HELP = """🎴 <b>Boardgame bot</b>
 /games - list the games you can start (and what's running here)
+/flip7 - press-your-luck Flip 7 (also /flip7_join /flip7_start /flip7_rules /join_npc)
 /rules - how to play (reply to a board for that game's rules)   /cancel - reply to a board to cancel that game
 /regicide - co-op Regicide (also /regicide_join /regicide_start /regicide_play /regicide_yield /regicide_discard /regicide_rules /regicide_cancel)
 /odin - card-shedding Odin (also /odin_join /odin_start /odin_play /odin_pass /odin_pickup /odin_score /odin_cancel /odin_rules)
@@ -273,6 +274,52 @@ def _npc_player():
     return {"user_id": NPC_ID, "name": "🤖 NPC", "npc": True}
 
 
+NPC_MAX = {"games": 6, "regicide": 4, "odin": 6, "lsd": 5, "spots": 4,
+           "yahtzee": Y.MAX_PLAYERS, "tornado": TS.MAX_PLAYERS, "fliptoons": 4}
+NPC_FULL = {
+    "games": "⛔ Game is full.",
+    "regicide": "⛔ Regicide is 2-4 players (full).",
+    "odin": "⛔ Odin is 2-6 players (full).",
+    "lsd": "⛔ Let's Summon Demons is 2-5 players (full).",
+    "spots": "⛔ Spots is 1-4 players (full).",
+    "yahtzee": f"⛔ Yahtzee is 2-{Y.MAX_PLAYERS} players (full).",
+    "tornado": f"⛔ Tornado Splash is 2-{TS.MAX_PLAYERS} players (full).",
+    "fliptoons": "⛔ Fliptoons is 2-4 players (full).",
+}
+
+
+def add_npc(key, g):
+    """Seat the shared mock player in a lobby (command or lobby button).
+    Returns an error string, or None on success."""
+    if g["phase"] != "lobby":
+        return "⛔ Game already started."
+    if any(p.get("npc") for p in g["players"]):
+        return "🤖 NPC is already in this game."
+    if len(g["players"]) >= NPC_MAX[key]:
+        return NPC_FULL[key]
+    if key == "games":
+        p = G.new_player(NPC_ID, "🤖 NPC")
+        p["npc"] = True
+    elif key == "regicide":
+        p = {**_npc_player(), "hand": []}
+    elif key == "odin":
+        p = {**_npc_player(), "hand": [], "score": O.START_SCORE}
+    elif key == "lsd":
+        p = {**_npc_player(), "souls": 5, "candle": None,
+             "in_play": [], "demons": [], "demon_hand": []}
+    elif key == "spots":
+        p = {**_npc_player(), "dogs": [], "scored": [], "yard": [], "treats": 1}
+    elif key == "yahtzee":
+        p = {**_npc_player(), **Y.new_player(NPC_ID, "🤖 NPC")}
+    elif key == "tornado":
+        p = {**_npc_player(), **TS.new_player(NPC_ID, "🤖 NPC")}
+    elif key == "fliptoons":
+        p = _ft_player(NPC_ID, "🤖 NPC")
+        p["npc"] = True
+    g["players"].append(p)
+    return None
+
+
 def _actor_idx(g, user_id, ref):
     """Index to act as: your own, or the reference player's if it is the
     NPC (anyone may control the NPC)."""
@@ -447,6 +494,8 @@ def turn_ping(g):
 def keyboard(g):
     if g["phase"] == "lobby":
         kb = [[{"text": "🙋 Join game", "callback_data": "f7:join"}]]
+        if not any(p.get("npc") for p in g["players"]):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "f7:npc"}])
         ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
         wk = web_keyboard(ct, g["chat_id"])
         if wk:
@@ -480,8 +529,8 @@ def keyboard(g):
 def prompt_text(g):
     if g["phase"] == "lobby":
         return (f"🎴 <b>Flip 7 lobby</b> - {len(g['players'])} player(s). "
-                f"Join via the Mini App button, then anyone taps Start there. "
-                f"(Official game: 3+ players, first to 200.)")
+                f"Friends: /flip7_join, anyone: /flip7_start "
+                f"(or use the Mini App). (Official game: 3+ players, first to 200.)")
     if g["pending_action"]:
         return f"{G.board_lines(g)}\n\n{turn_ping(g)}"
     if g["phase"] == "playing":
@@ -517,13 +566,16 @@ def render(g, events=None):
             if old:
                 api("deleteMessage", chat_id=chat_id, message_id=old)
         return
-    if g.get("board_message_id"):
+    if g.get("board_message_id") and g.get("phase") != "lobby":
         r = edit(chat_id, g["board_message_id"], text, kb)
         if r.get("ok"):
             return
     r = send_board(g, "games", text, kb)
     if r.get("ok"):
+        old = g.get("board_message_id")
         g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=chat_id, message_id=old)
 
 
 # ---------- Regicide (co-op, same bot, separate state) ----------
@@ -579,6 +631,8 @@ def rg_keyboard(g):
     wk = web_keyboard(ct, g["chat_id"], game="regicide")
     if g["phase"] == "lobby":
         kb = [[{"text": "🙋 Join Regicide", "callback_data": "rg:join"}]]
+        if not any(p.get("npc") for p in g["players"]):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "rg:npc"}])
         return kb + (wk or [])
     kb = []
     cur = g["players"][g["current_index"]] if g["players"] else None
@@ -675,14 +729,10 @@ def handle_regicide(state, msg, cmd, text, uid, name):
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
     if cmd == "/regicide_join_npc":
-        if g["phase"] != "lobby":
-            send(chat_id, "⛔ Game already started.")
-        elif any(p.get("npc") for p in g["players"]):
-            send(chat_id, "🤖 NPC is already in this game.")
-        elif len(g["players"]) >= 4:
-            send(chat_id, "⛔ Regicide is 2-4 players (full).")
+        err = add_npc("regicide", g)
+        if err:
+            send(chat_id, err)
         else:
-            g["players"].append({**_npc_player(), "hand": []})
             send(chat_id, "🤖 NPC joined - anyone can play for it!")
             rg_render(g)
         return True
@@ -804,7 +854,10 @@ def odin_keyboard(g):
     ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
     wk = web_keyboard(ct, g["chat_id"], game="odin")
     if g["phase"] == "lobby":
-        return [[{"text": "🙋 Join Odin", "callback_data": "od:join"}]] + (wk or [])
+        kb = [[{"text": "🙋 Join Odin", "callback_data": "od:join"}]]
+        if not any(p.get("npc") for p in g["players"]):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "od:npc"}])
+        return kb + (wk or [])
     kb = []
     if g["phase"] == "playing" and g["table"]:
         kb.append([{"text": "⏭ Pass", "callback_data": "od:pass"}])
@@ -893,14 +946,10 @@ def handle_odin(state, msg, cmd, text, uid, name):
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
     if cmd == "/odin_join_npc":
-        if g["phase"] != "lobby":
-            send(chat_id, "⛔ Game already started.")
-        elif any(p.get("npc") for p in g["players"]):
-            send(chat_id, "🤖 NPC is already in this game.")
-        elif len(g["players"]) >= 6:
-            send(chat_id, "⛔ Odin is 2-6 players (full).")
+        err = add_npc("odin", g)
+        if err:
+            send(chat_id, err)
         else:
-            g["players"].append({**_npc_player(), "hand": [], "score": O.START_SCORE})
             send(chat_id, "🤖 NPC joined - anyone can play for it!")
             odin_render(g)
         return True
@@ -1084,7 +1133,10 @@ def lsd_keyboard(g):
     ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
     wk = web_keyboard(ct, g["chat_id"], game="lsd")
     if g["phase"] == "lobby":
-        return [[{"text": "🙋 Join Summon Demons", "callback_data": "lsd:join"}]] + (wk or [])
+        kb = [[{"text": "🙋 Join Summon Demons", "callback_data": "lsd:join"}]]
+        if not any(p.get("npc") for p in g["players"]):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "lsd:npc"}])
+        return kb + (wk or [])
     kb = []
     if g["pending"]:
         opts = lsd_pending_options(g)
@@ -1170,15 +1222,10 @@ def handle_lsd(state, msg, cmd, text, uid, name):
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
     if cmd == "/lsd_join_npc":
-        if g["phase"] != "lobby":
-            send(chat_id, "⛔ Game already started.")
-        elif any(p.get("npc") for p in g["players"]):
-            send(chat_id, "🤖 NPC is already in this game.")
-        elif len(g["players"]) >= 5:
-            send(chat_id, "⛔ Let's Summon Demons is 2-5 players (full).")
+        err = add_npc("lsd", g)
+        if err:
+            send(chat_id, err)
         else:
-            g["players"].append({**_npc_player(), "souls": 5, "candle": None,
-                                 "in_play": [], "demons": [], "demon_hand": []})
             send(chat_id, "🤖 NPC joined - anyone can play for it!")
             lsd_render(g)
         return True
@@ -1366,7 +1413,10 @@ def spots_keyboard(g):
     ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
     wk = web_keyboard(ct, g["chat_id"], game="spots")
     if g["phase"] == "lobby":
-        return [[{"text": "🙋 Join Spots", "callback_data": "spots:join"}]] + (wk or [])
+        kb = [[{"text": "🙋 Join Spots", "callback_data": "spots:join"}]]
+        if not any(p.get("npc") for p in g["players"]):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "spots:npc"}])
+        return kb + (wk or [])
     kb = []
     if g["pending"]:
         kind = g["pending"]["kind"]
@@ -1440,14 +1490,10 @@ def handle_spots(state, msg, cmd, text, uid, name):
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
     if cmd == "/spots_join_npc":
-        if g["phase"] != "lobby":
-            send(chat_id, "⛔ Game already started.")
-        elif any(p.get("npc") for p in g["players"]):
-            send(chat_id, "🤖 NPC is already in this game.")
-        elif len(g["players"]) >= 4:
-            send(chat_id, "⛔ Spots is 1-4 players (full).")
+        err = add_npc("spots", g)
+        if err:
+            send(chat_id, err)
         else:
-            g["players"].append({**_npc_player(), "dogs": [], "scored": [], "yard": [], "treats": 1})
             send(chat_id, "🤖 NPC joined - anyone can play for it!")
             spots_render(g)
         return True
@@ -1605,7 +1651,10 @@ def yahtzee_keyboard(g):
     ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
     wk = web_keyboard(ct, g["chat_id"], game="yahtzee")
     if g["phase"] == "lobby":
-        return [[{"text": "🙋 Join Yahtzee", "callback_data": "yz:join"}]] + (wk or [])
+        kb = [[{"text": "🙋 Join Yahtzee", "callback_data": "yz:join"}]]
+        if not any(p.get("npc") for p in g["players"]):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "yz:npc"}])
+        return kb + (wk or [])
     kb = []
     t = g.get("turn")
     if t and t["dice"]:
@@ -1686,14 +1735,10 @@ def handle_yahtzee(state, msg, cmd, text, uid, name):
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
     if cmd == "/yahtzee_join_npc":
-        if g["phase"] != "lobby":
-            send(chat_id, "⛔ Game already started.")
-        elif any(p.get("npc") for p in g["players"]):
-            send(chat_id, "🤖 NPC is already in this game.")
-        elif len(g["players"]) >= Y.MAX_PLAYERS:
-            send(chat_id, f"⛔ Yahtzee is 2-{Y.MAX_PLAYERS} players (full).")
+        err = add_npc("yahtzee", g)
+        if err:
+            send(chat_id, err)
         else:
-            g["players"].append({**_npc_player(), **Y.new_player(NPC_ID, "🤖 NPC")})
             send(chat_id, "🤖 NPC joined - anyone can play for it!")
             yahtzee_render(g)
         return True
@@ -1844,6 +1889,8 @@ def tornado_keyboard(g):
         if len(g["players"]) >= 2:
             kb.append([{"text": "🏁 Start race", "callback_data": "ts:start"},
                        {"text": "🏆 Grand Prix", "callback_data": "ts:gp"}])
+        if not any(p.get("npc") for p in g["players"]):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "ts:npc"}])
         return kb + (wk or [])
     if g["phase"] == "picking":
         kb = []
@@ -1938,14 +1985,10 @@ def handle_tornado(state, msg, cmd, text, uid, name):
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
     if cmd == "/tornado_join_npc":
-        if g["phase"] != "lobby":
-            send(chat_id, "⛔ Game already started.")
-        elif any(p.get("npc") for p in g["players"]):
-            send(chat_id, "🤖 NPC is already in this game.")
-        elif len(g["players"]) >= TS.MAX_PLAYERS:
-            send(chat_id, f"⛔ Tornado Splash is 2-{TS.MAX_PLAYERS} players (full).")
+        err = add_npc("tornado", g)
+        if err:
+            send(chat_id, err)
         else:
-            g["players"].append({**_npc_player(), **TS.new_player(NPC_ID, "🤖 NPC")})
             send(chat_id, "🤖 NPC joined - anyone can play for it!")
             tornado_render(g)
         return True
@@ -2135,7 +2178,10 @@ def fliptoons_keyboard(g):
     ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
     wk = web_keyboard(ct, g["chat_id"], game="fliptoons")
     if g["phase"] == "lobby":
-        return [[{"text": "🙋 Join Fliptoons", "callback_data": "ft:join"}]] + (wk or [])
+        kb = [[{"text": "🙋 Join Fliptoons", "callback_data": "ft:join"}]]
+        if not any(p.get("npc") for p in g["players"]):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "ft:npc"}])
+        return kb + (wk or [])
     kb = []
     pend = g.get("pending")
     if pend:
@@ -2226,16 +2272,10 @@ def handle_fliptoons(state, msg, cmd, text, uid, name):
         return True
     g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
     if cmd == "/fliptoons_join_npc":
-        if g["phase"] != "lobby":
-            send(chat_id, "⛔ Game already started.")
-        elif any(p.get("npc") for p in g["players"]):
-            send(chat_id, "🤖 NPC is already in this game.")
-        elif len(g["players"]) >= 4:
-            send(chat_id, "⛔ Fliptoons is 2-4 players (full).")
+        err = add_npc("fliptoons", g)
+        if err:
+            send(chat_id, err)
         else:
-            p = _ft_player(NPC_ID, "🤖 NPC")
-            p["npc"] = True
-            g["players"].append(p)
             send(chat_id, "🤖 NPC joined - anyone can play for it!")
             fliptoons_render(g)
         return True
@@ -2434,6 +2474,11 @@ REMATCH_END_PHASES = {"games": ("game_end",), "regicide": ("won", "lost"),
                      "tornado": ("race_end", "game_end")}
 
 
+RENDERERS = {"games": render, "regicide": rg_render, "odin": odin_render,
+             "lsd": lsd_render, "spots": spots_render, "yahtzee": yahtzee_render,
+             "fliptoons": fliptoons_render, "tornado": tornado_render}
+
+
 def rematch_game(state, key, chat_id, uid):
     """Reset a finished game to the lobby with the same players.
     Any player of the finished game may trigger it."""
@@ -2473,9 +2518,7 @@ def rematch_game(state, key, chat_id, uid):
         pm["npc"] = npc_
         g["players"].append(pm)
     ev = [f"🔄 Rematch! {len(keep)} player(s) - anyone taps Start."]
-    {"games": render, "regicide": rg_render, "odin": odin_render,
-     "lsd": lsd_render, "spots": spots_render, "yahtzee": yahtzee_render,
-     "fliptoons": fliptoons_render, "tornado": tornado_render}[key](g, ev)
+    RENDERERS[key](g, ev)
     return ev, None
 
 
@@ -2513,7 +2556,7 @@ def handle_command(state, msg):
 
     if cmd == "/games":
         _catalog = (
-            ("games", "🎴 Flip 7", "/games (Mini App button)", "join via the Mini App", "press-your-luck dice, first to 200"),
+            ("games", "🎴 Flip 7", "/flip7", "/flip7_join", "press-your-luck dice, first to 200"),
             ("regicide", "⚔️ Regicide", "/regicide", "/regicide_join", "co-op vs 12 royals, private hands"),
             ("odin", "🛡️ Odin", "/odin", "/odin_join", "card shedding, fewest points wins"),
             ("lsd", "😈 Let's Summon Demons", "/lsd", "/lsd_join", "dice activations, 3 demons + 10 souls"),
@@ -2535,7 +2578,7 @@ def handle_command(state, msg):
             else:
                 _st = "in progress"
             lines.append(f"• {_name} — {_new} ({_desc}) · {_st}")
-        lines.append("🤖 Add a mock player anyone can control: /join_npc (Flip 7) or /regicide_join_npc, /odin_join_npc, /lsd_join_npc, /spots_join_npc, /yahtzee_join_npc, /fliptoons_join_npc, /tornado_join_npc")
+        lines.append("🤖 Add a mock player: tap Add NPC in a lobby, or use /join_npc (Flip 7) / /<game>_join_npc.")
         send(chat_id, "\n".join(lines))
         return
     if cmd == "/cancel" and msg.get("reply_to_message"):
@@ -2594,20 +2637,53 @@ def handle_command(state, msg):
         _present = [_rules for _key, _rules in _by_key if state.get(_key, {}).get(str(chat_id))]
         send(chat_id, "\n\n".join(_present) if _present else RULES)
         return
-    if not g:
-        send(chat_id, "No Flip 7 game here yet - open the Mini App via the /games list or a game board button. /rules for how to play.")
+    if cmd == "/flip7_rules":
+        send(chat_id, RULES)
         return
-    if cmd in ("/join_npc", "/npc_join"):
+    if cmd == "/flip7":
+        if not g:
+            _name = user.get("first_name") or "Player"
+            g = G.new_game(chat_id, uid, _name)
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state["games"][str(chat_id)] = g
+            render(g, [f"🎴 Flip 7 game created by {_name}!"])
+        else:
+            render(g)
+        return
+    if not g:
+        send(chat_id, "No Flip 7 game here yet - send /flip7 to create one, or open the Mini App via /games. /rules for how to play.")
+        return
+    if cmd == "/flip7_join":
         if g["phase"] != "lobby":
             send(chat_id, "⛔ Game already started.")
-        elif any(p.get("npc") for p in g["players"]):
-            send(chat_id, "🤖 NPC is already in this game.")
+        elif any(p["user_id"] == uid for p in g["players"]):
+            send(chat_id, "You're already in!")
         elif len(g["players"]) >= 6:
             send(chat_id, "⛔ Game is full.")
         else:
-            _npc = G.new_player(NPC_ID, "🤖 NPC")
-            _npc["npc"] = True
-            g["players"].append(_npc)
+            g["players"].append(G.new_player(uid, user.get("first_name") or "Player"))
+            send(chat_id, f"🙋 <b>{name}</b> joined Flip 7 ({len(g['players'])} players).")
+            render(g)
+        return
+    if cmd == "/flip7_start":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Already started.")
+        elif len(g["players"]) < 2:
+            send(chat_id, "⛔ Need at least 2 players.")
+        else:
+            _ev = [f"🎮 Flip 7 started with {len(g['players'])} players! First to {G.WIN_SCORE}."]
+            _order = [(g["dealer_index"] + k) % len(g["players"])
+                      for k in range(len(g["players"]))]
+            g["deal_queue"] = list(_order)
+            g["phase"] = "dealing"
+            advance(g, _ev)
+            render(g, _ev)
+        return
+    if cmd in ("/join_npc", "/npc_join"):
+        err = add_npc("games", g)
+        if err:
+            send(chat_id, err)
+        else:
             send(chat_id, "🤖 NPC joined - anyone can play for it!")
             render(g)
         return
@@ -2626,6 +2702,19 @@ def handle_callback(state, cb):
     data = cb.get("data", "")
     uid = cb.get("from", {}).get("id")
     chat_id = cb.get("message", {}).get("chat", {}).get("id")
+    if data.endswith(":npc"):
+        key = {"f7": "games", "rg": "regicide", "od": "odin", "lsd": "lsd",
+               "spots": "spots", "yz": "yahtzee", "ts": "tornado",
+               "ft": "fliptoons"}.get(data.split(":")[0])
+        g = state.get(key, {}).get(str(chat_id)) if key else None
+        if not g:
+            return answer_cb(cb["id"], "No game here.")
+        err = add_npc(key, g)
+        if err:
+            return answer_cb(cb["id"], err)
+        answer_cb(cb["id"], "🤖 NPC joined")
+        RENDERERS[key](g, ["🤖 NPC joined - anyone can play for it!"])
+        return
     if data.startswith("spots:"):
         sp = spots_get(state, chat_id)
         if not sp:

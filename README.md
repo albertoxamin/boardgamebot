@@ -102,15 +102,18 @@ Add the bot to the group and make it **admin** (or @BotFather →
 
 ```
 /games              list the games you can start (with live chat status)
+/flip7              create a Flip 7 lobby (also /flip7_join /flip7_start /flip7_rules)
 /rules             how to play (reply to a board for that game's rules)
 /cancel            reply to a game's board message to cancel that game
-Flip 7 itself is played via Mini App buttons (Hit/Stay/Score/Rematch) and
-in-game Telegram buttons; /flip7 text commands were removed (Mini App only).
+Flip 7 lobbies can also be joined/started from the Mini App button; the bot's
+own Hit/Stay/Score buttons work too. Every lobby has an "Add NPC" button (same
+as /join_npc and /<game>_join_npc) to seat a mock player anyone can control.
 ```
 
 Buttons enforce whose turn it is; action cards show target buttons to the
-player who flipped them. A single board message is edited in place;
-flip results are posted as event messages.
+player who flipped them. Lobby boards are sent as box-art photos (board text
+as the caption) and re-sent when the lobby changes; after that a single board
+message is edited in place and flip results are posted as event messages.
 
 ## HTML5 game option (`/web` Mini App button)
 

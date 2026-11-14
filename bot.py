@@ -64,18 +64,32 @@ RULES = """<b>Flip 7 rules</b> (deck 94: numbers 0×1,1×1,2×2…12×12; +2/+4/
 
 
 # ---------- Telegram API (stdlib) ----------
+# Read-only/idempotent methods: safe to retry when Telegram's reply times out.
+RETRY_METHODS = {"getUpdates", "getMe", "deleteWebhook", "answerCallbackQuery",
+                 "deleteMessage", "editMessageText"}
+
+
 def api(method, **params):
     if not API:
         raise SystemExit("Set TELEGRAM_BOT_TOKEN (create a bot with @BotFather or python3 create_bot.py)")
     data = json.dumps(params).encode()
     req = urllib.request.Request(f"{API}/{method}", data=data,
                                  headers={"Content-Type": "application/json"})
-    try:
-        with urllib.request.urlopen(req, timeout=35) as r:
-            return json.loads(r.read())
-    except urllib.error.HTTPError as e:
-        print(f"Telegram {method} HTTP {e.code}: {e.read()[:300]}", file=sys.stderr)
-        return {"ok": False}
+    attempts = 3 if method in RETRY_METHODS else 1
+    for attempt in range(attempts):
+        try:
+            with urllib.request.urlopen(req, timeout=35) as r:
+                return json.loads(r.read())
+        except urllib.error.HTTPError as e:
+            print(f"Telegram {method} HTTP {e.code}: {e.read()[:300]}", file=sys.stderr)
+            return {"ok": False}
+        except (urllib.error.URLError, OSError) as e:
+            if attempt + 1 < attempts:
+                time.sleep(1 + attempt)
+                continue
+            print(f"Telegram {method} network error: {e} (after {attempts} tries)",
+                  file=sys.stderr)
+            return {"ok": False}
 
 
 def send(chat_id, text, kb=None):
@@ -133,6 +147,9 @@ def send_photo(chat_id, path, caption="", kb=None):
     except urllib.error.HTTPError as e:
         print(f"sendPhoto HTTP {e.code}: {e.read()[:300]}", file=sys.stderr)
         return {"ok": False}
+    except (urllib.error.URLError, OSError) as e:
+        print(f"sendPhoto network error: {e}", file=sys.stderr)
+        return {"ok": False}
 
 
 def send_board(g, game, text, kb=None):
@@ -188,6 +205,9 @@ def send_document(chat_id, path, caption=""):
             return json.loads(r.read())
     except urllib.error.HTTPError as e:
         print(f"sendDocument HTTP {e.code}: {e.read()[:300]}", file=sys.stderr)
+        return {"ok": False}
+    except (urllib.error.URLError, OSError) as e:
+        print(f"sendDocument network error: {e}", file=sys.stderr)
         return {"ok": False}
 
 

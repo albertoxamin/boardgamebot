@@ -16,6 +16,7 @@ import lsd as D
 import spots as SP
 import yahtzee as Y
 import fliptoons as FT
+import tornado as TS
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT_TOKEN", "")
 API = f"https://api.telegram.org/bot{TOKEN}" if TOKEN else ""
@@ -44,6 +45,7 @@ HELP = """🎴 <b>Boardgame bot</b>
 /spots - push-your-luck dog dice (also /spots_join /spots_start /spots_trick /spots_place /spots_reroll /spots_score /spots_cancel /spots_rules)
 /yahtzee - dice scorecard classic (also /yahtzee_join /yahtzee_start /yahtzee_roll /yahtzee_score /yahtzee_cancel /yahtzee_rules)
 /fliptoons - grid-building card market (also /fliptoons_join /fliptoons_start /fliptoons_hire /fliptoons_dismiss /fliptoons_skip /fliptoons_choose /fliptoons_cancel /fliptoons_rules)
+/tornado - jet-ski racing Tornado Splash (also /tornado_join /tornado_start /tornado_pick /tornado_play /tornado_wait /tornado_hand /tornado_next /tornado_cancel /tornado_rules)
 /games - list the games you can start (and what's running here)
 🤖 /join_npc (or /<game>_join_npc) - add a mock player anyone can control, in the lobby
 /lsd - dice game Let's Summon Demons (also /lsd_join /lsd_start /lsd_roll /lsd_buy /lsd_summon /lsd_end /lsd_score /lsd_cancel /lsd_rules)
@@ -138,23 +140,23 @@ def web_keyboard(chat_type="private", chat_id=None, game="flip7"):
     startapp=<game><chat_id> (no second BotFather app needed)."""
     if not WEB_URL:
         return None
-    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "lsd": "🎮 Play Summon Demons (HTML)", "spots": "🎮 Play Spots (HTML)", "yahtzee": "🎮 Play Yahtzee (HTML)", "fliptoons": "🎮 Play Fliptoons (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
+    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "lsd": "🎮 Play Summon Demons (HTML)", "spots": "🎮 Play Spots (HTML)", "yahtzee": "🎮 Play Yahtzee (HTML)", "fliptoons": "🎮 Play Fliptoons (HTML)", "tornado": "🎮 Play Tornado Splash (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
     if chat_type in ("group", "supergroup", "channel"):
         if chat_id:
-            start = f"{game}{chat_id}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons") else str(chat_id)
+            start = f"{game}{chat_id}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado") else str(chat_id)
             url = f"https://t.me/flip7groupbot?startapp={start}"
         else:
             url = WEB_URL
         btn = {"text": label, "url": url}
     else:
-        url = WEB_URL + (f"?app={game}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons") else "")
+        url = WEB_URL + (f"?app={game}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado") else "")
         btn = {"text": label, "web_app": {"url": url}}
     return [[btn]]
 
 
 # ---------- State ----------
 def load_state():
-    s = {"games": {}, "regicide": {}, "odin": {}, "lsd": {}, "spots": {}, "yahtzee": {}, "fliptoons": {}}
+    s = {"games": {}, "regicide": {}, "odin": {}, "lsd": {}, "spots": {}, "yahtzee": {}, "fliptoons": {}, "tornado": {}}
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE) as f:
@@ -168,6 +170,7 @@ def load_state():
     s.setdefault("spots", {})
     s.setdefault("yahtzee", {})
     s.setdefault("fliptoons", {})
+    s.setdefault("tornado", {})
     return s
 
 
@@ -1689,6 +1692,284 @@ def handle_yahtzee(state, msg, cmd, text, uid, name):
     return False
 
 
+TORNADO_RULES = """🛥️ <b>Tornado Splash rules</b> (2-5 players, Arclight 2025): pick one of 6 jet skis (each with its own 20-card deck of ➡️ straight / 🌊 curve cards worth 1-2 spaces) and race to the finish gate.
+• <b>Boat selection</b>: a random player picks first, then clockwise. Boats differ in Speed/Handling stars and weight (the lightest boat lines up first and draws 4, the heaviest draws 6).
+• Every round: 1) <b>Rank racers</b> - turn order by proximity to the finish (ties → lighter boat). 2) <b>Replenish hand</b> - draw up to your rank's limit: 1st 4, last 6, others 5; deck empty → your played cards come back, earliest first. 3) <b>Make waves</b> - in rank order, play cards and move their total in spaces: <b>max 3/round</b>, 4 on your once-per-race ⚡ boost.
+• <b>Checkpoints</b>: passing one requires a 🌊 curve card in that move; stopping exactly on it is free.
+• First to reach or cross the finish wins; the race continues until all but one have finished. Optional <b>Grand Prix</b>: 3 races over 4 courses, points 5/3/2/0 by finish - most points is champion.
+• Commands: /tornado_pick &lt;boat 1-6&gt; · /tornado_play &lt;card#...&gt; [b] · /tornado_hand · /tornado_wait [card#...] (discard &amp; wait) · /tornado_next (next GP race)."""
+
+
+def tornado_get(state, chat_id):
+    return state.setdefault("tornado", {}).get(str(chat_id))
+
+
+def tornado_board_text(g):
+    if g["phase"] == "lobby":
+        return (f"🛥️ <b>Tornado Splash lobby</b> - {len(g['players'])} racer(s). "
+                f"Friends: /tornado_join, anyone: /tornado_start (add 'gp' for Grand Prix)")
+    if g["phase"] == "picking":
+        c = TS.course(g)
+        lines = [f"🛥️ <b>Tornado Splash</b> - boat selection "
+                 f"({'Grand Prix, 3 races' if g['gp'] else 'single race'})",
+                 f"🌊 Course: {c['name']} - {c['length']} spaces, checkpoints at "
+                 + ", ".join(f"{cp} ({d})" for cp, d in c["checkpoints"])]
+        for k, idx in enumerate(g["picking_order"]):
+            p = g["players"][idx]
+            if p["boat"] is not None:
+                b = TS.BOATS[p["boat"]]
+                lines.append(f"• {html.escape(p['name'])}: {b['name']}")
+            elif k == g["picking_index"]:
+                lines.append(f"👉 {html.escape(p['name'])} is picking a boat...")
+        lines.append("🎲 /tornado_auto - auto-assign the rest and start")
+        return "\n".join(lines)
+    if g["phase"] == "game_end":
+        names = " & ".join(html.escape(TS.name_of(g, u)) for u in g.get("winners", []))
+        scores = " · ".join(f"{html.escape(p['name'])} {p['points']} pts" for p in g["players"])
+        return f"🏆 <b>Grand Prix over</b> - champion: <b>{names}</b>\n{scores}"
+    c = TS.course(g)
+    head = (f"🛥️ <b>Tornado Splash</b> - Race {g['race_number']}/{TS.total_races(g)}: "
+            if g["gp"] else f"🛥️ <b>Tornado Splash</b>: ") + f"{c['name']} ({c['length']} spaces)"
+    lines = [head,
+             "Checkpoints: " + ", ".join(f"{cp} ({d})" for cp, d in c["checkpoints"])]
+    cur = g["turn_order"][g["current_index"]] if g["turn_order"] else None
+    for i in TS.compute_ranks(g):
+        p = g["players"][i]
+        b = TS.BOATS[p["boat"]] if p["boat"] is not None else None
+        nm = html.escape(p["name"]) + (f" ({b['name']})" if b else "")
+        if p["finished"]:
+            lines.append(f"• {p['finish_rank']}{TS._ord(p['finish_rank'])} {nm} 🏁"
+                         + (f" · {p['points']} pts" if g["gp"] else ""))
+        else:
+            arrow = " 👈" if i == cur else ""
+            boost = " ⚡" if not p["boost_used"] else ""
+            lines.append(f"• {nm}: {p['pos']}/{c['length']}{boost}{arrow}")
+    if g["phase"] == "race_end":
+        if g["gp"]:
+            lines.append(f"Race {g['race_number']} done - anyone: /tornado_next")
+        else:
+            by = TS.compute_ranks(g)
+            pod = ", ".join(f"{k+1}. {html.escape(g['players'][i]['name'])}" for k, i in enumerate(by[:3]))
+            lines.append(f"🏆 Podium: {pod}")
+    return "\n".join(lines)
+
+
+def tornado_keyboard(g):
+    ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
+    wk = web_keyboard(ct, g["chat_id"], game="tornado")
+    if g["phase"] == "lobby":
+        kb = [[{"text": "🙋 Join Tornado Splash", "callback_data": "ts:join"}]]
+        if len(g["players"]) >= 2:
+            kb.append([{"text": "🏁 Start race", "callback_data": "ts:start"},
+                       {"text": "🏆 Grand Prix", "callback_data": "ts:gp"}])
+        return kb + (wk or [])
+    if g["phase"] == "picking":
+        kb = []
+        row = []
+        for bi, b in enumerate(TS.BOATS):
+            taken = any(p["boat"] == bi for p in g["players"])
+            row.append({"text": ("✅ " if taken else "") + b["name"],
+                        "callback_data": f"ts:pick:{bi}"})
+            if len(row) == 3:
+                kb.append(row)
+                row = []
+        if row:
+            kb.append(row)
+        kb.append([{"text": "🎲 Auto-assign & start", "callback_data": "ts:auto"}])
+        kb.extend(wk or [])
+        return kb
+    if g["phase"] == "playing":
+        kb = [[{"text": "🃏 My hand", "callback_data": "ts:hand"}],
+              [{"text": "⏳ Wait", "callback_data": "ts:wait"}]]
+        kb.extend(wk or [])
+        return kb
+    if g["phase"] == "race_end":
+        kb = ([[{"text": "▶️ Next race", "callback_data": "ts:next"}]] if g["gp"]
+              else [[{"text": "🔄 Rematch!", "callback_data": "ts:rematch"}]])
+        kb.extend(wk or [])
+        return kb
+    if g["phase"] == "game_end":
+        return [[{"text": "🔄 Rematch!", "callback_data": "ts:rematch"}]] + (wk or [])
+    return wk
+
+
+def tornado_render(g, events=None):
+    chat_id = g["chat_id"]
+    if events is None:
+        events = []
+    lines = [html.escape(e) for e in events]
+    if g["phase"] == "playing" and g["turn_order"]:
+        p = g["players"][g["turn_order"][g["current_index"]]]
+        ping = ("👉 🤖 NPC's turn - anyone can play for it!" if p.get("npc")
+                else f"👉 {tornado_mention(g, p['user_id'])} - your turn (3 spaces max)")
+        lines.append(ping)
+    text = "\n".join(lines + [tornado_board_text(g)]) if lines else tornado_board_text(g)
+    kb = tornado_keyboard(g)
+    r = send(chat_id, text, kb)
+    if r.get("ok"):
+        old = g.get("board_message_id")
+        g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=chat_id, message_id=old)
+
+
+def tornado_mention(g, user_id):
+    return f'<a href="tg://user?id={user_id}">{html.escape(TS.name_of(g, user_id))}</a>'
+
+
+def tornado_hand_str(g, idx):
+    p = g["players"][idx]
+    cap = TS.max_move(g, idx, boost=False)
+    cap_b = TS.max_move(g, idx, boost=True)
+    c = TS.course(g)
+    cp_ahead = [cp for cp, _ in c["checkpoints"] if cp > p["pos"]]
+    lines = [f"🃏 Your hand ({TS.BOATS[p['boat']]['name']}, space {p['pos']}/{c['length']}):"]
+    if p["hand"]:
+        lines.append(" · ".join(f"{h+1}.{TS.card_str(cd)}" for h, cd in enumerate(p["hand"])))
+    else:
+        lines.append("(empty)")
+    lines.append(f"Max {cap} spaces this turn"
+                 + (f" ({cap_b} with ⚡ boost)" if not p["boost_used"] else "")
+                 + (f" · next checkpoint at {cp_ahead[0]} (needs 🌊)" if cp_ahead else ""))
+    lines.append("Play: /tornado_play 1 3 (add b for boost) · /tornado_wait")
+    return "\n".join(lines)
+
+
+def handle_tornado(state, msg, cmd, text, uid, name):
+    chat_id = msg["chat"]["id"]
+    g = tornado_get(state, chat_id)
+    if cmd == "/tornado_rules":
+        send(chat_id, TORNADO_RULES)
+        return True
+    if cmd == "/tornado":
+        if not g:
+            g = TS.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state.setdefault("tornado", {})[str(chat_id)] = g
+            send(chat_id, "🛥️ Tornado Splash game created! Friends: /tornado_join, anyone: /tornado_start")
+            tornado_render(g)
+        else:
+            tornado_render(g)
+        return True
+    if not g:
+        send(chat_id, "No Tornado Splash game here yet - send /tornado to create one.")
+        return True
+    g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd == "/tornado_join_npc":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p.get("npc") for p in g["players"]):
+            send(chat_id, "🤖 NPC is already in this game.")
+        elif len(g["players"]) >= TS.MAX_PLAYERS:
+            send(chat_id, f"⛔ Tornado Splash is 2-{TS.MAX_PLAYERS} players (full).")
+        else:
+            g["players"].append({**_npc_player(), **TS.new_player(NPC_ID, "🤖 NPC")})
+            send(chat_id, "🤖 NPC joined - anyone can play for it!")
+            tornado_render(g)
+        return True
+    if cmd == "/tornado_join":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p["user_id"] == uid for p in g["players"]):
+            send(chat_id, "You're already in!")
+        elif len(g["players"]) >= TS.MAX_PLAYERS:
+            send(chat_id, f"⛔ Tornado Splash is 2-{TS.MAX_PLAYERS} players (full).")
+        else:
+            g["players"].append(TS.new_player(uid, msg.get("from", {}).get("first_name") or "Player"))
+            send(chat_id, f"🙋 <b>{name}</b> joined Tornado Splash ({len(g['players'])} racers).")
+            tornado_render(g)
+        return True
+    if cmd == "/tornado_start":
+        if g["phase"] != "lobby":
+            send(chat_id, "Already started.")
+        elif len(g["players"]) < 2:
+            send(chat_id, "⛔ Need at least 2 racers.")
+        else:
+            gp = any(a in ("gp", "grandprix", "grand_prix", "prix")
+                     for a in text.lower().split()[1:])
+            ev = []
+            err = TS.start_picking(g, ev, gp=gp if gp else None)
+            if err:
+                send(chat_id, f"⛔ {err}")
+            else:
+                tornado_render(g, ev)
+        return True
+    if cmd == "/tornado_cancel":
+        if uid != g["created_by"]:
+            send(chat_id, "⛔ Only the creator can cancel.")
+        else:
+            del state["tornado"][str(chat_id)]
+            send(chat_id, "🗑 Tornado Splash game cancelled.")
+        return True
+    if cmd == "/tornado_pick":
+        idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == uid), None)
+        if idx is None and g["phase"] == "picking" and g["picking_order"]:
+            idx = _actor_idx(g, uid, g["picking_order"][g["picking_index"]])
+        if idx is None:
+            send(chat_id, "⛔ You're not in this game - /tornado_join in lobby.")
+            return True
+        parts = [p for p in text.split()[1:] if p.isdigit()]
+        if not parts:
+            send(chat_id, "Pick a boat: /tornado_pick 1-6")
+            return True
+        ev = []
+        err = TS.pick_boat(g, idx, int(parts[0]) - 1, ev)
+        if err:
+            send(chat_id, f"⛔ {err}")
+        else:
+            tornado_render(g, ev)
+        return True
+    if cmd == "/tornado_auto":
+        if not any(p["user_id"] == uid for p in g["players"]):
+            send(chat_id, "⛔ You're not in this game - /tornado_join in lobby.")
+            return True
+        ev = []
+        err = TS.auto_assign_boats(g, ev)
+        if err:
+            send(chat_id, f"⛔ {err}")
+        else:
+            tornado_render(g, ev)
+        return True
+    if cmd == "/tornado_hand":
+        idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == uid), None)
+        if idx is None:
+            send(chat_id, "⛔ You're not in this game.")
+        elif g["players"][idx]["boat"] is None:
+            send(chat_id, "Pick a boat first.")
+        else:
+            send(chat_id, tornado_hand_str(g, idx))
+        return True
+    if cmd in ("/tornado_play", "/tornado_wait"):
+        cur = g["turn_order"][g["current_index"]] if g["turn_order"] else None
+        idx = _actor_idx(g, uid, cur if cur is not None else 0)
+        if idx is None:
+            send(chat_id, "⛔ You're not in this game - /tornado_join in lobby.")
+            return True
+        toks = text.split()[1:]
+        boost = any(t.lower() in ("b", "boost") for t in toks)
+        pos = [int(t) - 1 for t in toks
+               if t.isdigit() and 0 < int(t) <= 20]
+        ev = []
+        if cmd == "/tornado_play":
+            err = TS.do_play(g, idx, pos, boost=boost, events=ev)
+        else:
+            err = TS.do_wait(g, idx, discard=pos, events=ev)
+        if err:
+            send(chat_id, f"⛔ {err}")
+        else:
+            tornado_render(g, ev)
+        return True
+    if cmd == "/tornado_next":
+        ev = []
+        err = TS.next_race(g, uid, ev)
+        if err:
+            send(chat_id, f"⛔ {err}")
+        else:
+            tornado_render(g, ev)
+        return True
+    return False
+
+
 FLIPTOONS_RULES = """🦋 <b>Fliptoons rules</b> (2-4 players): build a 3×2 grid of toon cards each round and earn fame; the first player to reach <b>30</b> fame triggers the Final Flip.
 • <b>Flip</b>: each player automatically reveals cards into their grid (abilities resolve).
 • <b>Check Fame</b>: add up the fame of every face-up card in your grid.
@@ -2068,7 +2349,8 @@ def fliptoons_api_move(state, chat_id, user_id, body):
 
 REMATCH_END_PHASES = {"games": ("game_end",), "regicide": ("won", "lost"),
                      "odin": ("game_end",), "lsd": ("game_end",), "spots": ("game_end",),
-                     "yahtzee": ("game_end",), "fliptoons": ("game_end",)}
+                     "yahtzee": ("game_end",), "fliptoons": ("game_end",),
+                     "tornado": ("race_end", "game_end")}
 
 
 def rematch_game(state, key, chat_id, uid):
@@ -2093,10 +2375,11 @@ def rematch_game(state, key, chat_id, uid):
                                "yard": [], "treats": 1},
         "yahtzee": lambda u, n: Y.new_player(u, n),
         "fliptoons": lambda u, n: _ft_player(u, n),
+        "tornado": lambda u, n: TS.new_player(u, n),
     }
     news = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
             "lsd": D.new_game, "spots": SP.new_game, "yahtzee": Y.new_game,
-            "fliptoons": FT.new_game}
+            "fliptoons": FT.new_game, "tornado": TS.new_game}
     chat_type = g.get("chat_type", "private")
     board_id = g.get("board_message_id")
     g.clear()
@@ -2111,7 +2394,7 @@ def rematch_game(state, key, chat_id, uid):
     ev = [f"🔄 Rematch! {len(keep)} player(s) - anyone taps Start."]
     {"games": render, "regicide": rg_render, "odin": odin_render,
      "lsd": lsd_render, "spots": spots_render, "yahtzee": yahtzee_render,
-     "fliptoons": fliptoons_render}[key](g, ev)
+     "fliptoons": fliptoons_render, "tornado": tornado_render}[key](g, ev)
     return ev, None
 
 
@@ -2156,6 +2439,7 @@ def handle_command(state, msg):
             ("spots", "🐶 Spots", "/spots", "/spots_join", "dog dice push-your-luck, 6 scored wins"),
             ("yahtzee", "🎲 Yahtzee", "/yahtzee", "/yahtzee_join", "dice scorecard, 13 boxes"),
             ("fliptoons", "🦋 Fliptoons", "/fliptoons", "/fliptoons_join", "grid-building card market, first to 30 fame"),
+            ("tornado", "🛥️ Tornado Splash", "/tornado", "/tornado_join", "jet-ski racing cards, first to the finish"),
         )
         lines = ["🎮 <b>Games you can start:</b>"]
         for _key, _name, _new, _join, _desc in _catalog:
@@ -2164,19 +2448,20 @@ def handle_command(state, msg):
                 _st = "not started here"
             elif _g["phase"] == "lobby":
                 _st = f"lobby ({len(_g['players'])} in) - {_join}"
-            elif _g["phase"] in ("game_end", "won", "lost"):
+            elif _g["phase"] in ("game_end", "won", "lost") or (
+                    _key == "tornado" and _g["phase"] == "race_end" and not _g.get("gp")):
                 _st = "finished - start a new one"
             else:
                 _st = "in progress"
             lines.append(f"• {_name} — {_new} ({_desc}) · {_st}")
-        lines.append("🤖 Add a mock player anyone can control: /join_npc (Flip 7) or /regicide_join_npc, /odin_join_npc, /lsd_join_npc, /spots_join_npc, /yahtzee_join_npc, /fliptoons_join_npc")
+        lines.append("🤖 Add a mock player anyone can control: /join_npc (Flip 7) or /regicide_join_npc, /odin_join_npc, /lsd_join_npc, /spots_join_npc, /yahtzee_join_npc, /fliptoons_join_npc, /tornado_join_npc")
         send(chat_id, "\n".join(lines))
         return
     if cmd == "/cancel" and msg.get("reply_to_message"):
         # Reply-targeted cancel: cancels the one game whose board message
         # was replied to (searches every game type in this chat).
         _mid = msg["reply_to_message"].get("message_id")
-        for _key in ("games", "regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons"):
+        for _key in ("games", "regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado"):
             _gg = state.get(_key, {}).get(str(chat_id))
             if _gg is not None and _gg.get("board_message_id") == _mid:
                 del state[_key][str(chat_id)]
@@ -2202,6 +2487,9 @@ def handle_command(state, msg):
     if cmd.startswith("/fliptoons"):
         handle_fliptoons(state, msg, cmd, text, uid, name)
         return
+    if cmd.startswith("/tornado"):
+        handle_tornado(state, msg, cmd, text, uid, name)
+        return
     if cmd in ("/start", "/help", "/commands"):
         send(chat_id, HELP)
         return
@@ -2215,7 +2503,7 @@ def handle_command(state, msg):
         _mid = (msg.get("reply_to_message") or {}).get("message_id") if msg.get("reply_to_message") else None
         _by_key = (("games", RULES), ("regicide", REGICIDE_RULES), ("odin", ODIN_RULES),
                    ("lsd", LSD_RULES), ("spots", SPOTS_RULES), ("yahtzee", YAHTZEE_RULES),
-                   ("fliptoons", FLIPTOONS_RULES))
+                   ("fliptoons", FLIPTOONS_RULES), ("tornado", TORNADO_RULES))
         if _mid:
             for _key, _rules in _by_key:
                 _gg = state.get(_key, {}).get(str(chat_id))
@@ -2499,6 +2787,85 @@ def handle_callback(state, cb):
                 yahtzee_render(yz, ev)
         elif parts == ["yz", "rematch"]:
             ev, err = rematch_game(state, "yahtzee", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
+        else:
+            answer_cb(cb["id"], "Unknown button.")
+        return
+    if data.startswith("ts:"):
+        ts = tornado_get(state, chat_id)
+        if not ts:
+            return answer_cb(cb["id"], "No Tornado Splash game here.")
+        parts = data.split(":")
+        idx = next((i for i, p in enumerate(ts["players"]) if p["user_id"] == uid), None)
+        picker = (ts["picking_order"][ts["picking_index"]]
+                  if ts["phase"] == "picking" and ts["picking_order"] else None)
+        if idx is None and picker is not None:
+            idx = _actor_idx(ts, uid, picker)
+        if idx is None and ts["turn_order"]:
+            idx = _actor_idx(ts, uid, ts["turn_order"][ts["current_index"]])
+        ev = []
+        if parts == ["ts", "join"]:
+            if ts["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            if idx is not None:
+                return answer_cb(cb["id"], "Already in!")
+            if len(ts["players"]) >= TS.MAX_PLAYERS:
+                return answer_cb(cb["id"], "Game is full.")
+            ts["players"].append(TS.new_player(uid, cb["from"].get("first_name") or "Player"))
+            answer_cb(cb["id"], "Joined!")
+            tornado_render(ts, [f"🙋 {cb['from'].get('first_name')} joined Tornado Splash."])
+        elif parts in (["ts", "start"], ["ts", "gp"]):
+            err = (TS.start_picking(ts, ev, gp=(parts[1] == "gp"))
+                   if ts["phase"] == "lobby" else "already started")
+            answer_cb(cb["id"], err or "Started")
+            if not err:
+                tornado_render(ts, ev)
+        elif len(parts) == 3 and parts[1] == "pick":
+            if idx is None:
+                return answer_cb(cb["id"], "not in game")
+            err = TS.pick_boat(ts, idx, int(parts[2]), ev)
+            answer_cb(cb["id"], err or "Boat locked in")
+            if not err:
+                tornado_render(ts, ev)
+        elif parts == ["ts", "auto"]:
+            if idx is None:
+                return answer_cb(cb["id"], "not in game")
+            err = TS.auto_assign_boats(ts, ev)
+            answer_cb(cb["id"], err or "Boats assigned")
+            if not err:
+                tornado_render(ts, ev)
+        elif parts == ["ts", "hand"]:
+            mine = next((i for i, p in enumerate(ts["players"])
+                         if p["user_id"] == uid), None)
+            if mine is None:
+                return answer_cb(cb["id"], "You're not in this game.")
+            p = ts["players"][mine]
+            if p["boat"] is None:
+                return answer_cb(cb["id"], "Pick a boat first.")
+            cap = TS.max_move(ts, mine)
+            capb = TS.max_move(ts, mine, boost=True)
+            cards = " ".join(f"{h+1}{TS.card_str(cd)}"
+                             for h, cd in enumerate(p["hand"])) or "(empty)"
+            answer_cb(cb["id"],
+                      f"🃏 {TS.BOATS[p['boat']]['name']} @{p['pos']}: {cards} · max {cap}"
+                      + (f"/{capb}⚡" if not p["boost_used"] else "")
+                      + " · /tornado_hand for details")
+        elif parts == ["ts", "wait"]:
+            if idx is None:
+                return answer_cb(cb["id"], "not in game")
+            err = TS.do_wait(ts, idx, events=ev)
+            answer_cb(cb["id"], err or "Waited")
+            if not err:
+                tornado_render(ts, ev)
+        elif parts == ["ts", "next"]:
+            err = TS.next_race(ts, uid, ev)
+            answer_cb(cb["id"], err or "Next race!")
+            if not err:
+                tornado_render(ts, ev)
+        elif parts == ["ts", "rematch"]:
+            ev, err = rematch_game(state, "tornado", chat_id, uid)
             answer_cb(cb["id"], err or "Rematch!")
             if not err:
                 save_state(state)
@@ -3269,6 +3636,127 @@ def yahtzee_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
+def tornado_board_json(g, viewer_id=None):
+    """Tornado Splash board; only the viewer's own hand is included."""
+    me = next((p for p in g["players"] if p["user_id"] == viewer_id), None)
+    my_idx = g["players"].index(me) if me else None
+    c = TS.course(g)
+    cur = g["turn_order"][g["current_index"]] if g["turn_order"] else None
+    picker = (g["picking_order"][g["picking_index"]]
+              if g["phase"] == "picking" and g["picking_order"] else None)
+    return {
+        "chat_id": g["chat_id"], "phase": g["phase"], "gp": g["gp"],
+        "race_number": g["race_number"], "total_races": TS.total_races(g),
+        "round": g["round"], "created_by": g["created_by"],
+        "is_player": me is not None, "my_index": my_idx,
+        "current_index": cur, "picker_index": picker,
+        "picking_order": list(g["picking_order"]),
+        "course": {"name": c["name"], "length": c["length"],
+                   "checkpoints": [{"space": cp, "dir": d}
+                                   for cp, d in c["checkpoints"]]},
+        "winner_id": g.get("winner_id"), "winners": g.get("winners", []),
+        "finish_order": list(g["finish_order"]),
+        "rank_order": TS.compute_ranks(g),
+        "boats": [{"index": i, "name": b["name"], "type": b["type"],
+                   "speed": b["speed"], "handling": b["handling"],
+                   "weight": b["weight"]} for i, b in enumerate(TS.BOATS)],
+        "players": [{"user_id": p["user_id"], "name": p["name"],
+                     "npc": bool(p.get("npc")),
+                     "boat": p["boat"],
+                     "boat_name": (TS.BOATS[p["boat"]]["name"]
+                                   if p["boat"] is not None else None),
+                     "pos": p["pos"], "finished": p["finished"],
+                     "finish_rank": p["finish_rank"], "points": p["points"],
+                     "boost_used": p["boost_used"],
+                     "hand_count": len(p["hand"])} for p in g["players"]],
+        "my_hand": [dict(card) for card in me["hand"]] if me else [],
+        "my_max_move": TS.max_move(g, my_idx) if my_idx is not None else None,
+        "my_boost_available": bool(my_idx is not None
+                                   and not g["players"][my_idx]["boost_used"]),
+        "max_players": TS.MAX_PLAYERS,
+    }
+
+
+def _tornado_ints(raw):
+    if raw is None:
+        return []
+    if not isinstance(raw, list):
+        raise ValueError("not a list")
+    return [int(x) for x in raw]
+
+
+def tornado_api_move(state, chat_id, user_id, body):
+    g = tornado_get(state, chat_id)
+    if not g:
+        return [], "no tornado game in that chat"
+    idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
+    action = body.get("action")
+    if action in ("play", "wait") and idx is None and g["turn_order"]:
+        idx = _actor_idx(g, user_id, g["turn_order"][g["current_index"]])
+    ev = []
+    if action == "join":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        if idx is not None:
+            return ev, None
+        if len(g["players"]) >= TS.MAX_PLAYERS:
+            return [], "full"
+        iu_name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
+        g["players"].append(TS.new_player(user_id, iu_name))
+        ev.append("🙋 joined Tornado Splash.")
+    elif action == "start":
+        if g["phase"] != "lobby":
+            return [], "already started"
+        err = TS.start_picking(g, ev, gp=bool(body.get("gp")))
+        if err:
+            return [], err
+    elif action == "pick":
+        if idx is None:
+            return [], "not in this game"
+        try:
+            boat = int(body.get("boat"))
+        except (TypeError, ValueError):
+            return [], "no such boat"
+        err = TS.pick_boat(g, idx, boat, ev)
+        if err:
+            return [], err
+    elif action == "auto":
+        err = TS.auto_assign_boats(g, ev)
+        if err:
+            return [], err
+    elif action == "play":
+        if idx is None:
+            return [], "not in this game"
+        try:
+            cards = _tornado_ints(body.get("cards"))
+        except (TypeError, ValueError):
+            return [], "bad card selection"
+        err = TS.do_play(g, idx, cards, boost=bool(body.get("boost")), events=ev)
+        if err:
+            return [], err
+    elif action == "wait":
+        if idx is None:
+            return [], "not in this game"
+        try:
+            disc = _tornado_ints(body.get("discard"))
+        except (TypeError, ValueError):
+            return [], "bad card selection"
+        err = TS.do_wait(g, idx, discard=disc, events=ev)
+        if err:
+            return [], err
+    elif action == "next":
+        err = TS.next_race(g, user_id, ev)
+        if err:
+            return [], err
+    elif action == "rematch":
+        ev, err = rematch_game(state, "tornado", chat_id, user_id)
+        return ev, err
+    else:
+        return [], "unknown action"
+    tornado_render(g, ev)
+    return ev, None
+
+
 def start_web_server(state):
     from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -3311,6 +3799,9 @@ def start_web_server(state):
                 return self._send(200, open(p, "rb").read(), "text/javascript")
             if u.path == "/yahtzee.js":
                 p = os.path.join(os.path.dirname(JS_PATH), "yahtzee.js")
+                return self._send(200, open(p, "rb").read(), "text/javascript")
+            if u.path == "/tornado.js":
+                p = os.path.join(os.path.dirname(JS_PATH), "tornado.js")
                 return self._send(200, open(p, "rb").read(), "text/javascript")
             if u.path == "/fliptoons.js":
                 p = os.path.join(os.path.dirname(JS_PATH), "fliptoons.js")
@@ -3413,6 +3904,25 @@ def start_web_server(state):
                 with STATE_LOCK:
                     g = yahtzee_get(state, chat_id)
                     board = yahtzee_board_json(g, uid) if g else None
+                return self._send(200 if board else 404, {"ok": bool(board), "game": board})
+            if u.path == "/api/tornado/mygames":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                with STATE_LOCK:
+                    games = [tornado_board_json(g, uid) for g in state.get("tornado", {}).values()
+                             if any(p["user_id"] == uid for p in g["players"])]
+                return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/tornado/game":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                chat_id = q.get("chat_id", [""])[0]
+                with STATE_LOCK:
+                    g = tornado_get(state, chat_id)
+                    board = tornado_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/fliptoons/mygames":
                 q = urllib.parse.parse_qs(u.query)
@@ -3596,6 +4106,52 @@ def start_web_server(state):
                     events, err = yahtzee_api_move(state, chat_id, uid, body)
                     g = yahtzee_get(state, chat_id)
                     board = yahtzee_board_json(g, uid) if g else None
+                    save_state(state)
+                return self._send(200 if not err else 400,
+                                  {"ok": not err, "error": err, "events": events, "game": board})
+            if path in ("/api/tornado/create", "/api/tornado/move"):
+                try:
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                except Exception:
+                    return self._send(400, {"ok": False, "error": "bad json"})
+                iu = init_user(body.get("init_data", ""))
+                if iu is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                uid, name, start_param, chat_instance = iu
+                if path == "/api/tornado/create":
+                    chat_id = None
+                    for cand in (start_param, str(body.get("chat_id") or ""), chat_instance):
+                        cand = str(cand)
+                        if cand.startswith("tornado"):
+                            cand = cand[len("tornado"):]
+                        try:
+                            chat_id = int(cand)
+                            break
+                        except (TypeError, ValueError):
+                            continue
+                    if not chat_id:
+                        return self._send(400, {"ok": False, "error": "open the Mini App from a chat (startapp link)"})
+                    with STATE_LOCK:
+                        g = tornado_get(state, chat_id)
+                        if g and g["phase"] not in ("game_end", "race_end"):
+                            return self._send(200, {"ok": True, "game": tornado_board_json(g, uid), "created": False})
+                        g = TS.new_game(chat_id, uid, name)
+                        g["chat_type"] = "supergroup" if chat_id < 0 else "private"
+                        state.setdefault("tornado", {})[str(chat_id)] = g
+                        tornado_render(g, [f"🛥️ Tornado Splash game created by {name} via Mini App!"])
+                        save_state(state)
+                        board = tornado_board_json(g, uid)
+                    return self._send(200, {"ok": True, "game": board, "created": True})
+                chat_id = body.get("chat_id")
+                if not chat_id and start_param.startswith("tornado"):
+                    try:
+                        chat_id = int(start_param[len("tornado"):])
+                    except ValueError:
+                        pass
+                with STATE_LOCK:
+                    events, err = tornado_api_move(state, chat_id, uid, body)
+                    g = tornado_get(state, chat_id)
+                    board = tornado_board_json(g, uid) if g else None
                     save_state(state)
                 return self._send(200 if not err else 400,
                                   {"ok": not err, "error": err, "events": events, "game": board})

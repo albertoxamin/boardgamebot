@@ -173,6 +173,22 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 .ftopts button{font-size:14px;padding:8px 12px}
 .ftprompt{font-size:12px;font-weight:700;color:#f59e0b;text-align:center;margin:4px 0 0}
 .ftdismiss{background:#7f1d1d;color:#fff}
+/* Tornado Splash: race track + card hand */
+.tsbar{position:sticky;top:0;z-index:30;background:rgba(15,23,42,.97);border:1px solid #334155;border-radius:12px;padding:8px;margin-bottom:8px}
+.tsracer{background:rgba(15,23,42,.85);border:2px solid #334155;border-radius:10px;padding:6px 8px;margin:4px 0}
+.tsracer.current{border-color:#f59e0b}
+.tsracer.me{border-color:#38bdf8}
+.tsrhead{display:flex;justify-content:space-between;font-weight:800;font-size:14px}
+.tstrack{position:relative;height:14px;background:#0f172a;border:1px solid #334155;border-radius:999px;margin:6px 0 2px;overflow:hidden}
+.tsfill{height:100%;background:linear-gradient(90deg,#0ea5e9,#22d3ee);border-radius:999px;transition:width .3s ease}
+.tscp{position:absolute;top:0;bottom:0;width:2px;background:#f59e0b}
+.tshand{display:flex;flex-wrap:wrap;gap:6px;justify-content:center;margin:8px 0}
+.tscard{background:#f8fafc;color:#111;border:2px solid #cbd5e1;border-radius:10px;padding:10px 14px;font-weight:900;font-size:18px;cursor:pointer;user-select:none}
+.tscard.sel{outline:3px solid #f59e0b;transform:translateY(-3px)}
+.tsboats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0}
+.tsboat{background:#1e293b;color:#e2e8f0;border:2px solid #334155;border-radius:10px;padding:8px;font-size:15px;font-weight:800;display:flex;flex-direction:column;gap:2px;align-items:center;margin:0}
+.tsboat .small{font-size:11px}
+.tsboat.taken{opacity:.45}
 </style></head><body>
 <h1>🎴 Flip 7</h1>
 <div id="regicide" class="hidden">
@@ -244,6 +260,23 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <div class="log" id="ftLog"></div>
 <div id="ftZoom" class="ftzoom"></div>
 </div>
+<div id="tornado" class="hidden">
+<div id="tsTurn" style="font-size:18px;font-weight:700"></div>
+<div id="tsBoard"></div>
+<div id="tsHand"></div>
+<div id="tsActions"></div>
+<button class="primary hidden" id="tsJoin">🙋 Join Tornado Splash</button>
+<button class="primary hidden" id="tsStart">🏁 Start race</button>
+<button class="primary hidden" id="tsGp">🏆 Grand Prix (3 races)</button>
+<button class="primary hidden" id="tsAuto">🎲 Auto-assign & start</button>
+<button class="hit hidden" id="tsPlay">🛥️ Play selected</button>
+<button class="stay hidden" id="tsBoost">⚡ Boost</button>
+<button class="stay hidden" id="tsWait">⏳ Wait</button>
+<button class="stay hidden" id="tsDiscard">🗑 Discard & wait</button>
+<button class="primary hidden" id="tsNext">▶️ Next race</button>
+<button class="primary hidden" id="tsRematch">🔄 Rematch!</button>
+<div class="log" id="tsLog"></div>
+</div>
 <div id="synced">
 <div id="syncBoard"></div>
 <div id="syncTurn" style="font-size:18px;font-weight:700"></div>
@@ -255,11 +288,12 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <button class="primary hidden" id="syncRematch">🔄 Rematch!</button>
 <div class="log" id="syncLog"></div>
 </div>
-<script data-cfasync="false" src="flip7.js?v=24"></script>
+<script data-cfasync="false" src="flip7.js?v=25"></script>
 <script data-cfasync="false" src="regicide.js?v=17"></script>
 <script data-cfasync="false" src="odin.js?v=9"></script>
 <script data-cfasync="false" src="lsd.js?v=4"></script>
 <script data-cfasync="false" src="spots.js?v=14"></script>
 <script data-cfasync="false" src="yahtzee.js?v=3"></script>
 <script data-cfasync="false" src="fliptoons.js?v=9"></script>
+<script data-cfasync="false" src="tornado.js?v=1"></script>
 </body></html>

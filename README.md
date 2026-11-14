@@ -210,19 +210,42 @@ Mini App: board button = `?startapp=fliptoons<chat>` (same Main Mini App,
 routed by `start_param`). Engine: `fliptoons.py` + `test_fliptoons.py`
 (full card abilities, market, final flip).
 
+## Tornado Splash (same bot, jet-ski racing)
+
+Tornado Splash (Arclight Games, 2025), 2–5 players. Each racer picks one of
+6 jet skis (each with its own 20-card deck of straight/curve cards worth 1–2
+spaces; boats differ in Speed/Handling stars and weight). Every round:
+rank racers by proximity to the finish (ties → lighter boat), replenish
+hands (1st draws to 4, last to 6, others 5; an empty deck returns your
+played cards earliest-first), then play cards in rank order — max 3 spaces
+per round, or 4 with the once-per-race boost. Passing a checkpoint requires
+a curve card that turn; stopping exactly on it is free. The first racer to
+reach or cross the finish wins, and the race runs until all but one are
+finished. An optional Grand Prix runs 3 races over 4 courses with 5/3/2/0
+points by finish.
+Text commands: `/tornado` (create), `/tornado_join`, `/tornado_start [gp]`,
+`/tornado_pick <1-6>`, `/tornado_auto`, `/tornado_hand`, `/tornado_play
+<card#...> [b]`, `/tornado_wait [card#...]`, `/tornado_next` (next GP race),
+`/tornado_rules`, `/tornado_cancel` (creator), `/tornado_join_npc`.
+Mini App: board button = `?startapp=tornado<chat>` (same Main Mini App,
+routed by `start_param`). Engine: `tornado.py` + `test_tornado.py`.
+
 ## Files
 
 - `game.py` – pure engine: deck, scoring, bust/Flip 7, actions, rounds.
 - `yahtzee.py` – pure engine: dice, scorecard, turns, scoring.
 - `fliptoons.py` – pure engine: deck, grid, abilities, market, final flip.
+- `tornado.py` – pure engine: boats, decks, courses, ranks, movement, Grand Prix.
 - `bot.py` – Telegram polling, inline keyboards, commands, JSON state.
 - `create_bot.py` – BotFather self-creation (MTProto, see above).
 - `test_game.py` – unit tests: `python3 test_game.py`
 - `test_yahtzee.py` – Yahtzee unit tests: `python3 test_yahtzee.py`
 - `test_fliptoons.py` – Fliptoons unit tests: `python3 test_fliptoons.py`
+- `test_tornado.py` – Tornado Splash unit tests: `python3 test_tornado.py`
 - `web/flip7.html` – standalone HTML5 Flip 7 game (hot-seat, Mini App-ready)
 - `web/yahtzee.js` – Yahtzee Mini App view (synced)
 - `web/fliptoons.js` – Fliptoons Mini App view (synced)
+- `web/tornado.js` – Tornado Splash Mini App view (synced)
 - `web/server.py` – static server for the HTML game (needs HTTPS tunnel for in-Telegram use)
 - `state.json` – created at runtime (per-chat games, decks, scores).
 
@@ -232,6 +255,7 @@ routed by `start_param`). Engine: `fliptoons.py` + `test_fliptoons.py`
 python3 test_game.py        # 8 engine tests
 python3 test_yahtzee.py     # 6 Yahtzee tests
 python3 test_fliptoons.py   # Fliptoons engine/ability tests
+python3 test_tornado.py     # Tornado Splash engine tests
 ```
 A full 3-player game was also simulated end-to-end (hits/stays/actions/
 round rotation → a winner at 200+ in 13 rounds) with the Telegram layer

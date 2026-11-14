@@ -84,6 +84,7 @@ COMMANDS = (
     "odin - Card-shedding Odin game\n"
     "lsd - Let's Summon Demons dice game\n"
     "spots - Push-your-luck Spots dog dice\n"
+    "tornado - Jet-ski racing Tornado Splash\n"
     "games - List the games you can start\n"
     "join_npc - Add a mock player anyone can control\n"
     "score - Show board and scores\n"

@@ -2,7 +2,15 @@
 const TSV={user_id:0,chat_id:null,board:null,timer:null,init:'',sel:new Set(),boost:false,prevKey:''};
 function tsLog(s){let e=document.getElementById('tsLog');if(e)e.textContent+=s+'\n';}
 function tsApi(path,opts){return fetch(path,opts).then(r=>r.json());}
-function tsCard(c){return (c.kind==='c'?'🌊':'➡️')+c.spaces;}
+// The scanned running-card faces have no printed values, so this mapping of the
+// engine's four card types onto four of the five faces is arbitrary (and the
+// printed value is shown as a badge on top of the art).
+const TS_CARD_ART={s1:'running_1_wide.png',s2:'running_2_wide.png',c1:'running_3_wide.png',c2:'running_4_wide.png'};
+function tsCard(c){
+ let key=(c.kind==='c'?'c':'s')+c.spaces;
+ let src='tornado_cards/'+(TS_CARD_ART[key]||'running_5_wide.png');
+ return '<img src="'+src+'" alt=""><span class="tscardbadge">'+(c.kind==='c'?'🌊':'➡️')+c.spaces+'</span>';
+}
 function tsBoatStars(n){let s='';for(let i=0;i<n;i++)s+='⭐';return s;}
 async function tsLoad(){
  let tg=tgInit();
@@ -96,7 +104,9 @@ function tsRender(){
   let canPick=me&&picker&&(picker.user_id===TSV.user_id||picker.npc);
   pickHtml='<div class="tsboats">'+b.boats.map(x=>{
    let dis=taken.has(x.index)||!canPick;
-   return '<button class="tsboat'+(taken.has(x.index)?' taken':'')+'" data-boat="'+x.index+'"'+(dis?' disabled':'')+'>'+x.name
+   return '<button class="tsboat'+(taken.has(x.index)?' taken':'')+'" data-boat="'+x.index+'"'+(dis?' disabled':'')+'>'
+    +'<img class="tsboatimg" src="tornado_cards/number_'+(x.index+1)+'.png" alt="">'
+    +x.name
     +'<span class="small">'+tsBoatStars(x.speed)+'/'+tsBoatStars(x.handling)+'</span><span class="small">weight '+x.weight+'</span></button>';
   }).join('')+'</div>';
  }

@@ -242,6 +242,8 @@ def web_keyboard(chat_type="private", chat_id=None, game="flip7"):
         btn = {"text": label, "url": url}
     else:
         url = WEB_URL + (f"?app={game}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo") else "")
+        if chat_id:
+            url += ("&" if "?" in url else "?") + f"chat_id={chat_id}"
         btn = {"text": label, "web_app": {"url": url}}
     return [[btn]]
 
@@ -2500,7 +2502,8 @@ CC_LOC_NAME = {CC.CASTLE: "Castle", CC.VILLAGE: "Village"}
 
 
 def castlecombo_get(state, chat_id):
-    return state.setdefault("castlecombo", {}).get(str(chat_id))
+    g = state.setdefault("castlecombo", {}).get(str(chat_id))
+    return CC.normalize(g) if g else None
 
 
 def _cc_card_label(inst):
@@ -2556,20 +2559,88 @@ def _cc_display_line(g, loc):
     return " · ".join(parts)
 
 
+CC_ROUND_ARROWS = ["↖️", "⬆️", "↗️", "⬅️", "*️⃣", "➡️", "↙️", "⬇️", "↘️"]
+
+
+def send_rich(chat_id, rich, kb=None):
+    p = {"chat_id": chat_id, "rich_message": rich}
+    if kb:
+        p["reply_markup"] = {"inline_keyboard": kb}
+    return api("sendRichMessage", **p)
+
+
+def castlecombo_score_md(g):
+    res = g.get("results") or []
+    if not res:
+        return ""
+    by_idx = {r["idx"]: r for r in res}
+    players = g["players"]
+    head = ["Round"] + [html.escape(p["name"]) for p in players]
+    lines = ["| " + " | ".join(head) + " |",
+             "|" + "|".join(["---"] * len(head)) + "|"]
+    for i, arrow in enumerate(CC_ROUND_ARROWS):
+        cells = [arrow]
+        for idx in range(len(players)):
+            entries = (by_idx.get(idx, {}).get("entries") or [])
+            cells.append(str(entries[i]) if i < len(entries) else "")
+        lines.append("| " + " | ".join(cells) + " |")
+    for label, key in (("Keys", "keys"), ("Total", "score")):
+        cells = [label] + [str(by_idx.get(idx, {}).get(key, ""))
+                           for idx in range(len(players))]
+        lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(lines)
+
+
+def castlecombo_rich_message(g, events=None):
+    blocks = [{"type": "paragraph", "text": str(e)} for e in (events or [])]
+    if g.get("winner") is not None:
+        w = g["players"][g["winner"]]
+        res = g.get("results") or []
+        score = next((r["score"] for r in res if r["idx"] == g["winner"]), "?")
+        head = ["🏆 ", {"type": "bold", "text": "Castle Combo game over"},
+                " - winner: ", {"type": "bold", "text": w["name"]},
+                f" with {score} points!"]
+    else:
+        head = ["🤝 ", {"type": "bold", "text": "Castle Combo game over"},
+                " - it's a draw!"]
+    blocks.append({"type": "paragraph", "text": head})
+    res = g.get("results") or []
+    if res:
+        by_idx = {r["idx"]: r for r in res}
+        players = g["players"]
+        cols = ["Round"] + [p["name"] for p in players]
+        cells = [[{"text": c, "is_header": True} for c in cols]]
+        for i, arrow in enumerate(CC_ROUND_ARROWS):
+            row = [arrow]
+            for idx in range(len(players)):
+                entries = (by_idx.get(idx, {}).get("entries") or [])
+                row.append(str(entries[i]) if i < len(entries) else "")
+            cells.append([{"text": c} for c in row])
+        for label, key in (("Keys", "keys"), ("Total", "score")):
+            row = [label] + [str(by_idx.get(idx, {}).get(key, ""))
+                             for idx in range(len(players))]
+            cells.append([{"text": c} for c in row])
+        blocks.append({"type": "table", "cells": cells, "is_bordered": True,
+                       "is_striped": True, "is_compact": True})
+    return {"blocks": blocks}
+
+
 def castlecombo_board_text(g):
     if g["phase"] == "lobby":
         return (f"🏰 <b>Castle Combo lobby</b> - {len(g['players'])}/"
                 f"{CC.MAX_PLAYERS} players. Friends: /castlecombo_join, "
                 f"anyone: /castlecombo_start")
     if g["phase"] == "game_end":
+        table = castlecombo_score_md(g)
+        suffix = "\n\n" + table if table else ""
         if g.get("winner") is not None:
             w = g["players"][g["winner"]]
             res = g.get("results") or []
             score = next((r["score"] for r in res if r["idx"] == g["winner"]),
                          "?")
             return (f"🏆 <b>Castle Combo game over</b> - winner: "
-                    f"<b>{html.escape(w['name'])}</b> with {score} points!")
-        return "🤝 <b>Castle Combo game over</b> - it's a draw!"
+                    f"<b>{html.escape(w['name'])}</b> with {score} points!" + suffix)
+        return "🤝 <b>Castle Combo game over</b> - it's a draw!" + suffix
     actor = castlecombo_actor(g)
     cur = CC_LOC_NAME[g["messenger"]]
     lines = [f"🏰 <b>Castle Combo</b> · round {g['round']}/9 · "
@@ -2602,9 +2673,10 @@ def castlecombo_keyboard(g):
     kb = []
     pend = g.get("pending")
     if pend:
-        for j in range(0, len(pend["options"]), 2):
-            kb.append([{"text": o["label"][:60], "callback_data": f"cc:ch:{o['v']}"}
-                       for o in pend["options"][j:j + 2]])
+        if pend.get("kind") != "place":
+            for j in range(0, len(pend["options"]), 2):
+                kb.append([{"text": o["label"][:60], "callback_data": f"cc:ch:{o['v']}"}
+                           for o in pend["options"][j:j + 2]])
     else:
         row = g["rows"][g["messenger"]]
         p = g["players"][g["current"]]
@@ -2653,7 +2725,12 @@ def castlecombo_render(g, events=None):
                 lines.append(ping)
     text = "\n".join(lines + [castlecombo_board_text(g)]) if lines else castlecombo_board_text(g)
     kb = castlecombo_keyboard(g)
-    r = send_board(g, "castlecombo", text, kb)
+    if g["phase"] == "game_end":
+        r = send_rich(chat_id, castlecombo_rich_message(g, events), kb)
+        if not r.get("ok"):
+            r = send_board(g, "castlecombo", text, kb)
+    else:
+        r = send_board(g, "castlecombo", text, kb)
     if r.get("ok"):
         old = g.get("board_message_id")
         g["board_message_id"] = r["result"]["message_id"]
@@ -2785,6 +2862,7 @@ def _cc_card_json(g, inst, hidden=False):
 
 
 def castlecombo_board_json(g, viewer_id=None):
+    CC.normalize(g)
     me = next((p for p in g["players"] if p["user_id"] == viewer_id), None)
     actor = castlecombo_actor(g)
     can_act = bool(actor is not None and (
@@ -2803,6 +2881,8 @@ def castlecombo_board_json(g, viewer_id=None):
     for loc in (CC.CASTLE, CC.VILLAGE):
         rows[str(loc)] = {
             "live": g["mm_live"][loc],
+            "deck": len(g["decks"][loc]),
+            "deck_total": len(CC.CASTLE_IDS if loc == CC.CASTLE else CC.VILLAGE_IDS),
             "cards": [{"iid": c["id"], "cid": CC.card_of(c)["id"],
                        "name": CC.card_of(c)["name"],
                        "cost": CC.cost_for(g, g["current"], CC.card_of(c))
@@ -3573,6 +3653,8 @@ def handle_callback(state, cb):
             elif parts == ["cc", "renew"]:
                 err = CC.do_key(cc, idx, "renew", ev)
             elif len(parts) >= 3 and parts[1] == "ch":
+                if (cc.get("pending") or {}).get("kind") == "place":
+                    return answer_cb(cb["id"], "Use the Mini App to place a card.")
                 err = CC.apply_choice(cc, idx, ":".join(parts[2:]), ev)
             else:
                 return answer_cb(cb["id"], "Unknown button.")

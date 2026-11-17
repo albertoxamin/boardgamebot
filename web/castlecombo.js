@@ -16,20 +16,20 @@ const CC_CARDS={};
 const CC_POS_IDX={'0':0,'123':1,'456':2,'789':3,'147':4,'258':5,'369':6,'1379':7,'2468':8};
 function ccIcon(o){
  switch(o.i){
-  case 'gold':return '<span class="ccicon" style="width:16.8cqw;height:16.8cqw;background-image:url(/cc-icons/gold-icons.png);background-size:67.2cqw 16.8cqw;background-position-x:'+(o.q*33.333)+'%"></span>';
-  case 'key':return '<span class="ccicon" style="width:16.8cqw;height:16.8cqw;background-image:url(/cc-icons/key-icons.png);background-size:33.6cqw 16.8cqw"></span>';
-  case 'sh':return '<span class="ccicon" style="width:16.8cqw;height:13.6cqw;background-image:url(/cc-icons/shield-icons.png);background-size:100% auto;background-position-y:'+(o.c*16.6667)+'%"></span>';
-  case 'dir':return '<span class="ccicon" style="width:26.7cqw;height:24.7cqw;background-image:url(/cc-icons/direction-shield-icons.png);background-size:300% 700%;background-position:'+(o.k==='line'?0:o.k==='col'?'50%':'100%')+' '+(o.c*16.6667)+'%"></span>';
-  case 'pos':return '<span class="ccicon" style="width:14.2cqw;height:16.8cqw;background-image:url(/cc-icons/position-icons.png);background-size:127.8cqw 16.8cqw;background-position-x:'+(CC_POS_IDX[String(o.t)]*12.5)+'%"></span>';
+  case 'gold':return '<span class="ccicon" style="width:2.545em;height:2.545em;background-image:url(/cc-icons/gold-icons.png);background-size:10.182em 2.545em;background-position-x:'+(o.q*33.333)+'%"></span>';
+  case 'key':return '<span class="ccicon" style="width:2.545em;height:2.545em;background-image:url(/cc-icons/key-icons.png);background-size:5.091em 2.545em"></span>';
+  case 'sh':return '<span class="ccicon" style="width:2.545em;height:2.061em;background-image:url(/cc-icons/shield-icons.png);background-size:100% auto;background-position-y:'+(o.c*16.6667)+'%"></span>';
+  case 'dir':return '<span class="ccicon" style="width:4.045em;height:3.742em;background-image:url(/cc-icons/direction-shield-icons.png);background-size:300% 700%;background-position:'+(o.k==='line'?0:o.k==='col'?'50%':'100%')+' '+(o.c*16.6667)+'%"></span>';
+  case 'pos':return '<span class="ccicon" style="width:2.152em;height:2.545em;background-image:url(/cc-icons/position-icons.png);background-size:19.364em 2.545em;background-position-x:'+(CC_POS_IDX[String(o.t)]*12.5)+'%"></span>';
   case 'pt':{const qs=[-1,1,2,3,4,5,6,7,8,9,10,12];const i=qs.indexOf(o.q);
-   return '<span class="ccicon" style="width:22.4cqw;height:22.4cqw;background-image:url(/cc-icons/point-icons.png);background-size:268.8cqw 22.4cqw;background-position-x:'+(i*100/11)+'%"></span>';}
-  case 'ban':return '<span class="ccicon" style="width:'+(o.t===12?40:22.4)+'cqw;height:22.4cqw;background-image:url(/cc-icons/card-type-icons.png);background-size:auto 400%;background-position-y:'+((o.t===1?0:o.t===2?1:2)*33.333)+'%"></span>';
-  case 'disc':return '<span class="ccicon" style="width:67.1cqw;height:19.9cqw;background-image:url(/cc-icons/discount-icons.png);background-size:300% 100%;background-position-x:'+(o.t===1?0:o.t===2?50:100)+'%"></span>';
-  case 'purse':return '<span class="ccicon" style="width:16.8cqw;height:16.8cqw;background-image:url(/cc-icons/card-icons.png);background-size:151.2cqw 16.8cqw"></span>';
-  case 'flip':return '<span class="ccicon" style="width:16.8cqw;height:16.8cqw;background-image:url(/cc-icons/card-icons.png);background-size:151.2cqw 16.8cqw;background-position-x:87.5%"></span>';
-  case 'shset':return '<span class="ccicon" style="width:33.6cqw;height:10.5cqw;background-image:url(/cc-icons/shields-icons.png);background-size:100% auto;background-position-y:'+(o.t*20)+'%"></span>';
+   return '<span class="ccicon" style="width:3.394em;height:3.394em;background-image:url(/cc-icons/point-icons.png);background-size:40.727em 3.394em;background-position-x:'+(i*100/11)+'%"></span>';}
+  case 'ban':return '<span class="ccicon" style="width:'+(o.t===12?6.061:3.394)+'em;height:3.394em;background-image:url(/cc-icons/card-type-icons.png);background-size:auto 400%;background-position-y:'+((o.t===1?0:o.t===2?1:2)*33.333)+'%"></span>';
+  case 'disc':return '<span class="ccicon" style="width:10.167em;height:3.015em;background-image:url(/cc-icons/discount-icons.png);background-size:300% 100%;background-position-x:'+(o.t===1?0:o.t===2?50:100)+'%"></span>';
+  case 'purse':return '<span class="ccicon" style="width:2.545em;height:2.545em;background-image:url(/cc-icons/card-icons.png);background-size:22.909em 2.545em"></span>';
+  case 'flip':return '<span class="ccicon" style="width:2.545em;height:2.545em;background-image:url(/cc-icons/card-icons.png);background-size:22.909em 2.545em;background-position-x:87.5%"></span>';
+  case 'shset':return '<span class="ccicon" style="width:5.091em;height:1.591em;background-image:url(/cc-icons/shields-icons.png);background-size:100% auto;background-position-y:'+(o.t*20)+'%"></span>';
   case 'card':{const col=o.t==='cost'?(o.v===-1?1:o.v===0?2:o.v===4?3:o.v===5?4:2):0;
-   return '<span class="ccicon" style="width:16.8cqw;height:16.8cqw;background-image:url(/cc-icons/card-icons.png);background-size:151.2cqw 16.8cqw;background-position-x:'+(col*12.5)+'%"></span>';}
+   return '<span class="ccicon" style="width:2.545em;height:2.545em;background-image:url(/cc-icons/card-icons.png);background-size:22.909em 2.545em;background-position-x:'+(col*12.5)+'%"></span>';}
  }
  return '';
 }
@@ -56,6 +56,19 @@ function ccFit(root){
    fs*=0.93;el.style.fontSize=fs+'px';
   }
  });
+ root.querySelectorAll('.ccabs,.ccsc').forEach(box=>{
+  let lines=box.querySelectorAll('.ccab');
+  if(!lines.length)return;
+  lines.forEach(el=>el.style.fontSize='');
+  for(let i=0;i<16;i++){
+   if(box.scrollHeight<=box.clientHeight+1 &&
+      Array.prototype.every.call(lines,el=>el.scrollWidth<=el.clientWidth+1))break;
+   lines.forEach(el=>{
+    let fs=parseFloat(getComputedStyle(el).fontSize)||6;
+    el.style.fontSize=Math.max(2,fs*0.9)+'px';
+   });
+  }
+ });
 }
 function ccKey(c){return 'k'+c.iid+'_'+c.cid;}
 function ccTileData(c){
@@ -73,20 +86,28 @@ async function ccLoad(){
  let board=document.getElementById('ccBoard');
  if(!tg.id){board.innerHTML='<div class="table lobby-note">Open as Telegram Mini App via the bot\'s Castle Combo link.</div>';return;}
  CCAPP.user_id=tg.id; CCAPP.init=tg.init;
- let pref=ccChatId(tg.start)||ccChatId(new URLSearchParams(location.search).get('app'));
+ let qp=new URLSearchParams(location.search);
+ let pref=ccChatId(tg.start)||ccChatId(qp.get('app'))||parseInt(qp.get('chat_id'),10)||0;
+ if(!pref && tg.chat_instance) pref=parseInt(tg.chat_instance,10)||0;
  let r=await ccApi('/api/castlecombo/mygames?init_data='+encodeURIComponent(tg.init));
  let mine=r.games||[];
+ if(pref){
+  let pick=mine.find(g=>g.chat_id===pref);
+  if(!pick){
+   let spec=await ccApi('/api/castlecombo/game?chat_id='+encodeURIComponent(pref)+'&init_data='+encodeURIComponent(tg.init));
+   if(spec.ok&&spec.game) pick={chat_id:pref};
+  }
+  if(pick){ccSelect(pick.chat_id);return;}
+  let cr=await ccApi('/api/castlecombo/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init,chat_id:pref})});
+  if(cr.game){ccSelect(cr.game.chat_id);return;}
+  CCAPP.err=cr.error||'could not create the game';
+  board.innerHTML='<div class="table lobby-note">⛔ '+escapeHtml(CCAPP.err)+'</div>';
+  return;
+ }
  let cands=mine.slice().sort((a,b)=>((a.phase==='game_end')-(b.phase==='game_end')) ||
   ((b.players?b.players.length:0)-(a.players?a.players.length:0)));
- let pick=cands.find(g=>g.chat_id===pref)||cands[0];
- if(pick){ccSelect(pick.chat_id);return;}
- if(!pref){board.innerHTML='<div class="table lobby-note">No Castle Combo game for you yet — send /castlecombo in a chat, then open its Mini App link.</div>';return;}
- let spec=await ccApi('/api/castlecombo/game?chat_id='+encodeURIComponent(pref)+'&init_data='+encodeURIComponent(tg.init));
- if(spec.ok&&spec.game){ccSelect(pref);return;}
- let cr=await ccApi('/api/castlecombo/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init,chat_id:pref})});
- if(cr.game){ccSelect(cr.game.chat_id);return;}
- CCAPP.err=cr.error||'could not create the game';
- board.innerHTML='<div class="table lobby-note">⛔ '+escapeHtml(CCAPP.err)+'</div>';
+ if(cands.length){ccSelect(cands[0].chat_id);return;}
+ board.innerHTML='<div class="table lobby-note">No Castle Combo game for you yet — send /castlecombo in a chat, then open its Mini App link.</div>';
 }
 async function ccSelect(chat_id){CCAPP.chat_id=chat_id; CCAPP.err=''; await ccRefresh();
  if(CCAPP.timer)clearInterval(CCAPP.timer); CCAPP.timer=setInterval(ccRefresh,3000);}
@@ -114,14 +135,20 @@ function ccZoom(key){
   (flags.length?' · '+flags.join(' · '):'')+
   '<div class="small" style="margin-top:6px">'+escapeHtml(c.txt||'')+'</div></div>';
  z.classList.add('open');
+ ccFit(z);
 }
 // ---- render
 function ccRowDisplay(b,locName,loc,myTurn){
  let sec=b.rows[String(loc)];
  let cards=(sec&&sec.live)?(sec.cards||[]):null;
+ let deck=sec?sec.deck:0, total=sec?sec.deck_total:0;
+ let inactive=b.phase==='playing'&&b.messenger!==loc;
+ let msg=b.messenger===loc?'<img class="ccmsgr" src="/castlecombo-messenger.png" alt="messenger">':'';
  let h='<div class="table"><div class="small">'+locName+' '+(cards?'':'(out of cards)')+'</div><div class="ccrowflex">'+
-  (b.messenger===loc?'<img class="ccmsgr" src="/castlecombo-messenger.png" alt="messenger">':'')+
-  '<div class="ccrow">';
+  '<div class="ccdeck'+(inactive?' ccinactive':'')+'" title="'+deck+' cards left in deck (of '+total+')">'+
+   '<div class="cctile" style="'+ccArt(0,false,loc,1)+'"></div>'+
+   '<div class="ccdecknum">'+deck+'<span>/'+total+'</span></div>'+msg+'</div>'+
+  '<div class="ccrow'+(inactive?' ccinactive':'')+'">';
  if(cards){
   cards.forEach(c=>{
    h+='<div class="ccslot">'+ccTileData(c)+
@@ -152,21 +179,22 @@ function ccGrid(p){
 // BGA-style end-game score sheet: background art with printed labels
 // (entries 1..9, keys, total); our table overlays the player columns.
 function ccScoreSheet(b){
- let rs=b.results;
- let nameW=Math.min(97, Math.round(420/Math.max(rs.length,1)));
- let h='<div class="ccsheet"><table class="ccsheet-t" style="--csnw:'+nameW+'px">'+
-  '<tr><th class="ccsheet-corner"></th>'+
-  rs.map(r=>'<th class="ccsheet-pname">'+escapeHtml(r.name)+'</th>').join('')+'</tr>';
- for(let i=1;i<=9;i++){
-  h+='<tr><th class="ccsheet-lbl"></th>'+
-   rs.map(r=>'<td class="ccsheet-entry'+(i===9?' ccsheet-last':'')+'">'+((r.entries&&r.entries[i-1])||0)+'</td>').join('')+'</tr>';
- }
- h+='<tr><th class="ccsheet-lbl"></th>'+
-  rs.map(r=>'<td class="ccsheet-entry ccsheet-keys">'+(r.keys?('🗝️'+r.keys):'')+'</td>').join('')+'</tr>'+
-  '<tr><th class="ccsheet-lbl ccsheet-totlbl"></th>'+
-  rs.map(r=>'<td class="ccsheet-entry ccsheet-total'+(r.idx===b.winner?' ccsheet-win':'')+'">'+r.score+'</td>').join('')+'</tr>'+
-  '</table></div>';
- return h;
+ let rs=b.results||[];
+ let lefts=[38,86.5,135,183.5,232];
+ let centers=[56.5,83.5,110.5,145.75,173,200,235.25,262.5,289.75];
+ let h='<div class="ccsheet">';
+ for(let j=0;j<5;j++)h+='<div class="ccsheet-cell ccsheet-pname" style="left:'+lefts[j]+'px;top:8px">'+
+  (rs[j]?escapeHtml(rs[j].name):'')+'</div>';
+ for(let i=0;i<9;i++)for(let j=0;j<5;j++)
+  h+='<div class="ccsheet-cell ccsheet-entry'+(i===8?' ccsheet-last':'')+
+   '" style="left:'+lefts[j]+'px;top:'+(centers[i]-11)+'px">'+
+   (rs[j]&&rs[j].entries?rs[j].entries[i]:'')+'</div>';
+ for(let j=0;j<5;j++)h+='<div class="ccsheet-cell ccsheet-entry ccsheet-keys" style="left:'+lefts[j]+'px;top:300.75px">'+
+  (rs[j]&&rs[j].keys?'🗝️'+rs[j].keys:'')+'</div>';
+ for(let j=0;j<5;j++)h+='<div class="ccsheet-cell ccsheet-total'+
+  (rs[j]&&j===b.winner?' ccsheet-win':'')+'" style="left:'+lefts[j]+'px;top:338.75px">'+
+  (rs[j]?rs[j].score:'')+'</div>';
+ return h+'</div>';
 }
 // Clickable placement grid: the pending player's tableau extended by one
 // ring, with the valid spots as dashed slots (pending.kind === 'place').
@@ -177,6 +205,14 @@ function ccPlaceGrid(b){
  let x0=Math.min.apply(null,xs)-1,x1=Math.max.apply(null,xs)+1;
  let y0=Math.min.apply(null,ys)-1,y1=Math.max.apply(null,ys)+1;
  if(!p.tableau.length){x0=x1=0;y0=y1=0;}
+ else{
+  let minY=Math.min.apply(null,ys),maxY=Math.max.apply(null,ys);
+  let minX=Math.min.apply(null,xs),maxX=Math.max.apply(null,xs);
+  if(!opts.some(o=>o.y===y0))y0=minY;
+  if(!opts.some(o=>o.y===y1))y1=maxY;
+  if(!opts.some(o=>o.x===x0))x0=minX;
+  if(!opts.some(o=>o.x===x1))x1=maxX;
+ }
  let h='<div class="table"><div class="small">'+escapeHtml(pend.prompt)+' — tap a dashed slot</div>'+
   '<div class="ccgrid" style="grid-template-columns:repeat('+(x1-x0+1)+',66px)">';
  for(let y=y0;y<=y1;y++)for(let x=x0;x<=x1;x++){

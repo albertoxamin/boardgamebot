@@ -191,12 +191,19 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 .ccname span{font-size:11cqw;font-style:normal;display:block}
 .ccabs{position:absolute;top:60%;left:4%;right:4%;height:19%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
 .ccsc{position:absolute;top:79.5%;left:8%;right:8%;height:16.5%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
-.ccab{display:flex;align-items:center;justify-content:center;gap:1px;font-size:6.6cqw;max-width:100%;overflow:hidden;white-space:nowrap}
+.ccab{display:flex;align-items:center;justify-content:center;gap:1px;font-size:6.6cqw;line-height:1;max-width:100%;overflow:hidden;white-space:nowrap}
 .cccbtns{display:flex;gap:2px;margin:2px 0 0}
 .cccbtns button{font-size:11px;padding:4px 5px;margin:0;flex:1;white-space:nowrap}
 .ccrow{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:6px 0}
-.ccrowflex{display:flex;align-items:center;justify-content:center;gap:8px}
+.ccrowflex{display:flex;align-items:center;justify-content:center;gap:8px;margin-top:14px}
 .ccmsgr{width:38px;height:47px;flex:none;filter:drop-shadow(1px 2px 2px #0008)}
+.ccdeck{position:relative;width:66px;height:93px;flex:none;cursor:default}
+.ccdeck .cctile{cursor:default}
+.ccdeck .ccmsgr{position:absolute;top:-14px;left:50%;transform:translateX(-50%);z-index:2}
+.ccdecknum{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(15,23,42,.92);border:1px solid #fbbf24;border-radius:8px;padding:2px 5px;color:#fff;font-weight:900;font-size:14px;line-height:1;white-space:nowrap;box-shadow:0 1px 3px #000a}
+.ccdecknum span{color:#fbbf24;font-size:10px}
+.ccinactive .cctile{opacity:.42;filter:grayscale(.7)}
+.ccinactive .ccdecknum{opacity:.6}
 .ccslot{display:flex;flex-direction:column;align-items:center}
 .ccspot{width:66px;height:93px;border:2px dashed #f59e0b;border-radius:6px;background:rgba(245,158,11,.13);cursor:pointer}
 .ccspot:hover{background:rgba(245,158,11,.3)}
@@ -206,19 +213,15 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 .cczcard .cctile{cursor:default}
 .zcard-big{width:132px;height:186px}
 /* End-game score sheet over the printed BGA art (563x750 -> 281.5x375 at 50%):
-   labels x 52-290, rows: header 13-52, entries 1-9 at 25.5px each,
-   keys 238-280, total 283-344, player cols 97px + 3px gap. */
+   at display scale the label column is 38px and the five player columns are
+   48.5px wide (97px + 3px gap in the source art). */
 .ccsheet{background:url(cc-icons/castlecombo-endscore.jpg) center/100% 100% no-repeat;width:281.5px;height:375px;margin:12px auto 28px;position:relative;overflow:hidden}
-.ccsheet-t{position:absolute;left:0;top:8px;border-collapse:separate;border-spacing:0;table-layout:fixed;--csnh:25.5px}
-.ccsheet-pname{font-size:9px;line-height:1.1;font-weight:700;height:19.5px;width:var(--csnw);padding:0 1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#333;vertical-align:middle}
-.ccsheet-corner{width:26px;padding:0}
-.ccsheet-entry{text-align:center;vertical-align:middle;font-size:11px;font-weight:700;height:var(--csnh);width:var(--csnw);padding:0;color:#3b2b1d}
-.ccsheet-lbl{padding:0;width:26px}
+.ccsheet-cell{position:absolute;width:48.5px;height:22px;line-height:22px;text-align:center;overflow:hidden;white-space:nowrap;padding:0;box-sizing:border-box}
+.ccsheet-pname{height:39px;line-height:39px;font-size:8px;font-weight:700;color:#333;padding:0 1px;text-overflow:ellipsis}
+.ccsheet-entry{font-size:11px;font-weight:700;color:#3b2b1d}
 .ccsheet-last{font-size:9px;color:#6b5330}
-.ccsheet-keyslbl,.ccsheet-totlbl{height:21px}
-.ccsheet-keys{height:21px;font-size:10px}
-.ccsheet-totlbl{height:30.5px}
-.ccsheet-total{height:30.5px;font-size:14px;color:#2b1b0d}
+.ccsheet-keys{font-size:10px}
+.ccsheet-total{height:25px;line-height:25px;font-size:14px;color:#2b1b0d}
 .ccsheet-win{background:rgba(255,215,0,.45);border-radius:6px;outline:2px solid #b8860b}
 /* Tornado Splash: race track + card hand */
 .tsbar{position:sticky;top:0;z-index:30;background:rgba(15,23,42,.97);border:1px solid #334155;border-radius:12px;padding:8px;margin-bottom:8px}
@@ -355,6 +358,6 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <script data-cfasync="false" src="yahtzee.js?v=3"></script>
 <script data-cfasync="false" src="fliptoons.js?v=9"></script>
 <script data-cfasync="false" src="castlecombo-faces.js?v=1"></script>
-<script data-cfasync="false" src="castlecombo.js?v=2"></script>
+<script data-cfasync="false" src="castlecombo.js?v=6"></script>
 <script data-cfasync="false" src="tornado.js?v=2"></script>
 </body></html>

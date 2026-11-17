@@ -311,6 +311,14 @@ def card_name(inst):
 
 # ------------------------------------------------------------------ setup
 
+def normalize(g):
+    for key in ("decks", "discards", "rows", "mm_live"):
+        d = g.get(key)
+        if isinstance(d, dict):
+            g[key] = {int(k): v for k, v in d.items()}
+    return g
+
+
 def new_game(chat_id, creator_id, creator_name):
     return {
         "chat_id": int(chat_id), "created_by": int(creator_id),

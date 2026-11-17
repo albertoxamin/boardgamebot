@@ -641,6 +641,17 @@ def test_take_refuses_foreign_turn_and_pending():
     assert CC.do_take(g, 1, g["rows"][g["messenger"]][-1]["id"], False, []) != None
 
 
+def test_normalize_loaded_state_keys():
+    g = mk(2)
+    loaded = json.loads(json.dumps(g))
+    assert set(loaded["mm_live"]) == {"1", "2"}
+    assert CC.normalize(loaded) is loaded
+    for loc in (CC.CASTLE, CC.VILLAGE):
+        assert loaded["mm_live"][loc]
+        assert len(loaded["rows"][loc]) == 3
+        assert loaded["decks"][loc] and not loaded["discards"][loc]
+
+
 if __name__ == "__main__":
     for name, fn in sorted(globals().items()):
         if name.startswith("test_") and callable(fn):

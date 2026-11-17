@@ -149,6 +149,25 @@ function ccGrid(p){
  }
  return h+'</div>';
 }
+// BGA-style end-game score sheet: background art with printed labels
+// (entries 1..9, keys, total); our table overlays the player columns.
+function ccScoreSheet(b){
+ let rs=b.results;
+ let nameW=Math.min(97, Math.round(420/Math.max(rs.length,1)));
+ let h='<div class="ccsheet"><table class="ccsheet-t" style="--csnw:'+nameW+'px">'+
+  '<tr><th class="ccsheet-corner"></th>'+
+  rs.map(r=>'<th class="ccsheet-pname">'+escapeHtml(r.name)+'</th>').join('')+'</tr>';
+ for(let i=1;i<=9;i++){
+  h+='<tr><th class="ccsheet-lbl"></th>'+
+   rs.map(r=>'<td class="ccsheet-entry'+(i===9?' ccsheet-last':'')+'">'+((r.entries&&r.entries[i-1])||0)+'</td>').join('')+'</tr>';
+ }
+ h+='<tr><th class="ccsheet-lbl"></th>'+
+  rs.map(r=>'<td class="ccsheet-entry ccsheet-keys">'+(r.keys?('🗝️'+r.keys):'')+'</td>').join('')+'</tr>'+
+  '<tr><th class="ccsheet-lbl ccsheet-totlbl"></th>'+
+  rs.map(r=>'<td class="ccsheet-entry ccsheet-total'+(r.idx===b.winner?' ccsheet-win':'')+'">'+r.score+'</td>').join('')+'</tr>'+
+  '</table></div>';
+ return h;
+}
 // Clickable placement grid: the pending player's tableau extended by one
 // ring, with the valid spots as dashed slots (pending.kind === 'place').
 function ccPlaceGrid(b){
@@ -184,8 +203,10 @@ function ccRender(){
   t.textContent='🏆 Game over!';
   if(b.winner!=null){let w=b.players[b.winner]; parts.push('<div class="table lobby-note">Winner: <b>'+escapeHtml(w.name)+'</b>!</div>');}
   else parts.push('<div class="table lobby-note">It\'s a draw!</div>');
-  if(b.results)parts.push('<div class="table"><div class="small">Final scores</div>'+
+  if(b.results&&b.results[0].entries)parts.push(ccScoreSheet(b));
+  else if(b.results)parts.push('<div class="table"><div class="small">Final scores</div>'+
    b.results.map(r=>'<div>'+escapeHtml(r.name)+' — <b>'+r.score+'</b> pts'+(r.leftover?' ('+r.leftover+'g tiebreak)':'')+'</div>').join('')+'</div>');
+  if(b.results&&b.results.length>1)parts.push('<div class="table lobby-note small">Tiebreak: leftover gold</div>');
  } else {
   let mloc=b.messenger===1?'🏰 Castle':'🏘️ Village';
   t.textContent=isActor?(b.pending?'👉 Your choice':'👉 Your turn — take from '+mloc):(cur?'👉 '+escapeHtml(cur.name)+'\'s turn':'…');

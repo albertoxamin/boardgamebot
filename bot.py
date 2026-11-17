@@ -2823,7 +2823,8 @@ def castlecombo_board_json(g, viewer_id=None):
     results = None
     if g.get("results"):
         results = [{"idx": r["idx"], "name": r["name"], "score": r["score"],
-                    "leftover": r["leftover"]} for r in g["results"]]
+                    "leftover": r["leftover"], "keys": r.get("keys", 0),
+                    "entries": r.get("entries")} for r in g["results"]]
     return {
         "chat_id": g["chat_id"], "phase": g["phase"],
         "round": g["round"], "messenger": g["messenger"],
@@ -4472,11 +4473,13 @@ def start_web_server(state):
             if u.path == "/castlecombo-messenger.png":
                 p = os.path.join(os.path.dirname(JS_PATH), "castlecombo-messenger.png")
                 return self._send(200, open(p, "rb").read(), "image/png", cache="public, max-age=86400")
-            if u.path.startswith("/cc-icons/") and u.path.endswith((".png", ".woff")):
+            if u.path.startswith("/cc-icons/") and u.path.endswith((".png", ".woff", ".jpg")):
                 p = os.path.join(os.path.dirname(JS_PATH), "cc-icons",
                                  os.path.basename(u.path))
                 if os.path.exists(p):
-                    ctype = "font/woff" if u.path.endswith(".woff") else "image/png"
+                    ctype = ("font/woff" if u.path.endswith(".woff")
+                             else "image/jpeg" if u.path.endswith(".jpg")
+                             else "image/png")
                     return self._send(200, open(p, "rb").read(), ctype, cache="public, max-age=86400")
                 return self._send(404, {"ok": False})
             if u.path in ("/spots-dogs.webp", "/spots-dogs-scored.webp"):

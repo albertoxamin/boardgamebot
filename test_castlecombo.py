@@ -579,6 +579,10 @@ def test_end_game_explicit_winner():
     # 2 keys + 8 (Duchess top row) + 6 (Knight: 3 per blue in his row/col)
     assert g["results"][0]["score"] == 16
     assert g["results"][1]["score"] == 2
+    # score sheet entries: sum(entries) + keys == total
+    for r in g["results"]:
+        assert len(r["entries"]) == CC.ROUNDS
+        assert sum(r["entries"]) + r["keys"] == r["score"], r
 
 
 def test_preview_score_fills_purses():

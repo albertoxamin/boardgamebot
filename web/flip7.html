@@ -205,6 +205,21 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 .ccwrap{position:relative}
 .cczcard .cctile{cursor:default}
 .zcard-big{width:132px;height:186px}
+/* End-game score sheet over the printed BGA art (563x750 -> 281.5x375 at 50%):
+   labels x 52-290, rows: header 13-52, entries 1-9 at 25.5px each,
+   keys 238-280, total 283-344, player cols 97px + 3px gap. */
+.ccsheet{background:url(cc-icons/castlecombo-endscore.jpg) center/100% 100% no-repeat;width:281.5px;height:375px;margin:12px auto 28px;position:relative;overflow:hidden}
+.ccsheet-t{position:absolute;left:0;top:8px;border-collapse:separate;border-spacing:0;table-layout:fixed;--csnh:25.5px}
+.ccsheet-pname{font-size:9px;line-height:1.1;font-weight:700;height:19.5px;width:var(--csnw);padding:0 1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#333;vertical-align:middle}
+.ccsheet-corner{width:26px;padding:0}
+.ccsheet-entry{text-align:center;vertical-align:middle;font-size:11px;font-weight:700;height:var(--csnh);width:var(--csnw);padding:0;color:#3b2b1d}
+.ccsheet-lbl{padding:0;width:26px}
+.ccsheet-last{font-size:9px;color:#6b5330}
+.ccsheet-keyslbl,.ccsheet-totlbl{height:21px}
+.ccsheet-keys{height:21px;font-size:10px}
+.ccsheet-totlbl{height:30.5px}
+.ccsheet-total{height:30.5px;font-size:14px;color:#2b1b0d}
+.ccsheet-win{background:rgba(255,215,0,.45);border-radius:6px;outline:2px solid #b8860b}
 /* Tornado Splash: race track + card hand */
 .tsbar{position:sticky;top:0;z-index:30;background:rgba(15,23,42,.97);border:1px solid #334155;border-radius:12px;padding:8px;margin-bottom:8px}
 .tsracer{background:rgba(15,23,42,.85);border:2px solid #334155;border-radius:10px;padding:6px 8px;margin:4px 0}

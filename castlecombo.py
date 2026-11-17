@@ -1088,8 +1088,15 @@ def _end_game(g, events):
     for i, p in enumerate(g["players"]):
         left = store_leftover_gold(p)
         score, breakdown = score_player(g, i)
+        slots = _norm_slots(p)
+        # Per-round score sheet entries: tableau placement order == round
+        # order; every card is re-evaluated in the final tableau (BGA-style).
+        entries = [score_card(g, p, p["tableau"][r], slots, p["keys"])
+                   if r < len(p["tableau"]) else 0
+                   for r in range(ROUNDS)]
         results.append({"idx": i, "name": p["name"], "score": score,
-                        "leftover": left, "breakdown": breakdown})
+                        "leftover": left, "breakdown": breakdown,
+                        "entries": entries, "keys": p["keys"]})
     mx = max(r["score"] for r in results)
     tops = [r for r in results if r["score"] == mx]
     if len(tops) > 1:

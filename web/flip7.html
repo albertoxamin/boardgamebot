@@ -173,6 +173,21 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 .ftopts button{font-size:14px;padding:8px 12px}
 .ftprompt{font-size:12px;font-weight:700;color:#f59e0b;text-align:center;margin:4px 0 0}
 .ftdismiss{background:#7f1d1d;color:#fff}
+/* Castle Combo: BGA sprite sheet 10 cols x 8 rows, card id = t (t%10, floor(t/10));
+   sheet served at 1320x1488, display cell 44x62 (bg 440x496), zoom 132x186 */
+.cctile{width:44px;height:62px;border-radius:6px;background-repeat:no-repeat;background-color:#1e293b;box-shadow:1px 2px 3px #0008;flex:none;cursor:pointer}
+.cctile.ccfd{cursor:default;filter:brightness(.75)}
+.ccempty{opacity:.25;background-color:#1e293b}
+.cccbtns{display:flex;gap:2px;margin:2px 0 0}
+.cccbtns button{font-size:11px;padding:4px 5px;margin:0;flex:1;white-space:nowrap}
+.ccrow{display:flex;gap:6px;flex-wrap:wrap;justify-content:center;margin:6px 0}
+.ccslot{display:flex;flex-direction:column;align-items:center}
+.ccgrid{display:grid;gap:3px;margin-top:6px;justify-content:center}
+.ccgrid.empty{min-height:10px}
+.ccwrap{position:relative}
+.ccgold{position:absolute;bottom:1px;right:2px;background:#000b;color:#fbbf24;border-radius:4px;padding:0 3px;font-size:10px;font-weight:900;line-height:14px}
+.cczcard .cctile{cursor:default}
+.zcard-big{width:132px;height:186px}
 /* Tornado Splash: race track + card hand */
 .tsbar{position:sticky;top:0;z-index:30;background:rgba(15,23,42,.97);border:1px solid #334155;border-radius:12px;padding:8px;margin-bottom:8px}
 .tsracer{background:rgba(15,23,42,.85);border:2px solid #334155;border-radius:10px;padding:6px 8px;margin:4px 0}
@@ -263,6 +278,15 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <div class="log" id="ftLog"></div>
 <div id="ftZoom" class="ftzoom"></div>
 </div>
+<div id="castlecombo" class="hidden">
+<div id="ccTurn" style="font-size:18px;font-weight:700;background:#1e293b;border-radius:10px;padding:8px 10px;margin-bottom:8px"></div>
+<div id="ccBoard"></div>
+<button class="primary hidden" id="ccJoin">🙋 Join Castle Combo</button>
+<button class="primary hidden" id="ccStart">🎮 Start game</button>
+<button class="primary hidden" id="ccRematch">🔄 Rematch!</button>
+<div class="log" id="ccLog"></div>
+<div id="ccZoom" class="ftzoom"></div>
+</div>
 <div id="tornado" class="hidden">
 <div id="tsTurn" style="font-size:18px;font-weight:700"></div>
 <div id="tsBoard"></div>
@@ -298,5 +322,6 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <script data-cfasync="false" src="spots.js?v=14"></script>
 <script data-cfasync="false" src="yahtzee.js?v=3"></script>
 <script data-cfasync="false" src="fliptoons.js?v=9"></script>
+<script data-cfasync="false" src="castlecombo.js?v=1"></script>
 <script data-cfasync="false" src="tornado.js?v=2"></script>
 </body></html>

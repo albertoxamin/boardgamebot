@@ -12,6 +12,7 @@ let G=null;
   else if(String(start).startsWith('yahtzee')){document.getElementById('yahtzee').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='🎲 Yahtzee';}
   else if(String(start).startsWith('fliptoons')){document.getElementById('fliptoons').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='🦋 Fliptoons';}
   else if(String(start).startsWith('tornado')){document.getElementById('tornado').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='🛥️ Tornado Splash';}
+  else if(String(start).startsWith('castlecombo')){document.getElementById('castlecombo').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='🏰 Castle Combo';}
  }catch(e){}})();
 function buildDeck(){let d=[{k:'n',v:0}];for(let n=1;n<=12;n++)for(let i=0;i<n;i++)d.push({k:'n',v:n});
 ['+2','+4','+6','+8','+10','x2'].forEach(m=>d.push({k:'m',v:m}));
@@ -227,4 +228,4 @@ document.getElementById('syncStart').addEventListener('click',()=>move('start'))
 document.getElementById('syncRematch').addEventListener('click',()=>move('rematch'));
 (function autoSync(){let tg=tgInit(); if(!tg.id)return;
  // Regicide/Odin/LSD/Spots modes are started by their own scripts (loaded after this file).
-  if(document.getElementById('regicide').classList.contains('hidden')&&document.getElementById('odin').classList.contains('hidden')&&document.getElementById('lsd').classList.contains('hidden')&&document.getElementById('spots').classList.contains('hidden')&&document.getElementById('yahtzee').classList.contains('hidden')&&document.getElementById('fliptoons').classList.contains('hidden')) loadGames();})();
+  if(document.getElementById('regicide').classList.contains('hidden')&&document.getElementById('odin').classList.contains('hidden')&&document.getElementById('lsd').classList.contains('hidden')&&document.getElementById('spots').classList.contains('hidden')&&document.getElementById('yahtzee').classList.contains('hidden')&&document.getElementById('fliptoons').classList.contains('hidden')&&document.getElementById('castlecombo').classList.contains('hidden')) loadGames();})();

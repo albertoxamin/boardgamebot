@@ -16,6 +16,7 @@ import lsd as D
 import spots as SP
 import yahtzee as Y
 import fliptoons as FT
+import castlecombo as CC
 import tornado as TS
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT_TOKEN", "")
@@ -46,6 +47,7 @@ HELP = """🎴 <b>Boardgame bot</b>
 /spots - push-your-luck dog dice (also /spots_join /spots_start /spots_trick /spots_place /spots_reroll /spots_score /spots_cancel /spots_rules)
 /yahtzee - dice scorecard classic (also /yahtzee_join /yahtzee_start /yahtzee_roll /yahtzee_score /yahtzee_cancel /yahtzee_rules)
 /fliptoons - grid-building card market (also /fliptoons_join /fliptoons_start /fliptoons_hire /fliptoons_dismiss /fliptoons_skip /fliptoons_choose /fliptoons_cancel /fliptoons_rules)
+/castlecombo - deck-building Castle Combo (also /castlecombo_join /castlecombo_start /castlecombo_buy /castlecombo_flip /castlecombo_key /castlecombo_choose /castlecombo_cancel /castlecombo_rules)
 /tornado - jet-ski racing Tornado Splash (also /tornado_join /tornado_start /tornado_pick /tornado_play /tornado_wait /tornado_hand /tornado_next /tornado_cancel /tornado_rules)
 /games - list the games you can start (and what's running here)
 🤖 /join_npc (or /&lt;game&gt;_join_npc) - add a mock player anyone can control, in the lobby
@@ -112,7 +114,7 @@ COVERS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "co
 COVERS = {"games": "flip7.jpg", "flip7": "flip7.jpg", "regicide": "regicide.jpg",
           "odin": "odin.jpg", "lsd": "lsd.jpg", "spots": "spots.jpg",
           "yahtzee": "yahtzee.jpg", "fliptoons": "fliptoons.jpg",
-          "tornado": "tornado.jpg"}
+          "tornado": "tornado.jpg", "castlecombo": "castlecombo.jpg"}
 
 
 def cover_path(game):
@@ -230,23 +232,23 @@ def web_keyboard(chat_type="private", chat_id=None, game="flip7"):
     startapp=<game><chat_id> (no second BotFather app needed)."""
     if not WEB_URL:
         return None
-    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "lsd": "🎮 Play Summon Demons (HTML)", "spots": "🎮 Play Spots (HTML)", "yahtzee": "🎮 Play Yahtzee (HTML)", "fliptoons": "🎮 Play Fliptoons (HTML)", "tornado": "🎮 Play Tornado Splash (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
+    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "lsd": "🎮 Play Summon Demons (HTML)", "spots": "🎮 Play Spots (HTML)", "yahtzee": "🎮 Play Yahtzee (HTML)", "fliptoons": "🎮 Play Fliptoons (HTML)", "tornado": "🎮 Play Tornado Splash (HTML)", "castlecombo": "🎮 Play Castle Combo (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
     if chat_type in ("group", "supergroup", "channel"):
         if chat_id:
-            start = f"{game}{chat_id}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado") else str(chat_id)
+            start = f"{game}{chat_id}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo") else str(chat_id)
             url = f"https://t.me/flip7groupbot?startapp={start}"
         else:
             url = WEB_URL
         btn = {"text": label, "url": url}
     else:
-        url = WEB_URL + (f"?app={game}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado") else "")
+        url = WEB_URL + (f"?app={game}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo") else "")
         btn = {"text": label, "web_app": {"url": url}}
     return [[btn]]
 
 
 # ---------- State ----------
 def load_state():
-    s = {"games": {}, "regicide": {}, "odin": {}, "lsd": {}, "spots": {}, "yahtzee": {}, "fliptoons": {}, "tornado": {}}
+    s = {"games": {}, "regicide": {}, "odin": {}, "lsd": {}, "spots": {}, "yahtzee": {}, "fliptoons": {}, "tornado": {}, "castlecombo": {}}
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE) as f:
@@ -261,6 +263,7 @@ def load_state():
     s.setdefault("yahtzee", {})
     s.setdefault("fliptoons", {})
     s.setdefault("tornado", {})
+    s.setdefault("castlecombo", {})
     return s
 
 
@@ -282,7 +285,8 @@ def _npc_player():
 
 
 NPC_MAX = {"games": 6, "regicide": 4, "odin": 6, "lsd": 5, "spots": 4,
-           "yahtzee": Y.MAX_PLAYERS, "tornado": TS.MAX_PLAYERS, "fliptoons": 4}
+           "yahtzee": Y.MAX_PLAYERS, "tornado": TS.MAX_PLAYERS, "fliptoons": 4,
+           "castlecombo": CC.MAX_PLAYERS}
 NPC_FULL = {
     "games": "⛔ Game is full.",
     "regicide": "⛔ Regicide is 2-4 players (full).",
@@ -292,6 +296,7 @@ NPC_FULL = {
     "yahtzee": f"⛔ Yahtzee is 2-{Y.MAX_PLAYERS} players (full).",
     "tornado": f"⛔ Tornado Splash is 2-{TS.MAX_PLAYERS} players (full).",
     "fliptoons": "⛔ Fliptoons is 2-4 players (full).",
+    "castlecombo": f"⛔ Castle Combo is 2-{CC.MAX_PLAYERS} players (full).",
 }
 
 
@@ -322,6 +327,9 @@ def add_npc(key, g):
         p = {**_npc_player(), **TS.new_player(NPC_ID, "🤖 NPC")}
     elif key == "fliptoons":
         p = _ft_player(NPC_ID, "🤖 NPC")
+        p["npc"] = True
+    elif key == "castlecombo":
+        p = CC.new_player(NPC_ID, "🤖 NPC")
         p["npc"] = True
     g["players"].append(p)
     return None
@@ -2475,15 +2483,427 @@ def fliptoons_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
+# ============================================================ Castle Combo
+CASTLECOMBO_RULES = """🏰 <b>Castle Combo rules</b> (2-5 players): a deck-building tableau game. Build a 3×3 grid of cards and score points from shields, sets, positions and stored gold.
+
+• Each player starts with <b>15 gold</b> and <b>2 keys</b>. On your turn take exactly <b>one</b> card from the <b>messenger's</b> display (the Castle 🏰 or Village 🏘️ row it points to) and place it in your 3×3 grid, or spend a key.
+• <b>Buy</b> a card face-up for its gold cost, then resolve its ability. <b>Flip</b> it face-down instead: gain <b>+6 gold and +2 keys</b>, but it has no ability, no shields, no purse and scores 0.
+• Cards with a pennant 🚩 move the <b>messenger to the opposite row</b> of their own deck (Castle→Village, Village→Castle).
+• Spend a key to either <b>move</b> the messenger to the other row or <b>renew</b> the current display (discard it and draw 3 fresh cards).
+• Placement: cards must be orthogonally adjacent to one you own and never make a 4th card in a row/column; your first card goes anywhere.
+• After everyone has taken <b>9 cards</b> each (or both displays run out), the game ends. Leftover gold is stored on your purses (largest capacity first).
+• <b>Scoring:</b> 1 point per key left + each face-up card's printed value (shields in its row/column, position bonuses, sets, purses…).
+• Most points wins; ties break on leftover (unstored) gold."""
+
+CC_LOC_EMOJI = {CC.CASTLE: "🏰", CC.VILLAGE: "🏘️"}
+CC_LOC_NAME = {CC.CASTLE: "Castle", CC.VILLAGE: "Village"}
+
+
+def castlecombo_get(state, chat_id):
+    return state.setdefault("castlecombo", {}).get(str(chat_id))
+
+
+def _cc_card_label(inst):
+    if inst.get("fd"):
+        return "?"
+    return CC.card_of(inst)["name"]
+
+
+def castlecombo_actor(g):
+    """Index of the player who must act now, or None (game over)."""
+    if g.get("pending"):
+        return g["pending"]["player"]
+    if g["phase"] == "playing":
+        return g.get("current")
+    return None
+
+
+def _cc_tableau_lines(p):
+    if not p["tableau"]:
+        return ["  (empty)"]
+    xs = [c["x"] for c in p["tableau"]]
+    ys = [c["y"] for c in p["tableau"]]
+    x0, x1, y0, y1 = min(xs), max(xs), min(ys), max(ys)
+    out = []
+    for y in range(y0, y1 + 1):
+        cells = []
+        for x in range(x0, x1 + 1):
+            inst = next((c for c in p["tableau"]
+                         if c["x"] == x and c["y"] == y), None)
+            if inst is None:
+                cells.append("[·]")
+            elif inst["fd"]:
+                cells.append("[?]")
+            else:
+                nm = CC.card_of(inst)["name"]
+                cells.append(f"[{nm}]")
+        out.append("  " + " ".join(cells))
+    return out
+
+
+def _cc_display_line(g, loc):
+    row = g["rows"][loc]
+    if not g["mm_live"][loc]:
+        return "— (out of cards)"
+    if not row:
+        return "(empty)"
+    parts = []
+    for inst in row:
+        card = CC.card_of(inst)
+        mm = "🚩" if card["mm"] else ""
+        pur = f"💰{card['purse']}" if card["purse"] else ""
+        parts.append(f"{card['name']} {card['cost']}g{mm}{pur}")
+    return " · ".join(parts)
+
+
+def castlecombo_board_text(g):
+    if g["phase"] == "lobby":
+        return (f"🏰 <b>Castle Combo lobby</b> - {len(g['players'])}/"
+                f"{CC.MAX_PLAYERS} players. Friends: /castlecombo_join, "
+                f"anyone: /castlecombo_start")
+    if g["phase"] == "game_end":
+        if g.get("winner") is not None:
+            w = g["players"][g["winner"]]
+            res = g.get("results") or []
+            score = next((r["score"] for r in res if r["idx"] == g["winner"]),
+                         "?")
+            return (f"🏆 <b>Castle Combo game over</b> - winner: "
+                    f"<b>{html.escape(w['name'])}</b> with {score} points!")
+        return "🤝 <b>Castle Combo game over</b> - it's a draw!"
+    actor = castlecombo_actor(g)
+    cur = CC_LOC_NAME[g["messenger"]]
+    lines = [f"🏰 <b>Castle Combo</b> · round {g['round']}/9 · "
+             f"messenger at {CC_LOC_EMOJI[g['messenger']]} {cur}"]
+    for i, p in enumerate(g["players"]):
+        mark = " 👈" if i == actor else ""
+        loc_txt = (f"{CC_LOC_EMOJI[CC.CASTLE]} Castle: {_cc_display_line(g, CC.CASTLE)}"
+                   f" · {CC_LOC_EMOJI[CC.VILLAGE]} Village: "
+                   f"{_cc_display_line(g, CC.VILLAGE)}")
+        lines.append(f"• <b>{html.escape(p['name'])}</b> · "
+                     f"{p['gold']} gold · {p['keys']} keys · "
+                     f"{len(p['tableau'])}/9 cards{mark}")
+        lines.extend(_cc_tableau_lines(p))
+    lines.append("🛒 " + loc_txt)
+    if g.get("pending"):
+        lines.append(f"❓ {html.escape(g['pending']['prompt'])}")
+    return "\n".join(lines)
+
+
+def castlecombo_keyboard(g):
+    if g["phase"] == "game_end":
+        return [[{"text": "🔄 Rematch!", "callback_data": "cc:rematch"}]]
+    ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
+    wk = web_keyboard(ct, g["chat_id"], game="castlecombo")
+    if g["phase"] == "lobby":
+        kb = [[{"text": "🙋 Join Castle Combo", "callback_data": "cc:join"}]]
+        if not any(p.get("npc") for p in g["players"]):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "cc:npc"}])
+        return kb + (wk or [])
+    kb = []
+    pend = g.get("pending")
+    if pend:
+        for j in range(0, len(pend["options"]), 2):
+            kb.append([{"text": o["label"][:60], "callback_data": f"cc:ch:{o['v']}"}
+                       for o in pend["options"][j:j + 2]])
+    else:
+        row = g["rows"][g["messenger"]]
+        p = g["players"][g["current"]]
+        for inst in row:
+            card = CC.card_of(inst)
+            cost = CC.cost_for(g, g["current"], card)
+            afford = p["gold"] >= cost
+            label = f"{card['name']} ({cost}g)"
+            kb.append([
+                {"text": f"🛒 {label}" if afford else f"🚫 {label}",
+                 "callback_data": f"cc:buy:{inst['id']}"},
+                {"text": f"🔄 Flip {card['name']}",
+                 "callback_data": f"cc:flip:{inst['id']}"},
+            ])
+        if p["keys"] > 0:
+            kb.append([
+                {"text": "🔑 Move messenger",
+                 "callback_data": "cc:move"},
+                {"text": "🔑 Renew display",
+                 "callback_data": "cc:renew"},
+            ])
+    if wk:
+        kb.extend(wk)
+    return kb or None
+
+
+def castlecombo_mention(g, user_id):
+    return f'<a href="tg://user?id={user_id}">{html.escape(CC.name_of(g, user_id))}</a>'
+
+
+def castlecombo_render(g, events=None):
+    chat_id = g["chat_id"]
+    if events is None:
+        events = []
+    lines = [html.escape(e) for e in events]
+    if g["phase"] == "playing":
+        idx = castlecombo_actor(g)
+        if idx is not None:
+            p = g["players"][idx]
+            if g.get("pending"):
+                lines.append(f"👉 {castlecombo_mention(g, p['user_id'])} - "
+                             f"{html.escape(g['pending']['prompt'])}")
+            else:
+                ping = ("👉 🤖 NPC's turn - anyone can play for it!" if p.get("npc")
+                        else f"👉 {castlecombo_mention(g, p['user_id'])} - your turn")
+                lines.append(ping)
+    text = "\n".join(lines + [castlecombo_board_text(g)]) if lines else castlecombo_board_text(g)
+    kb = castlecombo_keyboard(g)
+    r = send_board(g, "castlecombo", text, kb)
+    if r.get("ok"):
+        old = g.get("board_message_id")
+        g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=chat_id, message_id=old)
+
+
+def handle_castlecombo(state, msg, cmd, text, uid, name):
+    chat_id = msg["chat"]["id"]
+    g = castlecombo_get(state, chat_id)
+    if cmd == "/castlecombo_rules":
+        send(chat_id, CASTLECOMBO_RULES)
+        return True
+    if cmd == "/castlecombo":
+        if not g:
+            name = msg.get("from", {}).get("first_name") or "Player"
+            g = CC.new_game(chat_id, uid, name)
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state.setdefault("castlecombo", {})[str(chat_id)] = g
+            castlecombo_render(g, [f"🏰 Castle Combo game created by {name}!"])
+        else:
+            castlecombo_render(g)
+        return True
+    if not g:
+        send(chat_id, "No Castle Combo game here yet - send /castlecombo to create one.")
+        return True
+    g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd == "/castlecombo_join_npc":
+        err = add_npc("castlecombo", g)
+        if err:
+            send(chat_id, err)
+        else:
+            send(chat_id, "🤖 NPC joined - anyone can play for it!")
+            castlecombo_render(g)
+        return True
+    if cmd == "/castlecombo_join":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p["user_id"] == uid for p in g["players"]):
+            send(chat_id, "You're already in!")
+        elif len(g["players"]) >= CC.MAX_PLAYERS:
+            send(chat_id, NPC_FULL["castlecombo"])
+        else:
+            g["players"].append(CC.new_player(
+                uid, msg.get("from", {}).get("first_name") or "Player"))
+            send(chat_id, f"🙋 <b>{name}</b> joined Castle Combo "
+                          f"({len(g['players'])} players).")
+            castlecombo_render(g)
+        return True
+    if cmd == "/castlecombo_start":
+        if g["phase"] != "lobby":
+            send(chat_id, "Already started.")
+        elif len(g["players"]) < 2:
+            send(chat_id, "⛔ Need at least 2 players.")
+        else:
+            ev = []
+            err = CC.start_game(g, ev)
+            if err:
+                send(chat_id, f"⛔ {err}")
+            else:
+                castlecombo_render(g, ev)
+        return True
+    if cmd == "/castlecombo_cancel":
+        if uid != g["created_by"]:
+            send(chat_id, "⛔ Only the creator can cancel.")
+        else:
+            del state["castlecombo"][str(chat_id)]
+            send(chat_id, "🗑 Castle Combo game cancelled.")
+        return True
+    if cmd in ("/castlecombo_buy", "/castlecombo_flip", "/castlecombo_move",
+               "/castlecombo_renew", "/castlecombo_choose"):
+        ref = castlecombo_actor(g)
+        if ref is None:
+            send(chat_id, "⛔ Nothing to do right now.")
+            return True
+        idx = _actor_idx(g, uid, ref)
+        if idx is None:
+            send(chat_id, "⛔ You're not in this Castle Combo game - /castlecombo_join in lobby.")
+            return True
+        parts = text.split()[1:]
+        ev = []
+        if cmd == "/castlecombo_move":
+            err = CC.do_key(g, idx, "move", ev)
+        elif cmd == "/castlecombo_renew":
+            err = CC.do_key(g, idx, "renew", ev)
+        elif cmd == "/castlecombo_buy":
+            if not parts or not parts[0].isdigit():
+                send(chat_id, "Usage: /castlecombo_buy &lt;card id&gt;")
+                return True
+            err = CC.do_take(g, idx, int(parts[0]), False, ev)
+        elif cmd == "/castlecombo_flip":
+            if not parts or not parts[0].isdigit():
+                send(chat_id, "Usage: /castlecombo_flip &lt;card id&gt;")
+                return True
+            err = CC.do_take(g, idx, int(parts[0]), True, ev)
+        else:
+            pend = g.get("pending")
+            if not pend:
+                send(chat_id, "No pending choice right now.")
+                return True
+            want = " ".join(parts).lower()
+            opt = next((o for o in pend["options"]
+                        if str(o["v"]).lower() == want
+                        or o["label"].lower() == want), None)
+            if opt is None:
+                send(chat_id, "⛔ Unknown choice. Options: " +
+                     ", ".join(str(o["v"]) for o in pend["options"]))
+                return True
+            err = CC.apply_choice(g, idx, str(opt["v"]), ev)
+        if err:
+            send(chat_id, f"⛔ {err}")
+        else:
+            castlecombo_render(g, ev)
+        return True
+    return False
+
+
+def _cc_card_json(g, inst, hidden=False):
+    card = CC.card_of(inst)
+    if hidden:
+        return {"iid": inst["id"], "cid": 0, "name": "?", "fd": True,
+                "x": inst["x"], "y": inst["y"], "gold": 0, "purse": 0,
+                "loc": card["loc"], "cost": card["cost"], "txt": ""}
+    return {"iid": inst["id"], "cid": card["id"], "name": card["name"],
+            "fd": inst["fd"], "x": inst["x"], "y": inst["y"],
+            "gold": inst["gold"], "purse": card["purse"], "loc": card["loc"],
+            "cost": card["cost"], "sh": card["sh"], "disc": card["disc"],
+            "mm": card["mm"], "txt": card["txt"]}
+
+
+def castlecombo_board_json(g, viewer_id=None):
+    me = next((p for p in g["players"] if p["user_id"] == viewer_id), None)
+    actor = castlecombo_actor(g)
+    can_act = bool(actor is not None and (
+        g["players"][actor]["user_id"] == viewer_id
+        or g["players"][actor].get("npc")))
+    players = []
+    for i, p in enumerate(g["players"]):
+        players.append({
+            "user_id": p["user_id"], "name": p["name"],
+            "npc": bool(p.get("npc")), "gold": p["gold"], "keys": p["keys"],
+            "cards": len(p["tableau"]),
+            "tableau": [_cc_card_json(g, c, c["fd"]) for c in p["tableau"]],
+            "is_current": i == actor,
+        })
+    rows = {}
+    for loc in (CC.CASTLE, CC.VILLAGE):
+        rows[str(loc)] = {
+            "live": g["mm_live"][loc],
+            "cards": [{"iid": c["id"], "cid": CC.card_of(c)["id"],
+                       "name": CC.card_of(c)["name"],
+                       "cost": CC.cost_for(g, g["current"], CC.card_of(c))
+                       if g["phase"] == "playing" else CC.card_of(c)["cost"],
+                       "mm": CC.card_of(c)["mm"],
+                       "purse": CC.card_of(c)["purse"],
+                       "txt": CC.card_of(c)["txt"]}
+                      for c in g["rows"][loc]]
+            if g["mm_live"][loc] else [],
+        }
+    pend = g.get("pending")
+    pending = None
+    if pend:
+        pending = {"kind": pend["kind"], "player": pend["player"],
+                   "prompt": pend["prompt"],
+                   "options": [{"v": o["v"], "label": o["label"]}
+                               for o in pend["options"]]}
+    results = None
+    if g.get("results"):
+        results = [{"idx": r["idx"], "name": r["name"], "score": r["score"],
+                    "leftover": r["leftover"]} for r in g["results"]]
+    return {
+        "chat_id": g["chat_id"], "phase": g["phase"],
+        "round": g["round"], "messenger": g["messenger"],
+        "mm_live": {str(k): v for k, v in g["mm_live"].items()},
+        "actor": actor, "can_act": can_act, "is_player": me is not None,
+        "winner": g.get("winner"), "pending": pending,
+        "rows": rows, "players": players, "results": results,
+        "max_players": CC.MAX_PLAYERS,
+    }
+
+
+def castlecombo_api_move(state, chat_id, user_id, body):
+    g = castlecombo_get(state, chat_id)
+    if not g:
+        return [], "no castlecombo game in that chat"
+    idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
+    action = body.get("action")
+    ev = []
+    if action == "join":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        if idx is not None:
+            return ev, None
+        if len(g["players"]) >= CC.MAX_PLAYERS:
+            return [], "full"
+        iu_name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
+        g["players"].append(CC.new_player(user_id, iu_name))
+        ev.append("🙋 joined Castle Combo.")
+    elif action == "start":
+        if g["phase"] != "lobby":
+            return [], "already started"
+        err = CC.start_game(g, ev)
+        if err:
+            return [], err
+    elif action == "rematch":
+        return rematch_game(state, "castlecombo", chat_id, user_id)
+    else:
+        ref = castlecombo_actor(g)
+        if ref is None:
+            return [], "nothing to do right now"
+        idx = _actor_idx(g, user_id, ref)
+        if idx is None:
+            return [], "not in this game"
+        if action == "buy":
+            try:
+                iid = int(body.get("iid"))
+            except (TypeError, ValueError):
+                return [], "bad card"
+            err = CC.do_take(g, idx, iid, False, ev)
+        elif action == "flip":
+            try:
+                iid = int(body.get("iid"))
+            except (TypeError, ValueError):
+                return [], "bad card"
+            err = CC.do_take(g, idx, iid, True, ev)
+        elif action == "move":
+            err = CC.do_key(g, idx, "move", ev)
+        elif action == "renew":
+            err = CC.do_key(g, idx, "renew", ev)
+        elif action == "choose":
+            err = CC.apply_choice(g, idx, str(body.get("choice", "")), ev)
+        else:
+            return [], "unknown action"
+        if err:
+            return [], err
+    castlecombo_render(g, ev)
+    return ev, None
+
+
 REMATCH_END_PHASES = {"games": ("game_end",), "regicide": ("won", "lost"),
                      "odin": ("game_end",), "lsd": ("game_end",), "spots": ("game_end",),
                      "yahtzee": ("game_end",), "fliptoons": ("game_end",),
-                     "tornado": ("race_end", "game_end")}
+                     "tornado": ("race_end", "game_end"),
+                     "castlecombo": ("game_end",)}
 
 
 RENDERERS = {"games": render, "regicide": rg_render, "odin": odin_render,
              "lsd": lsd_render, "spots": spots_render, "yahtzee": yahtzee_render,
-             "fliptoons": fliptoons_render, "tornado": tornado_render}
+             "fliptoons": fliptoons_render, "tornado": tornado_render,
+             "castlecombo": castlecombo_render}
 
 
 def rematch_game(state, key, chat_id, uid):
@@ -2508,11 +2928,13 @@ def rematch_game(state, key, chat_id, uid):
                                "yard": [], "treats": 1},
         "yahtzee": lambda u, n: Y.new_player(u, n),
         "fliptoons": lambda u, n: _ft_player(u, n),
+        "castlecombo": lambda u, n: CC.new_player(u, n),
         "tornado": lambda u, n: TS.new_player(u, n),
     }
     news = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
             "lsd": D.new_game, "spots": SP.new_game, "yahtzee": Y.new_game,
-            "fliptoons": FT.new_game, "tornado": TS.new_game}
+            "fliptoons": FT.new_game, "tornado": TS.new_game,
+            "castlecombo": CC.new_game}
     chat_type = g.get("chat_type", "private")
     board_id = g.get("board_message_id")
     g.clear()
@@ -2570,6 +2992,7 @@ def handle_command(state, msg):
             ("spots", "🐶 Spots", "/spots", "/spots_join", "dog dice push-your-luck, 6 scored wins"),
             ("yahtzee", "🎲 Yahtzee", "/yahtzee", "/yahtzee_join", "dice scorecard, 13 boxes"),
             ("fliptoons", "🦋 Fliptoons", "/fliptoons", "/fliptoons_join", "grid-building card market, first to 30 fame"),
+            ("castlecombo", "🏰 Castle Combo", "/castlecombo", "/castlecombo_join", "deck-building tableau, 3×3 shields & sets"),
             ("tornado", "🛥️ Tornado Splash", "/tornado", "/tornado_join", "jet-ski racing cards, first to the finish"),
         )
         lines = ["🎮 <b>Games you can start:</b>"]
@@ -2592,7 +3015,7 @@ def handle_command(state, msg):
         # Reply-targeted cancel: cancels the one game whose board message
         # was replied to (searches every game type in this chat).
         _mid = msg["reply_to_message"].get("message_id")
-        for _key in ("games", "regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado"):
+        for _key in ("games", "regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo"):
             _gg = state.get(_key, {}).get(str(chat_id))
             if _gg is not None and _gg.get("board_message_id") == _mid:
                 del state[_key][str(chat_id)]
@@ -2618,6 +3041,9 @@ def handle_command(state, msg):
     if cmd.startswith("/fliptoons"):
         handle_fliptoons(state, msg, cmd, text, uid, name)
         return
+    if cmd.startswith("/castlecombo"):
+        handle_castlecombo(state, msg, cmd, text, uid, name)
+        return
     if cmd.startswith("/tornado"):
         handle_tornado(state, msg, cmd, text, uid, name)
         return
@@ -2634,7 +3060,8 @@ def handle_command(state, msg):
         _mid = (msg.get("reply_to_message") or {}).get("message_id") if msg.get("reply_to_message") else None
         _by_key = (("games", RULES), ("regicide", REGICIDE_RULES), ("odin", ODIN_RULES),
                    ("lsd", LSD_RULES), ("spots", SPOTS_RULES), ("yahtzee", YAHTZEE_RULES),
-                   ("fliptoons", FLIPTOONS_RULES), ("tornado", TORNADO_RULES))
+                   ("fliptoons", FLIPTOONS_RULES), ("tornado", TORNADO_RULES),
+                   ("castlecombo", CASTLECOMBO_RULES))
         if _mid:
             for _key, _rules in _by_key:
                 _gg = state.get(_key, {}).get(str(chat_id))
@@ -2712,7 +3139,7 @@ def handle_callback(state, cb):
     if data.endswith(":npc"):
         key = {"f7": "games", "rg": "regicide", "od": "odin", "lsd": "lsd",
                "spots": "spots", "yz": "yahtzee", "ts": "tornado",
-               "ft": "fliptoons"}.get(data.split(":")[0])
+               "ft": "fliptoons", "cc": "castlecombo"}.get(data.split(":")[0])
         g = state.get(key, {}).get(str(chat_id)) if key else None
         if not g:
             return answer_cb(cb["id"], "No game here.")
@@ -3098,6 +3525,59 @@ def handle_callback(state, cb):
             answer_cb(cb["id"], err or "Done")
             if not err:
                 fliptoons_render(ft, ev)
+        return
+    if data.startswith("cc:"):
+        cc = castlecombo_get(state, chat_id)
+        if not cc:
+            return answer_cb(cb["id"], "No Castle Combo game here.")
+        parts = data.split(":")
+        idx = next((i for i, p in enumerate(cc["players"]) if p["user_id"] == uid), None)
+        ev = []
+        if parts == ["cc", "join"]:
+            if cc["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            if idx is not None:
+                return answer_cb(cb["id"], "Already in!")
+            if len(cc["players"]) >= CC.MAX_PLAYERS:
+                return answer_cb(cb["id"], "Game is full.")
+            cc["players"].append(CC.new_player(
+                uid, cb["from"].get("first_name") or "Player"))
+            answer_cb(cb["id"], "Joined!")
+            castlecombo_render(cc, [f"🙋 {cb['from'].get('first_name')} joined Castle Combo."])
+        elif parts == ["cc", "start"]:
+            if cc["phase"] != "lobby":
+                return answer_cb(cb["id"], "Already started.")
+            err = CC.start_game(cc, ev)
+            answer_cb(cb["id"], err or "Started")
+            if not err:
+                castlecombo_render(cc, ev)
+        elif parts == ["cc", "rematch"]:
+            ev, err = rematch_game(state, "castlecombo", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
+        else:
+            ref = castlecombo_actor(cc)
+            if ref is None:
+                return answer_cb(cb["id"], "Nothing to do right now.")
+            idx = _actor_idx(cc, uid, ref)
+            if idx is None:
+                return answer_cb(cb["id"], "Not in this game.")
+            if len(parts) == 3 and parts[1] == "buy":
+                err = CC.do_take(cc, idx, int(parts[2]), False, ev)
+            elif len(parts) == 3 and parts[1] == "flip":
+                err = CC.do_take(cc, idx, int(parts[2]), True, ev)
+            elif parts == ["cc", "move"]:
+                err = CC.do_key(cc, idx, "move", ev)
+            elif parts == ["cc", "renew"]:
+                err = CC.do_key(cc, idx, "renew", ev)
+            elif len(parts) >= 3 and parts[1] == "ch":
+                err = CC.apply_choice(cc, idx, ":".join(parts[2:]), ev)
+            else:
+                return answer_cb(cb["id"], "Unknown button.")
+            answer_cb(cb["id"], err or "Done")
+            if not err:
+                castlecombo_render(cc, ev)
         return
     if data.startswith("od:"):
         od = odin_get(state, chat_id)
@@ -3983,6 +4463,9 @@ def start_web_server(state):
             if u.path == "/fliptoons.js":
                 p = os.path.join(os.path.dirname(JS_PATH), "fliptoons.js")
                 return self._send(200, open(p, "rb").read(), "text/javascript")
+            if u.path == "/castlecombo.js":
+                p = os.path.join(os.path.dirname(JS_PATH), "castlecombo.js")
+                return self._send(200, open(p, "rb").read(), "text/javascript")
             if u.path in ("/spots-dogs.webp", "/spots-dogs-scored.webp"):
                 p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
@@ -4024,6 +4507,9 @@ def start_web_server(state):
                 if os.path.exists(p):
                     return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
                 return self._send(404, {"ok": False})
+            if u.path == "/castlecombo-cards.webp":
+                p = os.path.join(os.path.dirname(JS_PATH), "castlecombo-cards.webp")
+                return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
             if u.path.startswith("/tornado_cards/") and u.path.endswith((".png", ".jpg", ".jpeg")):
                 _name = os.path.basename(u.path)
                 _ext = os.path.splitext(_name)[1].lower()
@@ -4127,6 +4613,25 @@ def start_web_server(state):
                 with STATE_LOCK:
                     g = fliptoons_get(state, chat_id)
                     board = fliptoons_board_json(g, uid) if g else None
+                return self._send(200 if board else 404, {"ok": bool(board), "game": board})
+            if u.path == "/api/castlecombo/mygames":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                with STATE_LOCK:
+                    games = [castlecombo_board_json(g, uid) for g in state.get("castlecombo", {}).values()
+                             if any(p["user_id"] == uid for p in g["players"])]
+                return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/castlecombo/game":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                chat_id = q.get("chat_id", [""])[0]
+                with STATE_LOCK:
+                    g = castlecombo_get(state, chat_id)
+                    board = castlecombo_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/lsd/mygames":
                 q = urllib.parse.parse_qs(u.query)
@@ -4385,6 +4890,52 @@ def start_web_server(state):
                     events, err = fliptoons_api_move(state, chat_id, uid, body)
                     g = fliptoons_get(state, chat_id)
                     board = fliptoons_board_json(g, uid) if g else None
+                    save_state(state)
+                return self._send(200 if not err else 400,
+                                  {"ok": not err, "error": err, "events": events, "game": board})
+            if path in ("/api/castlecombo/create", "/api/castlecombo/move"):
+                try:
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                except Exception:
+                    return self._send(400, {"ok": False, "error": "bad json"})
+                iu = init_user(body.get("init_data", ""))
+                if iu is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                uid, name, start_param, chat_instance = iu
+                if path == "/api/castlecombo/create":
+                    chat_id = None
+                    for cand in (start_param, str(body.get("chat_id") or ""), chat_instance):
+                        cand = str(cand)
+                        if cand.startswith("castlecombo"):
+                            cand = cand[len("castlecombo"):]
+                        try:
+                            chat_id = int(cand)
+                            break
+                        except (TypeError, ValueError):
+                            continue
+                    if not chat_id:
+                        return self._send(400, {"ok": False, "error": "open the Mini App from a chat (startapp link)"})
+                    with STATE_LOCK:
+                        g = castlecombo_get(state, chat_id)
+                        if g and g["phase"] != "game_end":
+                            return self._send(200, {"ok": True, "game": castlecombo_board_json(g, uid), "created": False})
+                        g = CC.new_game(chat_id, uid, name)
+                        g["chat_type"] = "supergroup" if chat_id < 0 else "private"
+                        state.setdefault("castlecombo", {})[str(chat_id)] = g
+                        castlecombo_render(g, [f"🏰 Castle Combo game created by {name} via Mini App!"])
+                        save_state(state)
+                        board = castlecombo_board_json(g, uid)
+                    return self._send(200, {"ok": True, "game": board, "created": True})
+                chat_id = body.get("chat_id")
+                if not chat_id and start_param.startswith("castlecombo"):
+                    try:
+                        chat_id = int(start_param[len("castlecombo"):])
+                    except ValueError:
+                        pass
+                with STATE_LOCK:
+                    events, err = castlecombo_api_move(state, chat_id, uid, body)
+                    g = castlecombo_get(state, chat_id)
+                    board = castlecombo_board_json(g, uid) if g else None
                     save_state(state)
                 return self._send(200 if not err else 400,
                                   {"ok": not err, "error": err, "events": events, "game": board})

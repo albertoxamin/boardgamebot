@@ -4466,6 +4466,19 @@ def start_web_server(state):
             if u.path == "/castlecombo.js":
                 p = os.path.join(os.path.dirname(JS_PATH), "castlecombo.js")
                 return self._send(200, open(p, "rb").read(), "text/javascript")
+            if u.path == "/castlecombo-faces.js":
+                p = os.path.join(os.path.dirname(JS_PATH), "castlecombo-faces.js")
+                return self._send(200, open(p, "rb").read(), "text/javascript")
+            if u.path == "/castlecombo-messenger.png":
+                p = os.path.join(os.path.dirname(JS_PATH), "castlecombo-messenger.png")
+                return self._send(200, open(p, "rb").read(), "image/png", cache="public, max-age=86400")
+            if u.path.startswith("/cc-icons/") and u.path.endswith((".png", ".woff")):
+                p = os.path.join(os.path.dirname(JS_PATH), "cc-icons",
+                                 os.path.basename(u.path))
+                if os.path.exists(p):
+                    ctype = "font/woff" if u.path.endswith(".woff") else "image/png"
+                    return self._send(200, open(p, "rb").read(), ctype, cache="public, max-age=86400")
+                return self._send(404, {"ok": False})
             if u.path in ("/spots-dogs.webp", "/spots-dogs-scored.webp"):
                 p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")

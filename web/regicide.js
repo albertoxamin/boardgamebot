@@ -70,6 +70,8 @@ function rgRender(){let b=RG.board; if(!b)return;
  rgPreview();
  let cur=b.players[b.current_index]; let myTurn=(b.phase==='playing'&&cur&&(cur.user_id===RG.user_id||cur.npc));
  let myDiscard=(b.phase==='discard'&&b.players[b.current_index]&&(b.players[b.current_index].user_id===RG.user_id||b.players[b.current_index].npc));
+ let emptyDiscard=myDiscard&&!hand.length;
+ document.getElementById('rgDiscard').textContent=emptyDiscard?'🏳 Concede loss':'🗑 Discard selected';
  document.getElementById('rgPlay').classList.toggle('hidden',!myTurn);
  document.getElementById('rgYield').classList.toggle('hidden',!myTurn);
  document.getElementById('rgDiscard').classList.toggle('hidden',!myDiscard);
@@ -77,7 +79,7 @@ function rgRender(){let b=RG.board; if(!b)return;
  document.getElementById('rgRematch').classList.toggle('hidden',!((b.phase==='won'||b.phase==='lost')&&b.is_player));
  let t=document.getElementById('rgTurn'),ab=document.getElementById('rgActions'); ab.innerHTML='';
  if(b.phase==='playing') t.textContent=myTurn?'👉 Your turn - select card(s) and Play, or Yield':'👉 '+b.players[b.current_index].name+"'s turn";
- else if(b.phase==='discard') t.textContent=myDiscard? '💥 Discard ≥'+b.discard_needed+' (done '+b.discard_total+') - select card(s), then Discard' : '💥 '+b.players[b.current_index].name+' is discarding';
+ else if(b.phase==='discard') t.textContent=emptyDiscard?'💀 No cards left to cover the attack - concede the loss':(myDiscard? '💥 Discard ≥'+b.discard_needed+' (done '+b.discard_total+') - select card(s), then Discard' : '💥 '+b.players[b.current_index].name+' is discarding');
  else if(b.phase==='jester_next'){t.textContent='🎯 Pick who goes next:';
    b.players.forEach((p,i)=>{let btn=document.createElement('button');btn.className='targetbtn';btn.textContent='➡️ '+p.name;btn.addEventListener('click',()=>rgMove('jester_next',{target_index:i}));ab.appendChild(btn);});}
  else if(b.phase==='lobby') t.textContent='🪑 Lobby - anyone taps Start';
@@ -119,8 +121,8 @@ document.getElementById('rgYield').addEventListener('click',()=>rgMove('yield'))
 document.getElementById('rgStart').addEventListener('click',()=>rgMove('start'));
 document.getElementById('rgRematch').addEventListener('click',()=>rgMove('rematch'));
 document.getElementById('rgDiscard').addEventListener('click',()=>{
- if(!RG.selected.length){rgLog('Select card(s) to discard');return;}
  let cards=RG.selected.map(i=>RG.board.my_hand[i]);
+ if(!cards.length&&!(RG.board.phase==='discard'&&!(RG.board.my_hand||[]).length)){rgLog('Select card(s) to discard');return;}
  rgMove('discard',{cards:cards});});
 // Self-start when router (flip7.js) selected Regicide mode.
 if(!document.getElementById('regicide').classList.contains('hidden')) rgLoad();

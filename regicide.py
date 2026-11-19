@@ -232,6 +232,13 @@ def play_cards(g, idx, cards, events):
         events.append(f"🛡️ Shield covers the attack from {card_str(enemy)} (0) - no discard. "
                       f"Turn passes to {g['players'][g['current_index']]['name']}.")
         return None
+    if not g["players"][idx]["hand"]:
+        g["phase"] = "lost"
+        g["discard_needed"] = eff
+        g["discard_total"] = 0
+        events.append(f"💀 {g['players'][idx]['name']} has no cards to cover the "
+                      f"{eff}-point attack - the team loses.")
+        return None
     g["phase"] = "discard"
     g["discard_needed"] = eff
     g["discard_total"] = 0
@@ -246,6 +253,10 @@ def discard_cards(g, idx, cards, events):
         return "not in discard phase"
     if idx != g["current_index"]:
         return "only the attacked player discards"
+    if not cards and not g["players"][idx]["hand"]:
+        g["phase"] = "lost"
+        events.append("💀 Cannot cover the attack - the team loses.")
+        return None
     if not cards:
         return "select at least one card to discard"
     g["discard_total"] += sum(card_value(c) for c in cards)

@@ -49,9 +49,9 @@ def test_damage_and_exact_kill():
 def test_enemy_attack_discard_and_lose():
     g = mk(2)
     g["enemy"] = {"suit": "♥", "rank": "J"}
-    g["players"][0]["hand"] = [{"rank": "2", "suit": "♣"}]
+    g["players"][0]["hand"] = [{"rank": "2", "suit": "♣"}, {"rank": "8", "suit": "♦"}]
     ev = []
-    R.play_cards(g, 0, [g["players"][0]["hand"].pop()], ev)
+    R.play_cards(g, 0, [g["players"][0]["hand"].pop(0)], ev)
     assert g["phase"] == "discard" and g["discard_needed"] == 10
     g["players"][0]["hand"] = [{"rank": "9", "suit": "♦"}, {"rank": "A", "suit": "♠"}]
     R.discard_card(g, 0, g["players"][0]["hand"].pop(), ev)
@@ -61,10 +61,33 @@ def test_enemy_attack_discard_and_lose():
     # redo lose case with insufficient cards
     g = mk(2)
     g["enemy"] = {"suit": "♥", "rank": "J"}
-    g["players"][0]["hand"] = [{"rank": "2", "suit": "♣"}]
-    R.play_cards(g, 0, [g["players"][0]["hand"].pop()], [])
+    g["players"][0]["hand"] = [{"rank": "2", "suit": "♣"}, {"rank": "8", "suit": "♦"}]
+    R.play_cards(g, 0, [g["players"][0]["hand"].pop(0)], [])
     g["players"][0]["hand"] = [{"rank": "3", "suit": "♦"}]
     R.discard_card(g, 0, g["players"][0]["hand"].pop(), [])
+    assert g["phase"] == "lost"
+
+
+def test_attack_with_empty_hand_loses_immediately():
+    g = mk(2)
+    g["enemy"] = {"suit": "♥", "rank": "Q"}  # atk 15, hp 30
+    g["players"][0]["hand"] = [{"rank": "J", "suit": "♣"}]  # 20 dmg, no kill
+    ev = []
+    assert R.play_cards(g, 0, [g["players"][0]["hand"].pop()], ev) is None
+    assert g["enemy_damage"] == 20 and g["phase"] == "lost"
+    assert not g["players"][0]["hand"]
+    assert any("no cards" in e for e in ev)
+
+
+def test_stuck_empty_hand_discard_can_concede():
+    g = mk(2)
+    g["phase"] = "discard"
+    g["current_index"] = 0
+    g["players"][0]["hand"] = []
+    g["discard_needed"] = 15
+    g["discard_total"] = 0
+    ev = []
+    assert R.discard_cards(g, 0, [], ev) is None
     assert g["phase"] == "lost"
 
 
@@ -83,8 +106,8 @@ def test_zero_attack_skips_discard():
 def test_multi_discard():
     g = mk(2)
     g["enemy"] = {"suit": "♥", "rank": "J"}
-    g["players"][0]["hand"] = [{"rank": "2", "suit": "♣"}]
-    R.play_cards(g, 0, [g["players"][0]["hand"].pop()], [])
+    g["players"][0]["hand"] = [{"rank": "2", "suit": "♣"}, {"rank": "8", "suit": "♦"}]
+    R.play_cards(g, 0, [g["players"][0]["hand"].pop(0)], [])
     assert g["phase"] == "discard" and g["discard_needed"] == 10
     g["players"][0]["hand"] = [{"rank": "6", "suit": "♣"}, {"rank": "4", "suit": "♦"}, {"rank": "3", "suit": "♠"}]
     ev = []
@@ -96,8 +119,8 @@ def test_multi_discard():
     # insufficient batch with cards left: stays in discard, total accumulates
     g = mk(2)
     g["enemy"] = {"suit": "♥", "rank": "J"}
-    g["players"][0]["hand"] = [{"rank": "2", "suit": "♣"}]
-    R.play_cards(g, 0, [g["players"][0]["hand"].pop()], [])
+    g["players"][0]["hand"] = [{"rank": "2", "suit": "♣"}, {"rank": "8", "suit": "♦"}]
+    R.play_cards(g, 0, [g["players"][0]["hand"].pop(0)], [])
     g["players"][0]["hand"] = [{"rank": "6", "suit": "♣"}, {"rank": "3", "suit": "♦"}, {"rank": "9", "suit": "♠"}]
     cards = g["players"][0]["hand"][:2]
     g["players"][0]["hand"] = g["players"][0]["hand"][2:]

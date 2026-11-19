@@ -803,6 +803,14 @@ def handle_regicide(state, msg, cmd, text, uid, name):
             return True
         parts = text.split()[1:]
         if not parts:
+            if (cmd == "/regicide_discard" and g["phase"] == "discard"
+                    and not g["players"][idx]["hand"]):
+                err = R.discard_cards(g, idx, [], ev)
+                if err:
+                    send(chat_id, f"⛔ {err}")
+                else:
+                    rg_render(g, ev)
+                return True
             send(chat_id, "Usage: /regicide_play 7h  (or 10s, A♠, joker) - played card becomes public; use Mini App for private selection.")
             return True
         cards = [parse_card(t) for t in parts]
@@ -3990,7 +3998,7 @@ def rg_api_move(state, chat_id, user_id, body):
             return [], err
     elif action == "discard":
         cards = [{"suit": c["suit"], "rank": c["rank"]} for c in body.get("cards", [])]
-        if not cards:
+        if not cards and g["players"][idx]["hand"]:
             return [], "select at least one card to discard"
         removed, err = rg_take_cards(g, idx, cards)
         if err:
@@ -5243,6 +5251,16 @@ def main():
     state = load_state()
     _STATE["state"] = state
     print(f"Flip7 bot polling… state={STATE_FILE} games={len(state['games'])}", flush=True)
+    for g in state.get("regicide", {}).values():
+        if g.get("phase") != "discard":
+            continue
+        idx = g.get("current_index")
+        if not isinstance(idx, int) or not (0 <= idx < len(g.get("players", []))):
+            continue
+        if not g["players"][idx].get("hand"):
+            ev = []
+            R.discard_cards(g, idx, [], ev)
+            rg_render(g, ev)
     start_web_server(state)
     # Unstick games persisted at round_end by older versions: auto-next now.
     for g in state["games"].values():

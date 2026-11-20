@@ -244,19 +244,21 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 .tsboat.taken{opacity:.45}
 .atrowcards,.athand,.atchoices{display:flex;flex-wrap:wrap;gap:6px;margin-top:6px}
 .atrowcards,.athand{overflow-x:auto;flex-wrap:nowrap;padding-bottom:4px}
-.atcard{width:100px;height:150px;flex:0 0 100px;background:#1e293b;border:2px solid #475569;border-radius:9px;overflow:hidden;cursor:default;position:relative}
-.atart{width:100%;height:100%;object-fit:cover;display:block}
-.atcap{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.82);color:#fff;padding:4px 5px;line-height:1.15;text-align:left}
-.atcap b{display:block;font-size:10px;letter-spacing:.03em;text-shadow:0 1px 2px #000}
-.atcap span{display:block;font-size:8.5px;margin-top:2px;max-height:39px;overflow:hidden}
+.atcard{width:140px;height:210px;flex:0 0 140px;background:#1e293b;border:1px solid #000;border-radius:10px;box-sizing:border-box;overflow:hidden;cursor:default;position:relative}
+.atart{width:100%;height:100%;object-fit:cover;border-radius:9px;display:block}
+.atname{position:absolute;top:0;left:0;right:0;height:30px;display:flex;align-items:center;justify-content:center;font-family:carlmarx,'Arial Black',sans-serif;font-weight:800;font-size:15px;letter-spacing:.02em;text-align:center;word-break:break-word;text-shadow:0 1px 2px #000a,0 0 3px #fff9}
+.atname.artichoke{height:52px;font-size:13px}
+.atdesc{position:absolute;bottom:0;left:5px;right:5px;height:42px;display:flex;align-items:center;justify-content:center;color:#000;font-size:8px;font-weight:800;line-height:1.1;text-align:center;text-shadow:0 1px 0 #fff9}
+.atdesc span{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
+.atdesc.light-text{color:#fff;text-shadow:0 1px 2px #000}
 .atcard.clickable,.atchoice{cursor:pointer}
-.atcard.clickable:hover,.atchoice:hover{border-color:#84cc16}
+.atchoice:hover{border-color:#84cc16}
 .atcard.atsel,.atchoice.atsel{border-color:#22c55e;box-shadow:0 0 0 2px #22c55e}
 .atseats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px}
 .atseat{background:#0f172a;border:1px solid #334155;border-radius:9px;padding:7px}
 .atseat.atcurrent{border-color:#84cc16}
 .atseatname{font-weight:800;margin-bottom:3px}
-.athandcard{width:92px;height:138px;flex-basis:92px}
+.athandcard{width:126px;height:189px;flex-basis:126px}
 .atchoice{background:#1e293b;color:#e2e8f0;border:2px solid #475569;border-radius:9px;padding:7px 10px;font-size:13px;font-weight:700;margin:0}
 </style></head><body>
 <h1>🎴 Flip 7</h1>
@@ -384,5 +386,5 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <script data-cfasync="false" src="castlecombo-faces.js?v=2"></script>
 <script data-cfasync="false" src="castlecombo.js?v=6"></script>
 <script data-cfasync="false" src="tornado.js?v=2"></script>
-<script data-cfasync="false" src="artichokes.js?v=4"></script>
+<script data-cfasync="false" src="artichokes.js?v=7"></script>
 </body></html>

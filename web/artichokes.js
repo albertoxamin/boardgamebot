@@ -1,10 +1,14 @@
 const ATAPP={user_id:0,chat_id:null,board:null,timer:null,init:'',err:'',sel:[],pass:new Set()};
-const AT_VER=3;
+const AT_VER=4;
 const AT_SPRITE={beet:0,broccoli:1,carrot:2,corn:3,eggplant:4,leek:5,onion:6,peas:7,
  pepper:8,potato:9,artichoke:10,rhubarb:15,back:16};
 const AT_COLOR={beet:'#9f2645',broccoli:'#33762f',carrot:'#ef9131',corn:'#f3d80d',
  eggplant:'#7c3883',leek:'#6e8d51',onion:'#b66d36',peas:'#72b146',pepper:'#f3b637',
- potato:'#a27c3e',artichoke:'#c9d336',rhubarb:'#cb4f6b'};
+   potato:'#a27c3e',artichoke:'#c9d336',rhubarb:'#cb4f6b'};
+function atCardName(v){return String(v||'').replace(/^./,c=>c.toUpperCase());}
+function atCardDesc(c){
+ let fromBoard=(ATAPP.board&&ATAPP.board.descriptions&&ATAPP.board.descriptions[c.v])||'';
+ return fromBoard||String(c.desc||'');}
 function atChatId(raw){let s=String(raw||'');if(s.startsWith('artichokes'))s=s.slice(10);
  let n=parseInt(s,10);return isNaN(n)?0:n;}
 function atApi(path,opts){return fetch(path,opts).then(r=>r.json());}
@@ -50,13 +54,13 @@ async function atMove(action,extra){
  if(ATAPP.board)atRender();}
 function atCard(c,cls,extra){
  let num=AT_SPRITE[c.v];if(num===undefined)num=AT_SPRITE.back;
- let cap=escapeHtml(c.name||c.label||'Card');
- let desc=escapeHtml(c.desc||'');
- let title=cap+(desc?' — '+desc:'');
- return '<div class="atcard '+cls+'" title="'+title+'"'+(extra||'')+'>'+
-  '<img class="atart" src="/artichokes_cards/'+num+'.jpg?v='+AT_VER+'" alt="'+cap+'">'+
-  '<div class="atcap"><b style="color:'+(AT_COLOR[c.v]||'#fff')+'">'+cap+'</b>'+
-  (desc?'<span>'+desc+'</span>':'')+'</div></div>';}
+ let name=atCardName(c.v||'').toUpperCase(),desc=atCardDesc(c);
+ let light=['beet','broccoli','eggplant','artichoke'].indexOf(c.v)>=0;
+ let art=c.v==='artichoke'?' artichoke':'';
+ return '<div class="atcard '+cls+'"'+(extra||'')+'>'+
+  '<img class="atart" src="/artichokes_cards/'+num+'.jpg?v='+AT_VER+'" alt="'+escapeHtml(name)+'">'+
+  '<div class="atname'+art+'" style="color:'+(AT_COLOR[c.v]||'#fff')+'">'+escapeHtml(name)+'</div>'+
+  '<div class="atdesc'+(light?' light-text':'')+'"><span>'+escapeHtml(desc)+'</span></div></div>';}
 function atPlayer(p,i,b){
  let bits=[];
  if(b.phase!=='lobby'&&i===b.actor)bits.push('👉');
@@ -110,8 +114,8 @@ function atRender(){
     opts.map(o=>'<button class="atchoice" data-at-ch="'+escapeHtml(String(o.v))+'">'+escapeHtml(o.label)+'</button>').join('')+'</div></div>';
   }
  }
- let a='';
- if(b.phase==='lobby'){
+  let a='';
+  if(b.phase==='lobby'){
   if(!b.is_player)a+='<button class="primary" id="atJoin">🙋 Join</button>';
   if(b.players.length>=2)a+='<button class="primary" id="atStart">🎮 Start game</button>';
  }else if(b.phase==='game_end'){
@@ -121,8 +125,8 @@ function atRender(){
   else{a+='<button class="hit" id="atPlay">🃏 Play selected ('+ATAPP.sel.length+')</button>'+
         '<button class="stay" id="atEnd">🏁 End turn</button>';}
  }
- actions.innerHTML=a;
- if(ATAPP.err)choice.innerHTML+='<div class="lobby-note">⛔ '+escapeHtml(ATAPP.err)+'</div>';
+  actions.innerHTML=a;
+  if(ATAPP.err)choice.innerHTML+='<div class="lobby-note">⛔ '+escapeHtml(ATAPP.err)+'</div>';
 }
 (function atEvents(){
  document.addEventListener('click',e=>{
@@ -134,8 +138,8 @@ function atRender(){
   if(t.hasAttribute('data-at-pass')){let v=t.dataset.atPass;if(ATAPP.pass.has(v))ATAPP.pass.delete(v);else ATAPP.pass.add(v);atRender();return;}
  });
  document.addEventListener('click',e=>{
-  let id=e.target.id;
-  if(id==='atJoin')return atMove('join');
+   let id=e.target.id;
+   if(id==='atJoin')return atMove('join');
   if(id==='atStart')return atMove('start');
   if(id==='atRematch')return atMove('rematch');
   if(id==='atSkip')return atMove('skip');
@@ -144,5 +148,5 @@ function atRender(){
   if(id==='atEnd')return atMove('end');
   if(id==='atPassGo')return atMove('pass',{ids:Array.from(ATAPP.pass)});
  });
-})();
+ })();
 (function atStart(){if(document.getElementById('atBoard'))atLoad();})();

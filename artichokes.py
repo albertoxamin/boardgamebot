@@ -41,6 +41,7 @@ DESCRIPTIONS = {
     "pepper": "Put a card from your Discard Pile on top of your Deck.",
     "potato": "Reveal the top card of your Deck. Compost if Artichoke, otherwise discard it.",
     "artichoke": "Don't break my heart!",
+    "rhubarb": "Compost this card to refresh the Garden Row, then harvest a card. (Place old cards under Garden Stack.)",
 }
 
 

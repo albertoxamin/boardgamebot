@@ -48,6 +48,9 @@ def test_setup_counts():
 def test_card_descriptions():
     for v in A.VEGGIES + (A.ARTICHOKE,):
         assert A.card_desc({"v": v})
+    assert "reveal a random card" in A.card_desc({"v": "beet"})
+    assert "pass two cards" in A.card_desc({"v": "eggplant"})
+    assert "Don't break my heart!" in A.card_desc({"v": "artichoke"})
 
 
 def test_row_reshuffle_four_of_a_kind():

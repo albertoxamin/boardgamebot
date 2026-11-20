@@ -29,7 +29,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 4
+WEB_VER = 7
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -3293,6 +3293,7 @@ def artichokes_board_json(g, viewer_id=None):
                    "options": [{"v": o["v"], "label": o["label"]} for o in pend["options"]],
                    "chosen": pend.get("answers", {}).get(viewer_idx, []) if pend["kind"] == "eggplant" else []}
     return {"chat_id": g["chat_id"], "phase": g["phase"], "round": g["round"],
+            "descriptions": AT.DESCRIPTIONS,
             "garden_row": [{"pos": i, **_at_card_json(c)} for i, c in enumerate(g["garden_row"])],
             "garden_stack": len(g["garden_stack"]), "compost": len(g["compost"]),
             "actor": actor, "can_act": can_act, "is_player": me is not None,

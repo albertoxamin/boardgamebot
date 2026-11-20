@@ -29,6 +29,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
+WEB_VER = 3
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -239,12 +240,12 @@ def web_keyboard(chat_type="private", chat_id=None, game="flip7"):
     if chat_type in ("group", "supergroup", "channel"):
         if chat_id:
             start = f"{game}{chat_id}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes") else str(chat_id)
-            url = f"https://t.me/flip7groupbot?startapp={start}"
+            url = f"https://t.me/flip7groupbot?startapp={start}&v={WEB_VER}"
         else:
-            url = WEB_URL
+            url = f"{WEB_URL}?v={WEB_VER}"
         btn = {"text": label, "url": url}
     else:
-        url = WEB_URL + (f"?app={game}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes") else "")
+        url = WEB_URL + f"?v={WEB_VER}" + (f"&app={game}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes") else "")
         if chat_id:
             url += ("&" if "?" in url else "?") + f"chat_id={chat_id}"
         btn = {"text": label, "web_app": {"url": url}}

@@ -233,22 +233,44 @@ Text commands: `/tornado` (create), `/tornado_join`, `/tornado_start [gp]`,
 Mini App: board button = `?startapp=tornado<chat>` (same Main Mini App,
 routed by `start_param`). Engine: `tornado.py` + `test_tornado.py`.
 
+## Abandon All Artichokes (same bot, deck-wrecking veggies)
+
+Abandon All Artichokes (Gamewright), 2–4 players. Everyone starts with 10
+Artichokes in hand; a turn refills the 5-card Garden Row, harvests one row
+card, plays any number of vegetable powers, then discards and redraws 5.
+The Garden Stack holds 6 copies of each of the 10 vegetables; when 4+ of the
+same vegetable appear in the row, that kind is reshuffled into the stack and
+the row is refilled. Vegetables let you swap, draw, force discards, reveal
+opponents' hands, and more. You win at the end of your turn only when the
+refill leaves your hand with no Artichokes.
+Text commands: `/artichokes` (create), `/artichokes_join`,
+`/artichokes_join_npc`, `/artichokes_start`, `/artichokes_harvest <1-5>`,
+`/artichokes_skip`, `/artichokes_play <card id or name>`, `/artichokes_end`,
+`/artichokes_choose <value>`, `/artichokes_pass <card ids>`,
+`/artichokes_rules`, `/artichokes_cancel` (creator), `/artichokes_rematch`.
+Mini App: board button = `?startapp=artichokes<chat>` (same Main Mini App,
+routed by `start_param`). Engine: `artichokes.py` + `test_artichokes.py`.
+
 ## Files
 
 - `game.py` – pure engine: deck, scoring, bust/Flip 7, actions, rounds.
 - `yahtzee.py` – pure engine: dice, scorecard, turns, scoring.
 - `fliptoons.py` – pure engine: deck, grid, abilities, market, final flip.
 - `tornado.py` – pure engine: boats, decks, courses, ranks, movement, Grand Prix.
+- `artichokes.py` – pure engine: garden stack/row, harvesting, all vegetable powers, win check.
 - `bot.py` – Telegram polling, inline keyboards, commands, JSON state.
 - `create_bot.py` – BotFather self-creation (MTProto, see above).
 - `test_game.py` – unit tests: `python3 test_game.py`
 - `test_yahtzee.py` – Yahtzee unit tests: `python3 test_yahtzee.py`
 - `test_fliptoons.py` – Fliptoons unit tests: `python3 test_fliptoons.py`
 - `test_tornado.py` – Tornado Splash unit tests: `python3 test_tornado.py`
+- `test_artichokes.py` – Abandon All Artichokes unit tests: `python3 test_artichokes.py`
 - `web/flip7.html` – standalone HTML5 Flip 7 game (hot-seat, Mini App-ready)
 - `web/yahtzee.js` – Yahtzee Mini App view (synced)
 - `web/fliptoons.js` – Fliptoons Mini App view (synced)
 - `web/tornado.js` – Tornado Splash Mini App view (synced)
+- `web/artichokes.js` – Abandon All Artichokes Mini App view (synced)
+- `web/artichokes_cards/` – BGA card art (0–9 vegetables, 10–14 Artichokes, 15 Rhubarb, 16 back)
 - `web/covers/*.jpg` – box art shown as the lobby photo for each game
 - `web/server.py` – static server for the HTML game (needs HTTPS tunnel for in-Telegram use)
 - `state.json` – created at runtime (per-chat games, decks, scores).
@@ -260,6 +282,7 @@ python3 test_game.py        # 8 engine tests
 python3 test_yahtzee.py     # 6 Yahtzee tests
 python3 test_fliptoons.py   # Fliptoons engine/ability tests
 python3 test_tornado.py     # Tornado Splash engine tests
+python3 test_artichokes.py  # Abandon All Artichokes engine tests
 ```
 A full 3-player game was also simulated end-to-end (hits/stays/actions/
 round rotation → a winner at 200+ in 13 rounds) with the Telegram layer

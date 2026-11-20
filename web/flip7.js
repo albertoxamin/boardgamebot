@@ -12,8 +12,9 @@ let G=null;
   else if(String(start).startsWith('yahtzee')){document.getElementById('yahtzee').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='🎲 Yahtzee';}
   else if(String(start).startsWith('fliptoons')){document.getElementById('fliptoons').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='🦋 Fliptoons';}
   else if(String(start).startsWith('tornado')){document.getElementById('tornado').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='🛥️ Tornado Splash';}
-  else if(String(start).startsWith('castlecombo')){document.getElementById('castlecombo').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='🏰 Castle Combo';}
- }catch(e){}})();
+   else if(String(start).startsWith('castlecombo')){document.getElementById('castlecombo').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='🏰 Castle Combo';}
+   else if(String(start).startsWith('artichokes')){document.getElementById('artichokes').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='🥬 Abandon All Artichokes';}
+  }catch(e){}})();
 function buildDeck(){let d=[{k:'n',v:0}];for(let n=1;n<=12;n++)for(let i=0;i<n;i++)d.push({k:'n',v:n});
 ['+2','+4','+6','+8','+10','x2'].forEach(m=>d.push({k:'m',v:m}));
 ['Freeze','Flip Three','Second Chance'].forEach(a=>{for(let i=0;i<3;i++)d.push({k:'a',v:a})});return d;}

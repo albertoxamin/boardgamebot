@@ -10,6 +10,7 @@ import hashlib, hmac, html, json, os, re, sys, threading, time, urllib.parse, ur
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import game as G
+import artichokes as AT
 import regicide as R
 import odin as O
 import lsd as D
@@ -49,6 +50,7 @@ HELP = """🎴 <b>Boardgame bot</b>
 /fliptoons - grid-building card market (also /fliptoons_join /fliptoons_start /fliptoons_hire /fliptoons_dismiss /fliptoons_skip /fliptoons_choose /fliptoons_cancel /fliptoons_rules)
 /castlecombo - deck-building Castle Combo (also /castlecombo_join /castlecombo_start /castlecombo_buy /castlecombo_flip /castlecombo_key /castlecombo_choose /castlecombo_cancel /castlecombo_rules)
 /tornado - jet-ski racing Tornado Splash (also /tornado_join /tornado_start /tornado_pick /tornado_play /tornado_wait /tornado_hand /tornado_next /tornado_cancel /tornado_rules)
+/artichokes - deck-wrecking Abandon All Artichokes (also /artichokes_join /artichokes_start /artichokes_harvest /artichokes_play /artichokes_end /artichokes_choose /artichokes_cancel /artichokes_rules)
 /games - list the games you can start (and what's running here)
 🤖 /join_npc (or /&lt;game&gt;_join_npc) - add a mock player anyone can control, in the lobby
 /lsd - dice game Let's Summon Demons (also /lsd_join /lsd_start /lsd_roll /lsd_buy /lsd_summon /lsd_end /lsd_score /lsd_cancel /lsd_rules)
@@ -114,7 +116,8 @@ COVERS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "co
 COVERS = {"games": "flip7.jpg", "flip7": "flip7.jpg", "regicide": "regicide.jpg",
           "odin": "odin.jpg", "lsd": "lsd.jpg", "spots": "spots.jpg",
           "yahtzee": "yahtzee.jpg", "fliptoons": "fliptoons.jpg",
-          "tornado": "tornado.jpg", "castlecombo": "castlecombo.jpg"}
+           "tornado": "tornado.jpg", "castlecombo": "castlecombo.jpg",
+           "artichokes": "artichokes.jpg"}
 
 
 def cover_path(game):
@@ -232,16 +235,16 @@ def web_keyboard(chat_type="private", chat_id=None, game="flip7"):
     startapp=<game><chat_id> (no second BotFather app needed)."""
     if not WEB_URL:
         return None
-    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "lsd": "🎮 Play Summon Demons (HTML)", "spots": "🎮 Play Spots (HTML)", "yahtzee": "🎮 Play Yahtzee (HTML)", "fliptoons": "🎮 Play Fliptoons (HTML)", "tornado": "🎮 Play Tornado Splash (HTML)", "castlecombo": "🎮 Play Castle Combo (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
+    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "lsd": "🎮 Play Summon Demons (HTML)", "spots": "🎮 Play Spots (HTML)", "yahtzee": "🎮 Play Yahtzee (HTML)", "fliptoons": "🎮 Play Fliptoons (HTML)", "tornado": "🎮 Play Tornado Splash (HTML)", "castlecombo": "🎮 Play Castle Combo (HTML)", "artichokes": "🎮 Play Abandon All Artichokes (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
     if chat_type in ("group", "supergroup", "channel"):
         if chat_id:
-            start = f"{game}{chat_id}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo") else str(chat_id)
+            start = f"{game}{chat_id}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes") else str(chat_id)
             url = f"https://t.me/flip7groupbot?startapp={start}"
         else:
             url = WEB_URL
         btn = {"text": label, "url": url}
     else:
-        url = WEB_URL + (f"?app={game}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo") else "")
+        url = WEB_URL + (f"?app={game}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes") else "")
         if chat_id:
             url += ("&" if "?" in url else "?") + f"chat_id={chat_id}"
         btn = {"text": label, "web_app": {"url": url}}
@@ -250,7 +253,7 @@ def web_keyboard(chat_type="private", chat_id=None, game="flip7"):
 
 # ---------- State ----------
 def load_state():
-    s = {"games": {}, "regicide": {}, "odin": {}, "lsd": {}, "spots": {}, "yahtzee": {}, "fliptoons": {}, "tornado": {}, "castlecombo": {}}
+    s = {"games": {}, "regicide": {}, "odin": {}, "lsd": {}, "spots": {}, "yahtzee": {}, "fliptoons": {}, "tornado": {}, "castlecombo": {}, "artichokes": {}}
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE) as f:
@@ -266,6 +269,7 @@ def load_state():
     s.setdefault("fliptoons", {})
     s.setdefault("tornado", {})
     s.setdefault("castlecombo", {})
+    s.setdefault("artichokes", {})
     return s
 
 
@@ -288,7 +292,7 @@ def _npc_player():
 
 NPC_MAX = {"games": 6, "regicide": 4, "odin": 6, "lsd": 5, "spots": 4,
            "yahtzee": Y.MAX_PLAYERS, "tornado": TS.MAX_PLAYERS, "fliptoons": 4,
-           "castlecombo": CC.MAX_PLAYERS}
+           "castlecombo": CC.MAX_PLAYERS, "artichokes": AT.MAX_PLAYERS}
 NPC_FULL = {
     "games": "⛔ Game is full.",
     "regicide": "⛔ Regicide is 2-4 players (full).",
@@ -299,6 +303,7 @@ NPC_FULL = {
     "tornado": f"⛔ Tornado Splash is 2-{TS.MAX_PLAYERS} players (full).",
     "fliptoons": "⛔ Fliptoons is 2-4 players (full).",
     "castlecombo": f"⛔ Castle Combo is 2-{CC.MAX_PLAYERS} players (full).",
+    "artichokes": f"⛔ Abandon All Artichokes is 2-{AT.MAX_PLAYERS} players (full).",
 }
 
 
@@ -332,6 +337,9 @@ def add_npc(key, g):
         p["npc"] = True
     elif key == "castlecombo":
         p = CC.new_player(NPC_ID, "🤖 NPC")
+        p["npc"] = True
+    elif key == "artichokes":
+        p = AT.new_player(NPC_ID, "🤖 NPC")
         p["npc"] = True
     g["players"].append(p)
     return None
@@ -2982,17 +2990,381 @@ def castlecombo_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
+# ============================================================ Abandon All Artichokes
+ARTICHOKES_RULES = """🥬 <b>Abandon All Artichokes rules</b> (2-4 players): a deck-wrecking game. First to draw a hand with <b>no Artichokes</b> at the end of their turn wins.
+• Setup: everyone starts with a 10-Artichoke personal deck and draws 5. The shared Garden Stack has 6 of each of the 10 vegetables; 5 are face-up in the Garden Row.
+• Your turn: <b>1</b> refill the row to 5 (4+ matching cards are reshuffled); <b>2</b> harvest 1 row card into your hand; <b>3</b> play any number of vegetables; <b>4</b> discard your hand; <b>5</b> draw 5. If that new hand has no Artichokes, shout it and win!
+• You can never play an Artichoke unless a card says so. Composted cards are out for good.
+• <b>Beet</b> swap a random card with an opponent (two Artichokes = both composted). <b>Broccoli</b> compost 1 if you have 3+ Artichokes. <b>Carrot</b> compost 2 (your only play that turn). <b>Corn</b> discard an Artichoke, put a row card on your deck. <b>Eggplant</b> compost 1, everyone passes 2 cards left. <b>Leek</b> reveal an opponent's top deck card and take it or discard it. <b>Onion</b> compost 1, send the Onion to someone's discard. <b>Pepper</b> move a card from your discard to your deck. <b>Peas</b> send one of the top 2 stack cards to your discard and one to an opponent. <b>Potato</b> reveal your top card: compost it if it's an Artichoke.
+• <i>Bot adaptation:</i> the active player's hand is shown on the board so they can act from Telegram; other hands stay hidden (counts only). The Mini App shows each viewer only their own hand."""
+
+
+def artichokes_get(state, chat_id):
+    return state.setdefault("artichokes", {}).get(str(chat_id))
+
+
+def artichokes_actor(g):
+    if g["phase"] not in ("harvest", "play"):
+        return None
+    pend = g.get("pending")
+    if pend:
+        if pend["kind"] == "eggplant":
+            pos = pend["pos"]
+            return pend["order"][pos] if pos < len(pend["order"]) else g["current_index"]
+        return pend["by"]
+    return g["current_index"]
+
+
+def artichokes_actor_idx(g, uid):
+    ref = artichokes_actor(g)
+    if ref is None:
+        return None
+    if g.get("pending") and g["pending"]["kind"] == "eggplant":
+        return ref if (g["players"][ref]["user_id"] == uid or g["players"][ref].get("npc")) else None
+    return _actor_idx(g, uid, ref)
+
+
+def _at_card_json(c):
+    return {"id": c["id"], "v": c["v"], "name": AT.card_name(c),
+            "label": AT.card_label(c), "icon": AT.ICONS.get(c["v"], "🥬")}
+
+
+def _at_hand_text(p):
+    return ", ".join(f"{i + 1}:{AT.card_label(c)}" for i, c in enumerate(p["hand"])) or "empty"
+
+
+def artichokes_board_text(g):
+    if g["phase"] == "lobby":
+        return (f"🥬 <b>Abandon All Artichokes lobby</b> - {len(g['players'])}/{AT.MAX_PLAYERS} players. "
+                f"Friends: /artichokes_join, anyone: /artichokes_start")
+    if g["phase"] == "game_end":
+        winner = next((p for p in g["players"] if p["user_id"] == g.get("winner_id")), None)
+        return (f"🏆 <b>Abandon All Artichokes game over</b> - winner: "
+                f"<b>{html.escape(winner['name']) if winner else '?'}</b>! "
+                f"{len(g['compost'])} cards composted in {g['round']} turns.")
+    actor = artichokes_actor(g)
+    lines = [f"🥬 <b>Abandon All Artichokes</b> · turn {g['round']} · "
+             f"garden stack {len(g['garden_stack'])} · compost {len(g['compost'])}"]
+    row = " · ".join(f"{i + 1}:{AT.card_label(c)}" for i, c in enumerate(g["garden_row"])) or "empty"
+    lines.append(f"🌱 Garden row: {row}")
+    for i, p in enumerate(g["players"]):
+        mark = " 👈" if i == actor else ""
+        mine = ""
+        if i == actor and p["hand"]:
+            mine = f" · hand: {_at_hand_text(p)}"
+        lines.append(f"• <b>{html.escape(p['name'])}</b> - hand {len(p['hand'])} · "
+                     f"deck {len(p['deck'])} · discard {len(p['discard'])}{mine}{mark}")
+    pend = g.get("pending")
+    if pend:
+        lines.append(f"❓ {html.escape(pend['prompt'])}")
+        if pend.get("options"):
+            lines.append("   " + " · ".join(str(o["v"]) + ":" + html.escape(o["label"])
+                                            for o in pend["options"][:12]))
+        lines.append("   /artichokes_choose &lt;value&gt; or /artichokes_pass &lt;card ids&gt;")
+    elif g["phase"] == "harvest":
+        if g["garden_row"]:
+            lines.append("🌾 Harvest: /artichokes_harvest &lt;1-5&gt; (or tap a row card).")
+        else:
+            lines.append("🌾 Garden row empty - /artichokes_skip.")
+    else:
+        play = sorted(set(AT.playable(g, actor)))
+        lines.append("▶️ Your hand: " + ", ".join(
+            f"{c['id']}:{AT.card_label(c)}" for c in g["players"][actor]["hand"]) if g["players"][actor]["hand"] else "▶️ Empty hand.")
+        lines.append(f"Play: /artichokes_play &lt;card id or name&gt; (playable: {', '.join(map(str, play)) or 'none'}) · /artichokes_end")
+    return "\n".join(lines)
+
+
+def artichokes_keyboard(g):
+    if g["phase"] == "game_end":
+        return [[{"text": "🔄 Rematch!", "callback_data": "at:rematch"}]]
+    ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
+    wk = web_keyboard(ct, g["chat_id"], game="artichokes")
+    if g["phase"] == "lobby":
+        kb = [[{"text": "🙋 Join Artichokes", "callback_data": "at:join"}]]
+        if not any(p.get("npc") for p in g["players"]):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "at:npc"}])
+        kb.append([{"text": "▶️ Start game", "callback_data": "at:start"}])
+        return kb + (wk or [])
+    kb = []
+    pend = g.get("pending")
+    if pend:
+        opts = pend["options"]
+        for j in range(0, len(opts), 2):
+            kb.append([{"text": o["label"][:60], "callback_data": f"at:ch:{o['v']}"}
+                       for o in opts[j:j + 2]])
+    elif g["phase"] == "harvest":
+        row = []
+        for i, c in enumerate(g["garden_row"]):
+            row.append({"text": f"{i + 1}:{AT.card_label(c)}", "callback_data": f"at:h:{i}"})
+            if len(row) == 2:
+                kb.append(row)
+                row = []
+        if row:
+            kb.append(row)
+        if not g["garden_row"]:
+            kb.append([{"text": "⏭ Nothing to harvest", "callback_data": "at:skip"}])
+    else:
+        actor = artichokes_actor(g)
+        playable = set(AT.playable(g, actor))
+        row = []
+        for c in g["players"][actor]["hand"]:
+            if c["id"] in playable:
+                row.append({"text": AT.card_label(c), "callback_data": f"at:p:{c['id']}"})
+                if len(row) == 2:
+                    kb.append(row)
+                    row = []
+        if row:
+            kb.append(row)
+        kb.append([{"text": "⏭ End turn", "callback_data": "at:end"}])
+    if wk:
+        kb.extend(wk)
+    return kb or None
+
+
+def artichokes_render(g, events=None):
+    chat_id = g["chat_id"]
+    lines = [html.escape(e) for e in (events or [])]
+    idx = artichokes_actor(g)
+    if idx is not None:
+        p = g["players"][idx]
+        pend = g.get("pending")
+        ping = ("👉 🤖 NPC's turn - anyone can play for it!" if p.get("npc")
+                else f"👉 {artichokes_mention(g, p['user_id'])} - "
+                     + (html.escape(pend["prompt"]) if pend else "your turn"))
+        lines.append(ping)
+    text = "\n".join(lines + [artichokes_board_text(g)])
+    kb = artichokes_keyboard(g)
+    r = send_board(g, "artichokes", text, kb)
+    if r.get("ok"):
+        old = g.get("board_message_id")
+        g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=chat_id, message_id=old)
+
+
+def artichokes_mention(g, user_id):
+    return f'<a href="tg://user?id={user_id}">{html.escape(AT.name_of(g, user_id))}</a>'
+
+
+def handle_artichokes(state, msg, cmd, text, uid, name):
+    chat_id = msg["chat"]["id"]
+    g = artichokes_get(state, chat_id)
+    if cmd == "/artichokes_rules":
+        send(chat_id, ARTICHOKES_RULES)
+        return True
+    if cmd == "/artichokes":
+        if not g:
+            _name = msg.get("from", {}).get("first_name") or "Player"
+            g = AT.new_game(chat_id, uid, _name)
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state.setdefault("artichokes", {})[str(chat_id)] = g
+            artichokes_render(g, [f"🥬 Abandon All Artichokes game created by {html.escape(_name)}!"])
+        else:
+            artichokes_render(g)
+        return True
+    if not g:
+        send(chat_id, "No Abandon All Artichokes game here yet - send /artichokes to create one.")
+        return True
+    g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd == "/artichokes_join_npc":
+        err = add_npc("artichokes", g)
+        send(chat_id, err or "🤖 NPC joined - anyone can play for it!")
+        if not err:
+            artichokes_render(g)
+        return True
+    if cmd == "/artichokes_join":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p["user_id"] == uid for p in g["players"]):
+            send(chat_id, "You're already in!")
+        elif len(g["players"]) >= AT.MAX_PLAYERS:
+            send(chat_id, f"⛔ Abandon All Artichokes is 2-{AT.MAX_PLAYERS} players (full).")
+        else:
+            g["players"].append(AT.new_player(uid, msg.get("from", {}).get("first_name") or "Player"))
+            send(chat_id, f"🙋 <b>{name}</b> joined Abandon All Artichokes ({len(g['players'])} players).")
+            artichokes_render(g)
+        return True
+    if cmd == "/artichokes_start":
+        if g["phase"] != "lobby":
+            send(chat_id, "Already started.")
+        elif len(g["players"]) < AT.MIN_PLAYERS:
+            send(chat_id, f"⛔ Need at least {AT.MIN_PLAYERS} players.")
+        else:
+            ev = []
+            err = AT.start_game(g, ev)
+            send(chat_id, f"⛔ {err}" if err else "🥬 Game started!")
+            if not err:
+                artichokes_render(g, ev)
+        return True
+    if cmd == "/artichokes_cancel":
+        if uid != g["created_by"]:
+            send(chat_id, "⛔ Only the creator can cancel.")
+        else:
+            del state["artichokes"][str(chat_id)]
+            send(chat_id, "🗑 Abandon All Artichokes game cancelled.")
+        return True
+    if cmd == "/artichokes_rematch":
+        ev, err = rematch_game(state, "artichokes", chat_id, uid)
+        send(chat_id, f"⛔ {err}" if err else "🔄 Rematch!")
+        return True
+    actions = ("/artichokes_harvest", "/artichokes_skip", "/artichokes_play",
+               "/artichokes_end", "/artichokes_choose", "/artichokes_pass")
+    if cmd not in actions:
+        return False
+    idx = artichokes_actor_idx(g, uid)
+    if idx is None:
+        send(chat_id, "⛔ You're not in this game (or it isn't your turn).")
+        return True
+    parts = text.split()[1:]
+    ev = []
+    err = None
+    if cmd == "/artichokes_harvest":
+        if not parts or not parts[0].isdigit():
+            err = "Usage: /artichokes_harvest &lt;1-5&gt;"
+        else:
+            err = AT.harvest(g, idx, int(parts[0]) - 1, ev)
+    elif cmd == "/artichokes_skip":
+        err = AT.skip_harvest(g, idx, ev)
+    elif cmd == "/artichokes_play":
+        want = " ".join(parts).lower()
+        target = None
+        for c in g["players"][idx]["hand"]:
+            if str(c["id"]) == want or AT.card_name(c).lower() == want or AT.card_label(c).lower() == want:
+                target = c["id"]
+                break
+        err = "Usage: /artichokes_play &lt;card id or name&gt;" if target is None else AT.do_play(g, idx, target, ev)
+    elif cmd == "/artichokes_end":
+        err = AT.end_turn(g, idx, ev)
+    elif cmd == "/artichokes_pass":
+        try:
+            ids = [int(x) for x in parts]
+        except ValueError:
+            ids = []
+        err = "Usage: /artichokes_pass &lt;card id card id&gt;" if not ids else AT.apply_choice(g, idx, ids, ev)
+    else:
+        pend = g.get("pending")
+        if not pend:
+            err = "No pending choice right now."
+        else:
+            want = " ".join(parts)
+            opt = next((o for o in pend["options"] if str(o["v"]).lower() == want.lower()
+                        or o["label"].lower() == want.lower()), None)
+            if opt is None:
+                err = "Unknown choice. Options: " + ", ".join(str(o["v"]) for o in pend["options"])
+            else:
+                err = AT.apply_choice(g, idx, opt["v"], ev)
+    if err:
+        send(chat_id, f"⛔ {err}")
+    else:
+        artichokes_render(g, ev)
+    return True
+
+
+def artichokes_board_json(g, viewer_id=None):
+    me = next((p for p in g["players"] if p["user_id"] == viewer_id), None)
+    actor = artichokes_actor(g)
+    can_act = bool(actor is not None and me is not None and
+                   (g["players"][actor]["user_id"] == viewer_id or g["players"][actor].get("npc")))
+    players = []
+    for i, p in enumerate(g["players"]):
+        entry = {"user_id": p["user_id"], "name": p["name"], "npc": bool(p.get("npc")),
+                 "artichokes": AT.artichokes(p), "hand_count": len(p["hand"]),
+                 "deck": len(p["deck"]), "discard": len(p["discard"]),
+                 "is_current": i == actor}
+        if p["user_id"] == viewer_id:
+            entry["my_hand"] = [_at_card_json(c) for c in p["hand"]]
+        players.append(entry)
+    pend = g.get("pending")
+    pending = None
+    if pend:
+        viewer_idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == viewer_id), None)
+        pending = {"kind": pend["kind"], "by": pend.get("by"),
+                   "prompt": pend["prompt"],
+                   "options": [{"v": o["v"], "label": o["label"]} for o in pend["options"]],
+                   "chosen": pend.get("answers", {}).get(viewer_idx, []) if pend["kind"] == "eggplant" else []}
+    return {"chat_id": g["chat_id"], "phase": g["phase"], "round": g["round"],
+            "garden_row": [{"pos": i, **_at_card_json(c)} for i, c in enumerate(g["garden_row"])],
+            "garden_stack": len(g["garden_stack"]), "compost": len(g["compost"]),
+            "actor": actor, "can_act": can_act, "is_player": me is not None,
+            "winner_id": g.get("winner_id"), "pending": pending,
+            "playable": AT.playable(g, actor) if can_act else [], "players": players}
+
+
+def artichokes_api_move(state, chat_id, user_id, body):
+    g = artichokes_get(state, chat_id)
+    if not g:
+        return [], "no artichokes game in that chat"
+    action = body.get("action")
+    ev = []
+    idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
+    if action == "join":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        if idx is not None:
+            return ev, None
+        if len(g["players"]) >= AT.MAX_PLAYERS:
+            return [], "full"
+        iu_name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
+        g["players"].append(AT.new_player(user_id, iu_name))
+        ev.append("🙋 joined Abandon All Artichokes.")
+    elif action == "start":
+        if g["phase"] != "lobby":
+            return [], "already started"
+        err = AT.start_game(g, ev)
+        if err:
+            return [], err
+    elif action == "rematch":
+        return rematch_game(state, "artichokes", chat_id, user_id)
+    else:
+        idx = artichokes_actor_idx(g, user_id)
+        if idx is None:
+            return [], "not in this game"
+        if action == "harvest":
+            try:
+                pos = int(body.get("pos", body.get("row", -1)))
+            except (TypeError, ValueError):
+                return [], "bad row position"
+            err = AT.harvest(g, idx, pos, ev)
+        elif action == "skip":
+            err = AT.skip_harvest(g, idx, ev)
+        elif action == "play":
+            try:
+                iid = int(body.get("iid", body.get("card", -1)))
+            except (TypeError, ValueError):
+                return [], "bad card"
+            err = AT.do_play(g, idx, iid, ev)
+        elif action == "end":
+            err = AT.end_turn(g, idx, ev)
+        elif action == "choose":
+            err = AT.apply_choice(g, idx, body.get("choice"), ev)
+        elif action == "pass":
+            ids = body.get("ids", body.get("cards", []))
+            if not isinstance(ids, list):
+                return [], "bad cards"
+            try:
+                ids = [int(x) for x in ids]
+            except (TypeError, ValueError):
+                return [], "bad cards"
+            err = AT.apply_choice(g, idx, ids, ev)
+        else:
+            return [], "unknown action"
+        if err:
+            return [], err
+    artichokes_render(g, ev)
+    return ev, None
+
+
 REMATCH_END_PHASES = {"games": ("game_end",), "regicide": ("won", "lost"),
                      "odin": ("game_end",), "lsd": ("game_end",), "spots": ("game_end",),
                      "yahtzee": ("game_end",), "fliptoons": ("game_end",),
-                     "tornado": ("race_end", "game_end"),
-                     "castlecombo": ("game_end",)}
+                      "tornado": ("race_end", "game_end"),
+                      "castlecombo": ("game_end",), "artichokes": ("game_end",)}
 
 
 RENDERERS = {"games": render, "regicide": rg_render, "odin": odin_render,
              "lsd": lsd_render, "spots": spots_render, "yahtzee": yahtzee_render,
              "fliptoons": fliptoons_render, "tornado": tornado_render,
-             "castlecombo": castlecombo_render}
+             "castlecombo": castlecombo_render, "artichokes": artichokes_render}
 
 
 def rematch_game(state, key, chat_id, uid):
@@ -3019,11 +3391,12 @@ def rematch_game(state, key, chat_id, uid):
         "fliptoons": lambda u, n: _ft_player(u, n),
         "castlecombo": lambda u, n: CC.new_player(u, n),
         "tornado": lambda u, n: TS.new_player(u, n),
+        "artichokes": lambda u, n: AT.new_player(u, n),
     }
     news = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
             "lsd": D.new_game, "spots": SP.new_game, "yahtzee": Y.new_game,
-            "fliptoons": FT.new_game, "tornado": TS.new_game,
-            "castlecombo": CC.new_game}
+             "fliptoons": FT.new_game, "tornado": TS.new_game,
+             "castlecombo": CC.new_game, "artichokes": AT.new_game}
     chat_type = g.get("chat_type", "private")
     board_id = g.get("board_message_id")
     g.clear()
@@ -3083,6 +3456,7 @@ def handle_command(state, msg):
             ("fliptoons", "🦋 Fliptoons", "/fliptoons", "/fliptoons_join", "grid-building card market, first to 30 fame"),
             ("castlecombo", "🏰 Castle Combo", "/castlecombo", "/castlecombo_join", "deck-building tableau, 3×3 shields & sets"),
             ("tornado", "🛥️ Tornado Splash", "/tornado", "/tornado_join", "jet-ski racing cards, first to the finish"),
+            ("artichokes", "🥬 Abandon All Artichokes", "/artichokes", "/artichokes_join", "deck-wrecking veggies, draw a hand with no Artichokes"),
         )
         lines = ["🎮 <b>Games you can start:</b>"]
         for _key, _name, _new, _join, _desc in _catalog:
@@ -3104,7 +3478,7 @@ def handle_command(state, msg):
         # Reply-targeted cancel: cancels the one game whose board message
         # was replied to (searches every game type in this chat).
         _mid = msg["reply_to_message"].get("message_id")
-        for _key in ("games", "regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo"):
+        for _key in ("games", "regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes"):
             _gg = state.get(_key, {}).get(str(chat_id))
             if _gg is not None and _gg.get("board_message_id") == _mid:
                 del state[_key][str(chat_id)]
@@ -3136,6 +3510,9 @@ def handle_command(state, msg):
     if cmd.startswith("/tornado"):
         handle_tornado(state, msg, cmd, text, uid, name)
         return
+    if cmd.startswith("/artichokes"):
+        handle_artichokes(state, msg, cmd, text, uid, name)
+        return
     if cmd in ("/start", "/help", "/commands"):
         send(chat_id, HELP)
         return
@@ -3149,8 +3526,8 @@ def handle_command(state, msg):
         _mid = (msg.get("reply_to_message") or {}).get("message_id") if msg.get("reply_to_message") else None
         _by_key = (("games", RULES), ("regicide", REGICIDE_RULES), ("odin", ODIN_RULES),
                    ("lsd", LSD_RULES), ("spots", SPOTS_RULES), ("yahtzee", YAHTZEE_RULES),
-                   ("fliptoons", FLIPTOONS_RULES), ("tornado", TORNADO_RULES),
-                   ("castlecombo", CASTLECOMBO_RULES))
+                    ("fliptoons", FLIPTOONS_RULES), ("tornado", TORNADO_RULES),
+                    ("castlecombo", CASTLECOMBO_RULES), ("artichokes", ARTICHOKES_RULES))
         if _mid:
             for _key, _rules in _by_key:
                 _gg = state.get(_key, {}).get(str(chat_id))
@@ -3228,7 +3605,7 @@ def handle_callback(state, cb):
     if data.endswith(":npc"):
         key = {"f7": "games", "rg": "regicide", "od": "odin", "lsd": "lsd",
                "spots": "spots", "yz": "yahtzee", "ts": "tornado",
-               "ft": "fliptoons", "cc": "castlecombo"}.get(data.split(":")[0])
+                "ft": "fliptoons", "cc": "castlecombo", "at": "artichokes"}.get(data.split(":")[0])
         g = state.get(key, {}).get(str(chat_id)) if key else None
         if not g:
             return answer_cb(cb["id"], "No game here.")
@@ -3669,6 +4046,63 @@ def handle_callback(state, cb):
             answer_cb(cb["id"], err or "Done")
             if not err:
                 castlecombo_render(cc, ev)
+        return
+    if data.startswith("at:"):
+        at = artichokes_get(state, chat_id)
+        if not at:
+            return answer_cb(cb["id"], "No Abandon All Artichokes game here.")
+        parts = data.split(":")
+        mine = next((i for i, p in enumerate(at["players"]) if p["user_id"] == uid), None)
+        ev = []
+        if parts == ["at", "join"]:
+            if at["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            if mine is not None:
+                return answer_cb(cb["id"], "Already in!")
+            if len(at["players"]) >= AT.MAX_PLAYERS:
+                return answer_cb(cb["id"], "Game is full.")
+            at["players"].append(AT.new_player(uid, cb["from"].get("first_name") or "Player"))
+            answer_cb(cb["id"], "Joined!")
+            artichokes_render(at, [f"🙋 {cb['from'].get('first_name')} joined Abandon All Artichokes."])
+        elif parts == ["at", "start"]:
+            if at["phase"] != "lobby":
+                return answer_cb(cb["id"], "Already started.")
+            err = AT.start_game(at, ev)
+            answer_cb(cb["id"], err or "Started")
+            if not err:
+                artichokes_render(at, ev)
+        elif parts == ["at", "rematch"]:
+            ev, err = rematch_game(state, "artichokes", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
+        else:
+            idx = artichokes_actor_idx(at, uid)
+            if idx is None:
+                return answer_cb(cb["id"], "Not your turn.")
+            if len(parts) == 3 and parts[1] == "h":
+                try:
+                    err = AT.harvest(at, idx, int(parts[2]), ev)
+                except ValueError:
+                    err = "bad row position"
+            elif parts == ["at", "skip"]:
+                err = AT.skip_harvest(at, idx, ev)
+            elif len(parts) == 3 and parts[1] == "p":
+                try:
+                    err = AT.do_play(at, idx, int(parts[2]), ev)
+                except ValueError:
+                    err = "bad card"
+            elif parts == ["at", "end"]:
+                err = AT.end_turn(at, idx, ev)
+            elif len(parts) >= 3 and parts[1] == "ch":
+                raw = ":".join(parts[2:])
+                choice = int(raw) if re.fullmatch(r"-?\d+", raw) else raw
+                err = AT.apply_choice(at, idx, choice, ev)
+            else:
+                return answer_cb(cb["id"], "Unknown button.")
+            answer_cb(cb["id"], err or "Done")
+            if not err:
+                artichokes_render(at, ev)
         return
     if data.startswith("od:"):
         od = odin_get(state, chat_id)
@@ -4560,6 +4994,9 @@ def start_web_server(state):
             if u.path == "/castlecombo-faces.js":
                 p = os.path.join(os.path.dirname(JS_PATH), "castlecombo-faces.js")
                 return self._send(200, open(p, "rb").read(), "text/javascript")
+            if u.path == "/artichokes.js":
+                p = os.path.join(os.path.dirname(JS_PATH), "artichokes.js")
+                return self._send(200, open(p, "rb").read(), "text/javascript")
             if u.path == "/castlecombo-messenger.png":
                 p = os.path.join(os.path.dirname(JS_PATH), "castlecombo-messenger.png")
                 return self._send(200, open(p, "rb").read(), "image/png", cache="public, max-age=86400")
@@ -4623,6 +5060,15 @@ def start_web_server(state):
                 p = os.path.join(os.path.dirname(JS_PATH), "tornado_cards", _name)
                 if os.path.exists(p):
                     return self._send(200, open(p, "rb").read(), _ctype, cache="public, max-age=86400")
+                return self._send(404, {"ok": False})
+            if u.path.startswith("/artichokes_cards/") and u.path.endswith((".jpg", ".jpeg")):
+                _name = os.path.basename(u.path)
+                _num = os.path.splitext(_name)[0]
+                if _num.isdigit() and 0 <= int(_num) <= 16:
+                    p = os.path.join(os.path.dirname(JS_PATH), "artichokes_cards", _name)
+                    if os.path.exists(p):
+                        return self._send(200, open(p, "rb").read(), "image/jpeg",
+                                          cache="public, max-age=86400")
                 return self._send(404, {"ok": False})
             if u.path.startswith("/cards/") and u.path.endswith(".svg"):
                 p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
@@ -4738,6 +5184,25 @@ def start_web_server(state):
                 with STATE_LOCK:
                     g = castlecombo_get(state, chat_id)
                     board = castlecombo_board_json(g, uid) if g else None
+                return self._send(200 if board else 404, {"ok": bool(board), "game": board})
+            if u.path == "/api/artichokes/mygames":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                with STATE_LOCK:
+                    games = [artichokes_board_json(g, uid) for g in state.get("artichokes", {}).values()
+                             if any(p["user_id"] == uid for p in g["players"])]
+                return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/artichokes/game":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                chat_id = q.get("chat_id", [""])[0]
+                with STATE_LOCK:
+                    g = artichokes_get(state, chat_id)
+                    board = artichokes_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/lsd/mygames":
                 q = urllib.parse.parse_qs(u.query)
@@ -5042,6 +5507,52 @@ def start_web_server(state):
                     events, err = castlecombo_api_move(state, chat_id, uid, body)
                     g = castlecombo_get(state, chat_id)
                     board = castlecombo_board_json(g, uid) if g else None
+                    save_state(state)
+                return self._send(200 if not err else 400,
+                                  {"ok": not err, "error": err, "events": events, "game": board})
+            if path in ("/api/artichokes/create", "/api/artichokes/move"):
+                try:
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                except Exception:
+                    return self._send(400, {"ok": False, "error": "bad json"})
+                iu = init_user(body.get("init_data", ""))
+                if iu is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                uid, name, start_param, chat_instance = iu
+                if path == "/api/artichokes/create":
+                    chat_id = None
+                    for cand in (start_param, str(body.get("chat_id") or ""), chat_instance):
+                        cand = str(cand)
+                        if cand.startswith("artichokes"):
+                            cand = cand[len("artichokes"):]
+                        try:
+                            chat_id = int(cand)
+                            break
+                        except (TypeError, ValueError):
+                            continue
+                    if not chat_id:
+                        return self._send(400, {"ok": False, "error": "open the Mini App from a chat (startapp link)"})
+                    with STATE_LOCK:
+                        g = artichokes_get(state, chat_id)
+                        if g and g["phase"] != "game_end":
+                            return self._send(200, {"ok": True, "game": artichokes_board_json(g, uid), "created": False})
+                        g = AT.new_game(chat_id, uid, name)
+                        g["chat_type"] = "supergroup" if chat_id < 0 else "private"
+                        state.setdefault("artichokes", {})[str(chat_id)] = g
+                        artichokes_render(g, [f"🥬 Abandon All Artichokes game created by {name} via Mini App!"])
+                        save_state(state)
+                        board = artichokes_board_json(g, uid)
+                    return self._send(200, {"ok": True, "game": board, "created": True})
+                chat_id = body.get("chat_id")
+                if not chat_id and str(start_param).startswith("artichokes"):
+                    try:
+                        chat_id = int(str(start_param)[len("artichokes"):])
+                    except ValueError:
+                        pass
+                with STATE_LOCK:
+                    events, err = artichokes_api_move(state, chat_id, uid, body)
+                    g = artichokes_get(state, chat_id)
+                    board = artichokes_board_json(g, uid) if g else None
                     save_state(state)
                 return self._send(200 if not err else 400,
                                   {"ok": not err, "error": err, "events": events, "game": board})

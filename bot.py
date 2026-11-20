@@ -29,7 +29,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 7
+WEB_VER = 10
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -2997,7 +2997,7 @@ ARTICHOKES_RULES = """🥬 <b>Abandon All Artichokes rules</b> (2-4 players): a 
 • Your turn: <b>1</b> refill the row to 5 (4+ matching cards are reshuffled); <b>2</b> harvest 1 row card into your hand; <b>3</b> play any number of vegetables; <b>4</b> discard your hand; <b>5</b> draw 5. If that new hand has no Artichokes, shout it and win!
 • You can never play an Artichoke unless a card says so. Composted cards are out for good.
 • <b>Beet</b> swap a random card with an opponent (two Artichokes = both composted). <b>Broccoli</b> compost 1 if you have 3+ Artichokes. <b>Carrot</b> compost 2 (your only play that turn). <b>Corn</b> discard an Artichoke, put a row card on your deck. <b>Eggplant</b> compost 1, everyone passes 2 cards left. <b>Leek</b> reveal an opponent's top deck card and take it or discard it. <b>Onion</b> compost 1, send the Onion to someone's discard. <b>Pepper</b> move a card from your discard to your deck. <b>Peas</b> send one of the top 2 stack cards to your discard and one to an opponent. <b>Potato</b> reveal your top card: compost it if it's an Artichoke.
-• <i>Bot adaptation:</i> the active player's hand is shown on the board so they can act from Telegram; other hands stay hidden (counts only). The Mini App shows each viewer only their own hand."""
+• <i>Bot adaptation:</i> in private chats the active player's hand is shown on the board so they can act from Telegram; in groups and in the Mini App only your own hand is shown (counts only for others). The Mini App shows each viewer only their own hand."""
 
 
 def artichokes_get(state, chat_id):
@@ -3052,17 +3052,19 @@ def artichokes_board_text(g):
     for i, p in enumerate(g["players"]):
         mark = " 👈" if i == actor else ""
         mine = ""
-        if i == actor and p["hand"]:
+        if i == actor and p["hand"] and int(g.get("chat_id", 0)) > 0:
             mine = f" · hand: {_at_hand_text(p)}"
         lines.append(f"• <b>{html.escape(p['name'])}</b> - hand {len(p['hand'])} · "
                      f"deck {len(p['deck'])} · discard {len(p['discard'])}{mine}{mark}")
     pend = g.get("pending")
     if pend:
         lines.append(f"❓ {html.escape(pend['prompt'])}")
-        if pend.get("options"):
+        if pend.get("kind") == "eggplant":
+            lines.append("   Pass privately via the Mini App or /artichokes_pass &lt;card ids&gt;.")
+        elif pend.get("options"):
             lines.append("   " + " · ".join(str(o["v"]) + ":" + html.escape(o["label"])
                                             for o in pend["options"][:12]))
-        lines.append("   /artichokes_choose &lt;value&gt; or /artichokes_pass &lt;card ids&gt;")
+            lines.append("   /artichokes_choose &lt;value&gt;")
     elif g["phase"] == "harvest":
         if g["garden_row"]:
             lines.append("🌾 Harvest: /artichokes_harvest &lt;1-5&gt; (or tap a row card).")
@@ -3098,10 +3100,11 @@ def artichokes_keyboard(g):
     kb = []
     pend = g.get("pending")
     if pend:
-        opts = pend["options"]
-        for j in range(0, len(opts), 2):
-            kb.append([{"text": o["label"][:60], "callback_data": f"at:ch:{o['v']}"}
-                       for o in opts[j:j + 2]])
+        if pend.get("kind") != "eggplant":
+            opts = pend["options"]
+            for j in range(0, len(opts), 2):
+                kb.append([{"text": o["label"][:60], "callback_data": f"at:ch:{o['v']}"}
+                           for o in opts[j:j + 2]])
     elif g["phase"] == "harvest":
         row = []
         for i, c in enumerate(g["garden_row"]):
@@ -3114,17 +3117,18 @@ def artichokes_keyboard(g):
         if not g["garden_row"]:
             kb.append([{"text": "⏭ Nothing to harvest", "callback_data": "at:skip"}])
     else:
-        actor = artichokes_actor(g)
-        playable = set(AT.playable(g, actor))
-        row = []
-        for c in g["players"][actor]["hand"]:
-            if c["id"] in playable:
-                row.append({"text": AT.card_label(c), "callback_data": f"at:p:{c['id']}"})
-                if len(row) == 2:
-                    kb.append(row)
-                    row = []
-        if row:
-            kb.append(row)
+        if ct == "private":
+            actor = artichokes_actor(g)
+            playable = set(AT.playable(g, actor))
+            row = []
+            for c in g["players"][actor]["hand"]:
+                if c["id"] in playable:
+                    row.append({"text": AT.card_label(c), "callback_data": f"at:p:{c['id']}"})
+                    if len(row) == 2:
+                        kb.append(row)
+                        row = []
+            if row:
+                kb.append(row)
         kb.append([{"text": "⏭ End turn", "callback_data": "at:end"}])
     if wk:
         kb.extend(wk)
@@ -3288,9 +3292,11 @@ def artichokes_board_json(g, viewer_id=None):
     pending = None
     if pend:
         viewer_idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == viewer_id), None)
+        opts = [{"v": o["v"], "label": o["label"]} for o in pend["options"]]
+        if pend.get("kind") == "eggplant" and viewer_idx != pend.get("by"):
+            opts = []
         pending = {"kind": pend["kind"], "by": pend.get("by"),
-                   "prompt": pend["prompt"],
-                   "options": [{"v": o["v"], "label": o["label"]} for o in pend["options"]],
+                   "prompt": pend["prompt"], "options": opts,
                    "chosen": pend.get("answers", {}).get(viewer_idx, []) if pend["kind"] == "eggplant" else []}
     return {"chat_id": g["chat_id"], "phase": g["phase"], "round": g["round"],
             "descriptions": AT.DESCRIPTIONS,
@@ -5783,6 +5789,21 @@ def main():
             ev = []
             R.discard_cards(g, idx, [], ev)
             rg_render(g, ev)
+    for g in state.get("artichokes", {}).values():
+        pend = g.get("pending")
+        if not pend or pend.get("kind") != "eggplant":
+            continue
+        players = g.get("players", [])
+        answers = {}
+        for k, v in pend.get("answers", {}).items():
+            if isinstance(k, int) and 0 <= k < len(players):
+                need = min(2, len(players[k].get("hand", [])))
+                if need and len(v) >= need:
+                    answers[k] = v
+        pend["answers"] = answers
+        ev = []
+        AT._eggplant_next(g, ev)
+        artichokes_render(g, ev)
     start_web_server(state)
     # Unstick games persisted at round_end by older versions: auto-next now.
     for g in state["games"].values():

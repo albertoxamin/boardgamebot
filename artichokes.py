@@ -371,7 +371,9 @@ def _eggplant_next(g, events):
     who = pend["order"][pend["pos"]]
     pend["options"] = [{"v": c["id"], "label": card_label(c)} for c in g["players"][who]["hand"]]
     pend["by"] = who
-    pend["prompt"] = f"Pass up to two cards to {g['players'][(who + 1) % len(g['players'])]['name']}."
+    need = min(2, len(g["players"][who]["hand"]))
+    word = "one card" if need == 1 else "two cards"
+    pend["prompt"] = f"Pass {word} to {g['players'][(who + 1) % len(g['players'])]['name']}."
 
 
 def apply_choice(g, idx, choice, events):
@@ -383,24 +385,15 @@ def apply_choice(g, idx, choice, events):
         if idx != pend.get("by"):
             return "not your choice"
         need = min(2, len(g["players"][idx]["hand"]))
-        chosen = pend["answers"].get(idx, [])
-        if isinstance(choice, list):
-            picks = choice
-        else:
-            picks = [choice]
-        if len(chosen) + len(picks) > need or not picks:
+        picks = choice if isinstance(choice, list) else [choice]
+        if len(picks) != need:
             return "choose the right number of cards"
-        if len(set(chosen + picks)) != len(chosen) + len(picks):
+        if len(set(picks)) != len(picks):
             return "duplicate card"
         hand_ids = [c["id"] for c in g["players"][idx]["hand"]]
         if any(c not in hand_ids for c in picks):
             return "card not in your hand"
-        pend["answers"][idx] = chosen + picks
-        if len(pend["answers"][idx]) < need:
-            pend["options"] = [{"v": c["id"], "label": card_label(c)}
-                               for c in g["players"][idx]["hand"]
-                               if c["id"] not in pend["answers"][idx]]
-            return None
+        pend["answers"][idx] = picks
         pend["pos"] += 1
         _eggplant_next(g, events)
         return None

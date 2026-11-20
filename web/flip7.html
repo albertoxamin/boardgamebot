@@ -55,6 +55,7 @@ h1{font-size:22px;margin:6px 0} .card{background:#1e293b;border-radius:12px;padd
 .deckpile{display:flex;align-items:center;gap:10px;justify-content:center;margin:8px 0}
 .lobby-note{text-align:center;padding:10px}
 button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;cursor:pointer}
+button:disabled{opacity:.45;cursor:not-allowed}
 .hit{background:#f59e0b;color:#111;font-weight:800}.stay{background:#334155;color:#fff}
 .log{white-space:pre-wrap;font-size:14px;max-height:220px;overflow:auto}
 .small{font-size:13px;color:#94a3b8} .hidden{display:none}
@@ -251,6 +252,15 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 .atdesc{position:absolute;bottom:0;left:5px;right:5px;height:42px;display:flex;align-items:center;justify-content:center;color:#000;font-size:8px;font-weight:800;line-height:1.1;text-align:center;text-shadow:0 1px 0 #fff9}
 .atdesc span{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden}
 .atdesc.light-text{color:#fff;text-shadow:0 1px 2px #000}
+.atpopup{position:fixed;left:50%;top:10%;transform:translateX(-50%);z-index:1001;max-width:92vw;background:#0f172a;border:2px solid #84cc16;border-radius:12px;padding:10px 12px;box-shadow:0 10px 30px #000c;color:#f8fafc;text-align:center;pointer-events:none}
+.atpopuptext{font-size:13px;font-weight:800;line-height:1.3}
+.atpopupcards{display:flex;gap:8px;justify-content:center;margin-top:8px}
+.atpopupcard{width:84px;height:126px;object-fit:cover;border:2px solid #fff;border-radius:8px;animation:atcardin .45s cubic-bezier(.2,1.4,.4,1) both}
+.atpopupcard:nth-child(2){animation-delay:.12s}
+.atpopupcard:nth-child(3){animation-delay:.24s}
+.atpopupin{animation:atpopin .25s ease-out both}
+@keyframes atcardin{from{opacity:0;transform:translateY(-24px) scale(.6) rotate(-8deg)}to{opacity:1;transform:none}}
+@keyframes atpopin{from{opacity:0;transform:translateX(-50%) scale(.9)}to{opacity:1;transform:translateX(-50%) scale(1)}}
 .atcard.clickable,.atchoice{cursor:pointer}
 .atchoice:hover{border-color:#84cc16}
 .atcard.atsel,.atchoice.atsel{border-color:#22c55e;box-shadow:0 0 0 2px #22c55e}
@@ -258,6 +268,10 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 .atseat{background:#0f172a;border:1px solid #334155;border-radius:9px;padding:7px}
 .atseat.atcurrent{border-color:#84cc16}
 .atseatname{font-weight:800;margin-bottom:3px}
+.atcount{display:inline-block}
+.atbump{animation:atbump .5s ease-out}
+@keyframes atbump{0%{transform:scale(1)}35%{transform:scale(1.6);color:#84cc16}100%{transform:scale(1)}}
+.atfly{position:fixed;z-index:1002;border:1px solid #000;border-radius:10px;box-shadow:0 8px 22px #000b;pointer-events:none;transition:transform .65s cubic-bezier(.2,.8,.2,1),opacity .65s ease-in}
 .athandcard{width:126px;height:189px;flex-basis:126px}
 .atchoice{background:#1e293b;color:#e2e8f0;border:2px solid #475569;border-radius:9px;padding:7px 10px;font-size:13px;font-weight:700;margin:0}
 </style></head><body>
@@ -364,6 +378,7 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <div id="atChoice"></div>
 <div id="atActions"></div>
 <div class="log" id="atLog"></div>
+<div id="atPopup" class="atpopup hidden"></div>
 </div>
 <div id="synced">
 <div id="syncBoard"></div>
@@ -386,5 +401,5 @@ button{font-size:17px;padding:12px 18px;border:0;border-radius:10px;margin:4px;c
 <script data-cfasync="false" src="castlecombo-faces.js?v=2"></script>
 <script data-cfasync="false" src="castlecombo.js?v=6"></script>
 <script data-cfasync="false" src="tornado.js?v=2"></script>
-<script data-cfasync="false" src="artichokes.js?v=7"></script>
+<script data-cfasync="false" src="artichokes.js?v=10"></script>
 </body></html>

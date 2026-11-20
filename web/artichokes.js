@@ -1,4 +1,4 @@
-const ATAPP={user_id:0,chat_id:null,board:null,timer:null,init:'',err:'',sel:[],pass:new Set()};
+const ATAPP={user_id:0,chat_id:null,board:null,timer:null,init:'',err:'',sel:[],pass:new Set(),popupTimer:null};
 const AT_VER=4;
 const AT_SPRITE={beet:0,broccoli:1,carrot:2,corn:3,eggplant:4,leek:5,onion:6,peas:7,
  pepper:8,potato:9,artichoke:10,rhubarb:15,back:16};
@@ -9,10 +9,28 @@ function atCardName(v){return String(v||'').replace(/^./,c=>c.toUpperCase());}
 function atCardDesc(c){
  let fromBoard=(ATAPP.board&&ATAPP.board.descriptions&&ATAPP.board.descriptions[c.v])||'';
  return fromBoard||String(c.desc||'');}
+function atRevealCards(msg){
+ let s=String(msg||''),found=[];
+ if(!/revealed|drew|turned up/i.test(s))return found;
+ Object.keys(AT_SPRITE).forEach(v=>{
+  if(v==='back')return;
+  let re=new RegExp('(?:^|[^a-z])'+v+'(?:s)?(?:[^a-z]|$)','i');
+  if(re.test(s)&&found.indexOf(v)<0)found.push(v);
+ });
+ return found;}
+function atPopup(cards,msg){
+ let p=document.getElementById('atPopup');if(!p||!cards.length)return;
+ p.innerHTML='<div class="atpopuptext">'+escapeHtml(msg)+'</div><div class="atpopupcards">'+
+  cards.map(v=>'<img class="atpopupcard" src="/artichokes_cards/'+AT_SPRITE[v]+'.jpg?v='+AT_VER+'" alt="'+escapeHtml(atCardName(v))+'">').join('')+'</div>';
+ p.classList.remove('hidden','atpopupin');void p.offsetWidth;p.classList.add('atpopupin');
+ clearTimeout(ATAPP.popupTimer);
+ ATAPP.popupTimer=setTimeout(()=>p.classList.add('hidden'),2800);}
 function atChatId(raw){let s=String(raw||'');if(s.startsWith('artichokes'))s=s.slice(10);
  let n=parseInt(s,10);return isNaN(n)?0:n;}
 function atApi(path,opts){return fetch(path,opts).then(r=>r.json());}
-function atLog(s){let e=document.getElementById('atLog');if(e)e.textContent+=s+'\n';}
+function atLog(s){
+ let e=document.getElementById('atLog');if(e)e.textContent+=s+'\n';
+ let cards=atRevealCards(s);if(cards.length)atPopup(cards,s);}
 async function atLoad(){
  let tg=tgInit(); let board=document.getElementById('atBoard');
  if(!tg.id){board.innerHTML='<div class="table lobby-note">Open as Telegram Mini App via the bot\'s Abandon All Artichokes link.</div>';return;}
@@ -57,7 +75,7 @@ function atCard(c,cls,extra){
  let name=atCardName(c.v||'').toUpperCase(),desc=atCardDesc(c);
  let light=['beet','broccoli','eggplant','artichoke'].indexOf(c.v)>=0;
  let art=c.v==='artichoke'?' artichoke':'';
- return '<div class="atcard '+cls+'"'+(extra||'')+'>'+
+ return '<div class="atcard '+cls+'" data-at-card-id="'+escapeHtml(String(c.id))+'" data-at-v="'+escapeHtml(String(c.v))+'"'+(extra||'')+'>'+
   '<img class="atart" src="/artichokes_cards/'+num+'.jpg?v='+AT_VER+'" alt="'+escapeHtml(name)+'">'+
   '<div class="atname'+art+'" style="color:'+(AT_COLOR[c.v]||'#fff')+'">'+escapeHtml(name)+'</div>'+
   '<div class="atdesc'+(light?' light-text':'')+'"><span>'+escapeHtml(desc)+'</span></div></div>';}
@@ -65,13 +83,55 @@ function atPlayer(p,i,b){
  let bits=[];
  if(b.phase!=='lobby'&&i===b.actor)bits.push('👉');
  if(p.npc)bits.push('🤖');
- return '<div class="atseat'+(i===b.actor?' atcurrent':'')+'">'+
+ return '<div class="atseat'+(i===b.actor?' atcurrent':'')+'" data-at-seat="'+i+'">'+
   '<div class="atseatname">'+bits.join(' ')+' '+escapeHtml(p.name)+'</div>'+
-  '<div class="small">🥬 '+p.artichokes+' · ✋ '+p.hand_count+
-  ' · 🎴 '+p.deck+' · ♻️ '+p.discard+'</div></div>';}
+  '<div class="small">🥬 <span class="atcount" data-at-count="'+i+':artichokes">'+p.artichokes+'</span> · '+
+  '✋ <span class="atcount" data-at-count="'+i+':hand">'+p.hand_count+'</span> · '+
+  '🎴 <span class="atcount" data-at-count="'+i+':deck">'+p.deck+'</span> · '+
+  '♻️ <span class="atcount" data-at-count="'+i+':discard">'+p.discard+'</span></div></div>';}
 function atToggle(list,v){let i=list.indexOf(v);if(i<0)list.push(v);else list.splice(i,1);}
+function atCounts(b){
+ let out={};
+ (b.players||[]).forEach((p,i)=>{
+  out[i+':artichokes']=p.artichokes;
+  out[i+':hand']=p.hand_count;
+  out[i+':deck']=p.deck;
+  out[i+':discard']=p.discard;
+ });
+ return out;}
+function atSnapshot(b){
+ return {phase:b.phase,actor:b.actor,
+  garden_row:(b.garden_row||[]).map(c=>({id:c.id,v:c.v})),counts:atCounts(b)};}
+function atOldRects(){
+ let out={cards:{},seats:{}};
+ document.querySelectorAll('.atcard[data-at-card-id]').forEach(el=>{
+  out.cards[String(el.dataset.atCardId)]=el.getBoundingClientRect();});
+ document.querySelectorAll('[data-at-seat]').forEach(el=>{
+  out.seats[el.dataset.atSeat]=el.getBoundingClientRect();});
+ return out;}
+function atBumpCounts(oldCounts,newCounts){
+ document.querySelectorAll('[data-at-count]').forEach(el=>{
+  let k=el.dataset.atCount;
+  if(oldCounts[k]!==undefined&&oldCounts[k]!==newCounts[k]){
+   el.classList.remove('atbump');void el.offsetWidth;el.classList.add('atbump');}
+ });}
+function atFlyHarvest(card,from,to){
+ if(!from||!to||AT_SPRITE[card.v]===undefined)return;
+ let img=document.createElement('img');
+ img.className='atfly';
+ img.src='/artichokes_cards/'+AT_SPRITE[card.v]+'.jpg?v='+AT_VER;
+ let cx=from.left+from.width/2,cy=from.top+from.height/2;
+ let tx=to.left+to.width/2,ty=to.top+to.height/2;
+ img.style.left=from.left+'px';img.style.top=from.top+'px';
+ img.style.width=from.width+'px';img.style.height=from.height+'px';
+ document.body.appendChild(img);
+ requestAnimationFrame(()=>{
+  img.style.transform='translate('+(tx-cx)+'px,'+(ty-cy)+'px) scale(.16) rotate(12deg)';
+  img.style.opacity='.15';});
+ setTimeout(()=>img.remove(),700);}
 function atRender(){
  let b=ATAPP.board;if(!b)return;
+ let old=ATAPP.prevBoard,rects=atOldRects(),oldCounts=old&&old.counts||{};
  let turn=document.getElementById('atTurn'),board=document.getElementById('atBoard'),
   actions=document.getElementById('atActions'),hand=document.getElementById('atHand'),
   choice=document.getElementById('atChoice');
@@ -104,11 +164,13 @@ function atRender(){
  if(b.pending){
   let pend=b.pending,opts=pend.options||[];
   if(pend.kind==='eggplant'){
-   choice.innerHTML='<div class="table"><b>'+escapeHtml(pend.prompt)+'</b><div class="atchoices">'+
+   let need=Math.min(2,opts.length),n=ATAPP.pass.size;
+   choice.innerHTML='<div class="table"><b>'+escapeHtml(pend.prompt)+'</b>'+
+    '<div class="small">Selected '+n+' / '+need+'</div><div class="atchoices">'+
     opts.map(o=>{
      let on=ATAPP.pass.has(String(o.v));
      return '<button class="atchoice'+(on?' atsel':'')+'" data-at-pass="'+escapeHtml(String(o.v))+'">'+escapeHtml(o.label)+'</button>';
-    }).join('')+'</div>'+(b.can_act?'<button class="hit" id="atPassGo">✅ Pass selected</button>':'')+'</div>';
+    }).join('')+'</div>'+(b.can_act?'<button class="hit" id="atPassGo"'+(n!==need?' disabled':'')+'>✅ Pass selected ('+n+'/'+need+')</button>':'')+'</div>';
   }else{
    choice.innerHTML='<div class="table"><b>'+escapeHtml(pend.prompt)+'</b><div class="atchoices">'+
     opts.map(o=>'<button class="atchoice" data-at-ch="'+escapeHtml(String(o.v))+'">'+escapeHtml(o.label)+'</button>').join('')+'</div></div>';
@@ -127,6 +189,16 @@ function atRender(){
  }
   actions.innerHTML=a;
   if(ATAPP.err)choice.innerHTML+='<div class="lobby-note">⛔ '+escapeHtml(ATAPP.err)+'</div>';
+  let fresh=atSnapshot(b);
+  if(old){
+   atBumpCounts(oldCounts,fresh.counts);
+   if(old.phase==='harvest'&&b.phase==='play'){
+    let newIds=(b.garden_row||[]).map(c=>String(c.id));
+    let gone=(old.garden_row||[]).find(c=>newIds.indexOf(String(c.id))<0);
+    if(gone)atFlyHarvest(gone,rects.cards[String(gone.id)],rects.seats[String(b.actor)]);
+   }
+  }
+  ATAPP.prevBoard=fresh;
 }
 (function atEvents(){
  document.addEventListener('click',e=>{
@@ -135,7 +207,12 @@ function atRender(){
   if(t.hasAttribute('data-at-h'))return atMove('harvest',{pos:parseInt(t.dataset.atH,10)});
   if(t.hasAttribute('data-at-p')){atToggle(ATAPP.sel,parseInt(t.dataset.atP,10));atRender();return;}
   if(t.hasAttribute('data-at-ch'))return atMove('choose',{choice:/^-?\d+$/.test(t.dataset.atCh)?parseInt(t.dataset.atCh,10):t.dataset.atCh});
-  if(t.hasAttribute('data-at-pass')){let v=t.dataset.atPass;if(ATAPP.pass.has(v))ATAPP.pass.delete(v);else ATAPP.pass.add(v);atRender();return;}
+  if(t.hasAttribute('data-at-pass')){
+   let v=t.dataset.atPass,opts=(ATAPP.board&&ATAPP.board.pending&&ATAPP.board.pending.options)||[];
+   let need=Math.min(2,opts.length);
+   if(ATAPP.pass.has(v))ATAPP.pass.delete(v);
+   else if(ATAPP.pass.size<need)ATAPP.pass.add(v);
+   atRender();return;}
  });
  document.addEventListener('click',e=>{
    let id=e.target.id;
@@ -146,7 +223,11 @@ function atRender(){
   if(id==='atPlay'){if(!ATAPP.sel.length){ATAPP.err='Select a card first.';atRender();return;}
    return atMove('play',{iid:ATAPP.sel[0]});}
   if(id==='atEnd')return atMove('end');
-  if(id==='atPassGo')return atMove('pass',{ids:Array.from(ATAPP.pass)});
+  if(id==='atPassGo'){
+   let opts=(ATAPP.board&&ATAPP.board.pending&&ATAPP.board.pending.options)||[];
+   let need=Math.min(2,opts.length);
+   if(ATAPP.pass.size!==need){ATAPP.err='Select '+need+' cards.';atRender();return;}
+   return atMove('pass',{ids:Array.from(ATAPP.pass)});}
  });
  })();
 (function atStart(){if(document.getElementById('atBoard'))atLoad();})();

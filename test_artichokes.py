@@ -53,6 +53,35 @@ def test_card_descriptions():
     assert "Don't break my heart!" in A.card_desc({"v": "artichoke"})
 
 
+def test_eggplant_pending_hides_other_hands():
+    import bot
+    g, ev = mk(3)
+    g["chat_id"] = -100
+    g["phase"] = "play"
+    set_hand(g, 0, ["carrot", "beet", "peas"])
+    set_hand(g, 1, ["corn", "potato", "leek"])
+    ids = [c["id"] for c in g["players"][1]["hand"]]
+    g["pending"] = {"kind": "eggplant", "order": [0, 1, 2], "pos": 1,
+                    "answers": {}, "by": 1,
+                    "options": [{"v": i, "label": A.card_label(c)}
+                                for i, c in zip(ids, g["players"][1]["hand"])],
+                    "prompt": "Pass up to two cards to P3."}
+    other = bot.artichokes_board_json(g, g["players"][2]["user_id"])
+    assert other["pending"]["options"] == []
+    chooser = bot.artichokes_board_json(g, g["players"][1]["user_id"])
+    assert [o["v"] for o in chooser["pending"]["options"]] == ids
+    text = bot.artichokes_board_text(g)
+    assert "hand:" not in text
+    lines = text.splitlines()
+    tail = "\n".join(lines[next(i for i, l in enumerate(lines) if "Pass privately" in l):])
+    for o in g["pending"]["options"]:
+        assert o["label"] not in tail
+    kb = bot.artichokes_keyboard(g) or []
+    buttons = [b for row in kb for b in row]
+    assert all(o["label"] not in [b["text"] for b in buttons]
+               for o in g["pending"]["options"])
+
+
 def test_row_reshuffle_four_of_a_kind():
     g, ev = mk(2)
     g["garden_row"] = [card("pepper", i) for i in range(4)] + [card("beet", 90)]
@@ -161,10 +190,13 @@ def test_eggplant_passing():
     before = [len(p["hand"]) for p in g["players"]]
     pend = g["pending"]
     assert pend["kind"] == "eggplant"
+    assert pend["prompt"].startswith("Pass two cards")
     assert sum(c["v"] == "artichoke" for c in g["compost"]) == 1
     for _ in range(4):
         who = g["pending"]["by"]
-        choose = [c["id"] for c in g["players"][who]["hand"]][:2]
+        ids = [c["id"] for c in g["players"][who]["hand"]]
+        assert A.apply_choice(g, who, ids[:1], ev) == "choose the right number of cards"
+        choose = ids[:2]
         assert A.apply_choice(g, who, choose, ev) is None
     assert g["pending"] is None
     after = [len(p["hand"]) for p in g["players"]]

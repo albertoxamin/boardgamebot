@@ -29,6 +29,19 @@ ICONS = {
     "corn": "🌽", "eggplant": "🍆", "leek": "🧄", "onion": "🧅",
     "peas": "🫛", "pepper": "🌶️", "potato": "🥔",
 }
+DESCRIPTIONS = {
+    "beet": "You and an opponent each reveal a random card. Compost both if Artichokes, otherwise swap them.",
+    "broccoli": "Compost an Artichoke, if your hand has three or more Artichokes.",
+    "carrot": "As your only play action, compost exactly two Artichokes along with this card.",
+    "corn": "Play this card with an Artichoke. Then put a card from the Garden Row on top of your Deck.",
+    "eggplant": "Compost an Artichoke, along with this card. All players pass two cards to the left.",
+    "leek": "Reveal the top card of an opponent's Deck. Put it into your hand or on top of their Discard Pile.",
+    "onion": "Compost an Artichoke. Put this card on top of another player's Discard Pile.",
+    "peas": "Reveal two cards from the Garden Stack. Put one on your Discard pile, the other on an opponent's.",
+    "pepper": "Put a card from your Discard Pile on top of your Deck.",
+    "potato": "Reveal the top card of your Deck. Compost if Artichoke, otherwise discard it.",
+    "artichoke": "Don't break my heart!",
+}
 
 
 def card_name(card):
@@ -37,6 +50,10 @@ def card_name(card):
 
 def card_label(card):
     return f"{ICONS.get(card['v'], '🥬')} {card_name(card)}"
+
+
+def card_desc(card):
+    return DESCRIPTIONS.get(card["v"], "")
 
 
 def new_player(user_id, name):

@@ -45,6 +45,11 @@ def test_setup_counts():
     json.dumps(g)
 
 
+def test_card_descriptions():
+    for v in A.VEGGIES + (A.ARTICHOKE,):
+        assert A.card_desc({"v": v})
+
+
 def test_row_reshuffle_four_of_a_kind():
     g, ev = mk(2)
     g["garden_row"] = [card("pepper", i) for i in range(4)] + [card("beet", 90)]

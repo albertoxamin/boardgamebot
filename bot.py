@@ -29,7 +29,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 3
+WEB_VER = 4
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -3027,7 +3027,8 @@ def artichokes_actor_idx(g, uid):
 
 def _at_card_json(c):
     return {"id": c["id"], "v": c["v"], "name": AT.card_name(c),
-            "label": AT.card_label(c), "icon": AT.ICONS.get(c["v"], "🥬")}
+            "label": AT.card_label(c), "icon": AT.ICONS.get(c["v"], "🥬"),
+            "desc": AT.card_desc(c)}
 
 
 def _at_hand_text(p):
@@ -3071,6 +3072,14 @@ def artichokes_board_text(g):
         play = sorted(set(AT.playable(g, actor)))
         lines.append("▶️ Your hand: " + ", ".join(
             f"{c['id']}:{AT.card_label(c)}" for c in g["players"][actor]["hand"]) if g["players"][actor]["hand"] else "▶️ Empty hand.")
+        seen = []
+        for c in g["players"][actor]["hand"]:
+            if c["v"] not in seen and AT.card_desc(c):
+                seen.append(c["v"])
+        if seen:
+            lines.append("📖 " + " · ".join(
+                f"<b>{html.escape(AT.card_name({'v': v}))}</b>: {html.escape(AT.card_desc({'v': v}))}"
+                for v in seen))
         lines.append(f"Play: /artichokes_play &lt;card id or name&gt; (playable: {', '.join(map(str, play)) or 'none'}) · /artichokes_end")
     return "\n".join(lines)
 

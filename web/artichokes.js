@@ -1,7 +1,10 @@
 const ATAPP={user_id:0,chat_id:null,board:null,timer:null,init:'',err:'',sel:[],pass:new Set()};
-const AT_VER=2;
+const AT_VER=3;
 const AT_SPRITE={beet:0,broccoli:1,carrot:2,corn:3,eggplant:4,leek:5,onion:6,peas:7,
  pepper:8,potato:9,artichoke:10,rhubarb:15,back:16};
+const AT_COLOR={beet:'#9f2645',broccoli:'#33762f',carrot:'#ef9131',corn:'#f3d80d',
+ eggplant:'#7c3883',leek:'#6e8d51',onion:'#b66d36',peas:'#72b146',pepper:'#f3b637',
+ potato:'#a27c3e',artichoke:'#c9d336',rhubarb:'#cb4f6b'};
 function atChatId(raw){let s=String(raw||'');if(s.startsWith('artichokes'))s=s.slice(10);
  let n=parseInt(s,10);return isNaN(n)?0:n;}
 function atApi(path,opts){return fetch(path,opts).then(r=>r.json());}
@@ -48,9 +51,12 @@ async function atMove(action,extra){
 function atCard(c,cls,extra){
  let num=AT_SPRITE[c.v];if(num===undefined)num=AT_SPRITE.back;
  let cap=escapeHtml(c.name||c.label||'Card');
- return '<div class="atcard '+cls+'" title="'+cap+'"'+(extra||'')+'>'+
+ let desc=escapeHtml(c.desc||'');
+ let title=cap+(desc?' — '+desc:'');
+ return '<div class="atcard '+cls+'" title="'+title+'"'+(extra||'')+'>'+
   '<img class="atart" src="/artichokes_cards/'+num+'.jpg?v='+AT_VER+'" alt="'+cap+'">'+
-  '<div class="atcap">'+cap+'</div></div>';}
+  '<div class="atcap"><b style="color:'+(AT_COLOR[c.v]||'#fff')+'">'+cap+'</b>'+
+  (desc?'<span>'+desc+'</span>':'')+'</div></div>';}
 function atPlayer(p,i,b){
  let bits=[];
  if(b.phase!=='lobby'&&i===b.actor)bits.push('👉');

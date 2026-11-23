@@ -1,5 +1,13 @@
 // Azul Mini App (synced). Loaded by flip7.html router after leaves.js helpers.
 const AZ = {user_id: 0, chat_id: null, board: null, timer: null, init: ''};
+const AZ_TILE_SRC = {
+  blue: 'azul_assets/img/blue.svg',
+  yellow: 'azul_assets/img/yellow.svg',
+  red: 'azul_assets/img/red.svg',
+  black: 'azul_assets/img/black.svg',
+  white: 'azul_assets/img/cyan.svg',
+  first: 'azul_assets/img/first-player.svg'
+};
 
 function azLog(s) { const e = document.getElementById('azLog'); if (e) e.textContent += s + '\n'; }
 function azApi(path, opts) { return fetch(path, opts).then(r => r.json()); }
@@ -58,8 +66,9 @@ async function azMove(action, extra) {
 }
 function azTile(t) {
   if (!t) return '';
-  const cls = t === 'first' ? 'az-first' : 'az-' + t;
-  return '<span class="aztile ' + cls + '" title="' + escapeHtml(t) + '"></span>';
+  const src = AZ_TILE_SRC[t] || AZ_TILE_SRC.white;
+  return '<img class="aztile" src="' + src + '" alt="' + escapeHtml(t) +
+         '" title="' + escapeHtml(t) + '">';
 }
 function azSlots(tiles, size) {
   let html = '';
@@ -104,7 +113,7 @@ function azRender() {
   actions.innerHTML = '';
   if (b.phase === 'lobby') {
     turn.textContent = '🔷 Azul lobby — ' + b.players.length + '/4 players';
-    board.innerHTML = '<div class="table lobby-note">Join, then anyone taps Start.</div>' +
+    board.innerHTML = '<div class="table azlobby lobby-note">Join, then anyone taps Start.</div>' +
       b.players.map(p => '<div class="azplayer"><div class="azhead">' + escapeHtml(p.name) + '</div></div>').join('');
     if (!b.is_player) join.classList.remove('hidden');
     start.classList.remove('hidden');
@@ -125,7 +134,7 @@ function azRender() {
     '<div class="azfac">' + f.tiles.map(azTile).join('') + '</div>').join('');
   const center = (b.center.marker ? azTile('first') : '') +
     b.center.tiles.map(azTile).join('') || '<span class="small">empty</span>';
-  board.innerHTML = '<div class="table"><div class="small">FACTORIES</div><div>' + (facs || '<span class="small">empty</span>') +
+  board.innerHTML = '<div class="table aztable"><div class="small">FACTORIES</div><div>' + (facs || '<span class="small">empty</span>') +
     '</div><div class="small" style="margin-top:8px">CENTER</div><div class="azrow">' + center + '</div></div>' +
     b.players.map(p => azPlayer(p, b)).join('');
   if (b.can_act && b.pending) {

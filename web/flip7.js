@@ -17,10 +17,11 @@ let guideKey='games';
    else if(String(start).startsWith('castlecombo')){document.getElementById('castlecombo').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='🏰 Castle Combo';}
    else if(String(start).startsWith('artichokes')){document.getElementById('artichokes').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='🥬 Abandon All Artichokes';}
    else if(String(start).startsWith('fellowship')){document.getElementById('fellowship').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='💍 Fellowship of the Ring';}
+   else if(String(start).startsWith('azul')){document.getElementById('azul').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='🔷 Azul';}
      }catch(e){}
   let panelKeys={regicide:'regicide',odin:'odin',leaves:'leaves',lsd:'lsd',spots:'spots',
     yahtzee:'yahtzee',fliptoons:'fliptoons',castlecombo:'castlecombo',tornado:'tornado',
-    artichokes:'artichokes',fellowship:'fellowship'};
+    artichokes:'artichokes',fellowship:'fellowship',azul:'azul'};
   for(let panel in panelKeys){let el=document.getElementById(panel);
     if(el&&!el.classList.contains('hidden')){guideKey=panelKeys[panel];break;}}
   let btn=document.getElementById('guideBtn');if(btn)btn.classList.remove('hidden');
@@ -272,4 +273,4 @@ document.getElementById('syncStart').addEventListener('click',()=>move('start'))
 document.getElementById('syncRematch').addEventListener('click',()=>move('rematch'));
 (function autoSync(){let tg=tgInit(); if(!tg.id)return;
  // Regicide/Odin/LSD/Spots modes are started by their own scripts (loaded after this file).
-  if(document.getElementById('regicide').classList.contains('hidden')&&document.getElementById('odin').classList.contains('hidden')&&document.getElementById('leaves').classList.contains('hidden')&&document.getElementById('lsd').classList.contains('hidden')&&document.getElementById('spots').classList.contains('hidden')&&document.getElementById('yahtzee').classList.contains('hidden')&&document.getElementById('fliptoons').classList.contains('hidden')&&document.getElementById('tornado').classList.contains('hidden')&&document.getElementById('castlecombo').classList.contains('hidden')&&document.getElementById('artichokes').classList.contains('hidden')) loadGames();})();
+  if(document.getElementById('regicide').classList.contains('hidden')&&document.getElementById('odin').classList.contains('hidden')&&document.getElementById('leaves').classList.contains('hidden')&&document.getElementById('lsd').classList.contains('hidden')&&document.getElementById('spots').classList.contains('hidden')&&document.getElementById('yahtzee').classList.contains('hidden')&&document.getElementById('fliptoons').classList.contains('hidden')&&document.getElementById('tornado').classList.contains('hidden')&&document.getElementById('castlecombo').classList.contains('hidden')&&document.getElementById('artichokes').classList.contains('hidden')&&document.getElementById('azul').classList.contains('hidden')) loadGames();})();

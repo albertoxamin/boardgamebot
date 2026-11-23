@@ -166,6 +166,16 @@ GAME_SPECS = (
         module="fellowship", web_module="fellowship", static_assets=("fellowship.js",),
         command_aliases=("/fellowship",), callback_prefix_aliases=("fr",),
     ),
+    GameSpec(
+        key="azul", name="🔷 Azul", command="/azul", join_command="/azul_join",
+        description="tile-drafting wall builder, most points wins",
+        help_commands=("/azul_join", "/azul_join_npc", "/azul_start", "/azul_take",
+                       "/azul_place", "/azul_rules", "/azul_cancel", "/azul_rematch"),
+        web_label="🎮 Play Azul (HTML)", callback_prefix="az",
+        min_players=2, max_players=4, npc_full="⛔ Azul is 2-4 players (full).",
+        rematch_phases=("game_end",), cover="azul.png",
+        module="azul", web_module="azul", static_assets=("azul.js",),
+    ),
 )
 
 GAMES_BY_KEY = {spec.key: spec for spec in GAME_SPECS}

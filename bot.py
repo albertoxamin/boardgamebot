@@ -20,6 +20,7 @@ import fliptoons as FT
 import castlecombo as CC
 import tornado as TS
 import fellowship as FTR
+import azul as AZ
 import game_registry as GR
 import web_assets
 from game_modules.leaves import LEAVES_MODULE
@@ -33,7 +34,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 25
+WEB_VER = 26
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -425,6 +426,7 @@ NPC_PLAYERS = {
     "castlecombo": _castlecombo_npc,
     "artichokes": _artichokes_npc,
     "fellowship": _fellowship_npc,
+    "azul": lambda: {**_npc_player(), **AZ.new_player(NPC_ID, "🤖 NPC")},
 }
 
 
@@ -4076,19 +4078,324 @@ def artichokes_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
+AZUL_RULES = """🔷 <b>Azul rules</b> (2-4 players, by Michael Kiesling): draft colourful tiles to decorate your wall. The game ends after the round in which someone completes a wall row; most points wins.
+• <b>Factory offer:</b> 5 factories with 2 players, 7 with 3, 9 with 4. Take ALL tiles of one colour from a factory (the rest slide to the centre) or from the centre. Taking from the centre also takes the ⭐ if it's there; a centre holding only ⭐ is not a pick, and the round's first player keeps it if nobody takes centre tiles.
+• Put the tiles on one pattern line (row 1 holds 1 tile … row 5 holds 5). A line takes one colour only, and never a colour already in that row of your wall. Extra tiles fall onto your floor line; when its 7 spaces are full, further tiles are discarded. The ⭐ also goes on your floor and makes you first player next round.
+• <b>Wall-tiling</b> happens automatically at the end of the round: every full line moves its rightmost tile to the matching wall space. Score the connected group in its row plus the connected group in its column (1 point if isolated). Other line tiles and all floor tiles are discarded.
+• <b>Floor penalties:</b> the 7 spaces cost -1,-1,-2,-2,-2,-3,-3 (⭐ counts as a tile). Your score can't drop below 0.
+• <b>Final scoring:</b> +2 per complete row, +7 per complete column, +10 per colour with all five tiles on the wall. Ties break on completed rows, otherwise the win is shared.
+• Commands: /azul_take &lt;factory N|center&gt; &lt;colour&gt; then /azul_place &lt;1-5|floor&gt;, or use the buttons/Mini App."""
+
+
+def azul_get(state, chat_id):
+    return state.setdefault("azul", {}).get(str(chat_id))
+
+
+def azul_actor_idx(g, uid):
+    if g["phase"] != "draft":
+        return None
+    return _actor_idx(g, uid, g["current"])
+
+
+def azul_board_text(g):
+    if g["phase"] == "lobby":
+        return (f"🔷 <b>Azul lobby</b> - {len(g['players'])}/{AZ.MAX_PLAYERS} players. "
+                "Friends: /azul_join, anyone: /azul_start")
+    if g["phase"] == "game_end":
+        winners = " & ".join(html.escape(g["players"][i]["name"]) for i in g["winners"])
+        return (f"🏆 <b>Azul game over</b> - winner: <b>{winners}</b>! "
+                f"Scores after {g['round']} rounds.")
+    lines = [AZ.board_lines(g)]
+    lines.append("🎨 /azul_take &lt;factory N|center&gt; &lt;colour&gt; "
+                 "· /azul_place &lt;1-5|floor&gt; (or tap the buttons).")
+    return "\n".join(lines)
+
+
+def _az_choice_text(opt):
+    icon = AZ.SYMBOLS.get(opt["color"], "⭐")
+    label = "C" if opt["source"] == "center" else "F" + str(opt["index"] + 1)
+    return f"{label} {icon}×{opt['count']}"
+
+
+def azul_keyboard(g):
+    if g["phase"] == "game_end":
+        return [[{"text": "🔄 Rematch!", "callback_data": "az:rematch"}]]
+    ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
+    wk = web_keyboard(ct, g["chat_id"], game="azul")
+    if g["phase"] == "lobby":
+        kb = [[{"text": "🙋 Join Azul", "callback_data": "az:join"}]]
+        if not any(p.get("npc") for p in g["players"]):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "az:npc"}])
+        kb.append([{"text": "▶️ Start game", "callback_data": "az:start"}])
+        return kb + (wk or [])
+    kb = []
+    pend = g.get("pending")
+    if pend:
+        color = pend["color"]
+        rows = AZ.rows_for(g, pend["by"], color) if color else []
+        for r in rows:
+            kb.append([{"text": f"📏 Line {r + 1} ({r + 1} slot{'s' if r else ''})",
+                        "callback_data": f"az:r:{r}"}])
+        extra = ""
+        if pend["marker"]:
+            extra = " + ⭐"
+        n = len(pend["tiles"]) + (1 if pend["marker"] else 0)
+        kb.append([{"text": f"🧹 Floor ({n} tile{'s' if n != 1 else ''}{extra})",
+                    "callback_data": "az:r:-1"}])
+    else:
+        opts = AZ.take_options(g)
+        row = []
+        for opt in opts:
+            row.append({"text": _az_choice_text(opt),
+                        "callback_data": f"az:t:{'f' if opt['source'] == 'factory' else 'c'}:"
+                                         f"{opt['index']}:{opt['color']}"})
+            if len(row) == 3:
+                kb.append(row)
+                row = []
+        if row:
+            kb.append(row)
+    if wk:
+        kb.extend(wk)
+    return kb or None
+
+
+def azul_render(g, events=None):
+    chat_id = g["chat_id"]
+    lines = [html.escape(e) for e in (events or [])]
+    if g["phase"] == "draft":
+        p = g["players"][g["current"]]
+        pend = g.get("pending")
+        if p.get("npc"):
+            ping = "👉 🤖 NPC's turn - anyone can play for it!"
+        else:
+            ping = f"👉 {azul_mention(g, p['user_id'])} - " + (
+                "choose a line for your tiles." if pend else "pick a colour.")
+        lines.append(ping)
+    text = "\n".join(lines + [azul_board_text(g)])
+    r = send_board(g, "azul", text, azul_keyboard(g))
+    if r.get("ok"):
+        old = g.get("board_message_id")
+        g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=chat_id, message_id=old)
+
+
+def azul_mention(g, user_id):
+    return f'<a href="tg://user?id={user_id}">{html.escape(AZ.name_of(g, user_id))}</a>'
+
+
+def handle_azul(state, msg, cmd, text, uid, name):
+    chat_id = msg["chat"]["id"]
+    g = azul_get(state, chat_id)
+    if cmd == "/azul_rules":
+        send(chat_id, AZUL_RULES)
+        return True
+    if cmd == "/azul":
+        if not g:
+            _name = msg.get("from", {}).get("first_name") or "Player"
+            g = AZ.new_game(chat_id, uid, _name)
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state.setdefault("azul", {})[str(chat_id)] = g
+            azul_render(g, [f"🔷 Azul game created by {html.escape(_name)}!"])
+        else:
+            azul_render(g)
+        return True
+    if not g:
+        send(chat_id, "No Azul game here yet - send /azul to create one.")
+        return True
+    g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd == "/azul_join_npc":
+        err = add_npc("azul", g)
+        send(chat_id, err or "🤖 NPC joined - anyone can play for it!")
+        if not err:
+            azul_render(g)
+        return True
+    if cmd == "/azul_join":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p["user_id"] == uid for p in g["players"]):
+            send(chat_id, "You're already in!")
+        elif len(g["players"]) >= AZ.MAX_PLAYERS:
+            send(chat_id, f"⛔ Azul is {AZ.MIN_PLAYERS}-{AZ.MAX_PLAYERS} players (full).")
+        else:
+            g["players"].append(AZ.new_player(uid, msg.get("from", {}).get("first_name") or "Player"))
+            send(chat_id, f"🙋 <b>{name}</b> joined Azul ({len(g['players'])} players).")
+            azul_render(g)
+        return True
+    if cmd == "/azul_start":
+        if g["phase"] != "lobby":
+            send(chat_id, "Already started.")
+        elif len(g["players"]) < AZ.MIN_PLAYERS:
+            send(chat_id, f"⛔ Need at least {AZ.MIN_PLAYERS} players.")
+        else:
+            ev = []
+            err = AZ.start_game(g, ev)
+            send(chat_id, f"⛔ {err}" if err else "🔷 Azul started!")
+            if not err:
+                azul_render(g, ev)
+        return True
+    if cmd == "/azul_cancel":
+        if uid != g["created_by"]:
+            send(chat_id, "⛔ Only the creator can cancel.")
+        else:
+            del state["azul"][str(chat_id)]
+            send(chat_id, "🗑 Azul game cancelled.")
+        return True
+    if cmd == "/azul_rematch":
+        ev, err = rematch_game(state, "azul", chat_id, uid)
+        send(chat_id, f"⛔ {err}" if err else "🔄 Rematch!")
+        return True
+    if cmd not in ("/azul_take", "/azul_pick", "/azul_place"):
+        return False
+    idx = azul_actor_idx(g, uid)
+    if idx is None:
+        send(chat_id, "⛔ You're not in this game (or it isn't your turn).")
+        return True
+    parts = text.split()[1:]
+    ev = []
+    take_usage = ("Usage: /azul_take &lt;factory 1-" + str(len(g["factories"])) +
+                  "|center&gt; &lt;colour&gt;")
+    if cmd in ("/azul_take", "/azul_pick"):
+        if not parts:
+            err = take_usage
+        else:
+            src, color = parts[0].lower(), (parts[1].lower() if len(parts) > 1 else "")
+            if src in ("center", "c", "middle", "m"):
+                err = AZ.take_tiles(g, idx, "center", 0, color, ev)
+            elif src.isdigit():
+                err = AZ.take_tiles(g, idx, "factory", int(src) - 1, color, ev)
+            else:
+                err = take_usage
+    else:
+        raw = parts[0].lower() if parts else ""
+        if raw in ("floor", "f", "-1"):
+            err = AZ.place_tiles(g, idx, -1, ev)
+        elif raw.isdigit():
+            err = AZ.place_tiles(g, idx, int(raw) - 1, ev)
+        else:
+            err = "Usage: /azul_place &lt;1-5|floor&gt;"
+    if err:
+        send(chat_id, f"⛔ {err}")
+    else:
+        azul_render(g, ev)
+    return True
+
+
+def azul_board_json(g, viewer_id=None):
+    me = next((p for p in g["players"] if p["user_id"] == viewer_id), None)
+    actor = g["current"] if g["phase"] == "draft" else None
+    can_act = bool(actor is not None and me is not None and
+                   (g["players"][actor]["user_id"] == viewer_id or g["players"][actor].get("npc")))
+    players = []
+    for i, p in enumerate(g["players"]):
+        players.append({
+            "user_id": p["user_id"], "name": p["name"], "npc": bool(p.get("npc")),
+            "score": p["score"], "wall": p["wall"], "pattern": p["pattern"],
+            "floor": p["floor"], "last_round": p["last_round"], "winner": p["winner"],
+            "rows": AZ.complete_rows(p), "cols": AZ.complete_columns(p),
+            "sets": AZ.complete_colors(p), "is_current": i == actor,
+        })
+    board = {
+        "chat_id": g["chat_id"], "phase": g["phase"], "round": g["round"],
+        "current": g["current"], "first_player": g["first_player"],
+        "bag": len(g["bag"]), "lid": len(g["lid"]),
+        "factories": [{"index": i, "tiles": f} for i, f in enumerate(g["factories"]) if f],
+        "center": {"tiles": g["center"], "marker": g["marker_center"]},
+        "players": players, "actor": actor, "can_act": can_act,
+        "is_player": me is not None, "winner_id": g.get("winner_id"),
+        "winners": g.get("winners", []), "symbols": AZ.SYMBOLS,
+        "colors": list(AZ.COLORS), "options": [], "pending": None,
+    }
+    if can_act:
+        board["options"] = AZ.take_options(g)
+    pend = g.get("pending")
+    if pend and (can_act or (me and me["user_id"] == g["players"][pend["by"]]["user_id"])):
+        color = pend["color"]
+        board["pending"] = {
+            "color": color, "tiles": pend["tiles"], "marker": pend["marker"],
+            "rows": AZ.rows_for(g, pend["by"], color) if color else [],
+        }
+    return board
+
+
+def azul_api_move(state, chat_id, user_id, body):
+    g = azul_get(state, chat_id)
+    if not g:
+        return [], "no azul game in that chat"
+    action = body.get("action")
+    ev = []
+    idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
+    if action == "join":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        if idx is not None:
+            return ev, None
+        if len(g["players"]) >= AZ.MAX_PLAYERS:
+            return [], "full"
+        iu_name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
+        g["players"].append(AZ.new_player(user_id, iu_name))
+        ev.append("🙋 joined Azul.")
+    elif action == "start":
+        if g["phase"] != "lobby":
+            return [], "already started"
+        err = AZ.start_game(g, ev)
+        if err:
+            return [], err
+    elif action == "rematch":
+        return rematch_game(state, "azul", chat_id, user_id)
+    else:
+        idx = azul_actor_idx(g, user_id)
+        if idx is None:
+            return [], "not in this game"
+        if action == "take":
+            src = str(body.get("source", "")).lower()
+            color = str(body.get("color", "")).lower()
+            if src in ("center", "c", "middle", "m"):
+                source = "center"
+            elif src in ("factory", "f"):
+                source = "factory"
+            else:
+                return [], "bad source"
+            try:
+                index = int(body.get("index", body.get("factory", 0)))
+            except (TypeError, ValueError):
+                return [], "bad factory"
+            err = AZ.take_tiles(g, idx, source, index, color, ev)
+        elif action == "place":
+            raw = str(body.get("row", "floor")).lower()
+            if raw in ("floor", "f", "-1"):
+                row = -1
+            else:
+                try:
+                    row = int(raw)
+                except ValueError:
+                    return [], "bad row"
+            err = AZ.place_tiles(g, idx, row, ev)
+        elif action == "move":
+            move = body.get("move") or body
+            err = AZ.do_move(g, idx, move, ev)
+        else:
+            return [], "unknown action"
+        if err:
+            return [], err
+    azul_render(g, ev)
+    return ev, None
+
+
 REMATCH_END_PHASES = dict(GR.REMATCH_END_PHASES)
 
 RENDERERS = {"games": render, "regicide": rg_render, "odin": odin_render,
              "leaves": leaves_render, "lsd": lsd_render, "spots": spots_render, "yahtzee": yahtzee_render,
              "fliptoons": fliptoons_render, "tornado": tornado_render,
               "castlecombo": castlecombo_render, "artichokes": artichokes_render,
-              "fellowship": fotr_render}
+              "fellowship": fotr_render, "azul": azul_render}
 
 RULES_BY_KEY = {"games": RULES, "regicide": REGICIDE_RULES, "odin": ODIN_RULES,
                 "leaves": LEAVES_MODULE.rules(), "lsd": LSD_RULES, "spots": SPOTS_RULES,
                 "yahtzee": YAHTZEE_RULES, "fliptoons": FLIPTOONS_RULES,
                 "tornado": TORNADO_RULES, "castlecombo": CASTLECOMBO_RULES,
-                "artichokes": ARTICHOKES_RULES, "fellowship": FTR_RULES}
+                "artichokes": ARTICHOKES_RULES, "fellowship": FTR_RULES,
+                "azul": AZUL_RULES}
 
 
 def guide_payload(key):
@@ -4114,13 +4421,14 @@ PLAYER_MAKERS = {
     "tornado": lambda u, n: TS.new_player(u, n),
     "artichokes": lambda u, n: AT.new_player(u, n),
     "fellowship": lambda u, n: FTR.new_player(u, n),
+    "azul": lambda u, n: AZ.new_player(u, n),
 }
 
 GAME_MAKERS = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
                "leaves": LEAVES_MODULE.new_game, "lsd": D.new_game, "spots": SP.new_game,
                "yahtzee": Y.new_game, "fliptoons": FT.new_game, "tornado": TS.new_game,
                "castlecombo": CC.new_game, "artichokes": AT.new_game,
-               "fellowship": FTR.new_game}
+               "fellowship": FTR.new_game, "azul": AZ.new_game}
 
 
 def rematch_game(state, key, chat_id, uid):
@@ -4237,6 +4545,9 @@ def handle_command(state, msg):
     if cmd.startswith("/fotr") or cmd.startswith("/fellowship"):
         handle_fellowship(state, msg, cmd, text, uid, name)
         return
+    if cmd.startswith("/azul"):
+        handle_azul(state, msg, cmd, text, uid, name)
+        return
     if cmd in ("/start", "/help", "/commands"):
         send(chat_id, HELP)
         return
@@ -4333,6 +4644,58 @@ def handle_callback(state, cb):
             return answer_cb(cb["id"], err)
         answer_cb(cb["id"], "🤖 NPC joined")
         RENDERERS[key](g, ["🤖 NPC joined - anyone can play for it!"])
+        return
+    if data.startswith("az:"):
+        az = azul_get(state, chat_id)
+        if not az:
+            return answer_cb(cb["id"], "No Azul game here.")
+        parts = data.split(":")
+        mine = next((i for i, p in enumerate(az["players"]) if p["user_id"] == uid), None)
+        ev = []
+        if parts == ["az", "join"]:
+            if az["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            if mine is not None:
+                return answer_cb(cb["id"], "Already in!")
+            if len(az["players"]) >= AZ.MAX_PLAYERS:
+                return answer_cb(cb["id"], "Game is full.")
+            az["players"].append(AZ.new_player(uid, cb["from"].get("first_name") or "Player"))
+            answer_cb(cb["id"], "Joined!")
+            azul_render(az, [f"🙋 {cb['from'].get('first_name')} joined Azul."])
+        elif parts == ["az", "start"]:
+            if az["phase"] != "lobby":
+                return answer_cb(cb["id"], "Already started.")
+            err = AZ.start_game(az, ev)
+            answer_cb(cb["id"], err or "Started")
+            if not err:
+                azul_render(az, ev)
+        elif parts == ["az", "rematch"]:
+            ev, err = rematch_game(state, "azul", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
+        else:
+            idx = azul_actor_idx(az, uid)
+            if idx is None:
+                return answer_cb(cb["id"], "Not your turn.")
+            if len(parts) == 5 and parts[1] == "t":
+                source = "factory" if parts[2] == "f" else "center"
+                try:
+                    index = int(parts[3])
+                except ValueError:
+                    return answer_cb(cb["id"], "Bad factory.")
+                err = AZ.take_tiles(az, idx, source, index, parts[4], ev)
+            elif len(parts) == 3 and parts[1] == "r":
+                try:
+                    row = int(parts[2])
+                except ValueError:
+                    return answer_cb(cb["id"], "Bad line.")
+                err = AZ.place_tiles(az, idx, row, ev)
+            else:
+                return answer_cb(cb["id"], "Unknown button.")
+            answer_cb(cb["id"], err or "Done")
+            if not err:
+                azul_render(az, ev)
         return
     if data.startswith("lv:"):
         return handle_leaves_callback(state, cb, chat_id, uid)
@@ -5975,6 +6338,25 @@ def start_web_server(state):
                     g = artichokes_get(state, chat_id)
                     board = artichokes_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
+            if u.path == "/api/azul/mygames":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                with STATE_LOCK:
+                    games = [azul_board_json(g, uid) for g in state.get("azul", {}).values()
+                             if any(p["user_id"] == uid for p in g["players"])]
+                return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/azul/game":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                chat_id = q.get("chat_id", [""])[0]
+                with STATE_LOCK:
+                    g = azul_get(state, chat_id)
+                    board = azul_board_json(g, uid) if g else None
+                return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/lsd/mygames":
                 q = urllib.parse.parse_qs(u.query)
                 uid = verify_init_data(q.get("init_data", [""])[0])
@@ -6367,6 +6749,52 @@ def start_web_server(state):
                     events, err = artichokes_api_move(state, chat_id, uid, body)
                     g = artichokes_get(state, chat_id)
                     board = artichokes_board_json(g, uid) if g else None
+                    save_state(state)
+                return self._send(200 if not err else 400,
+                                  {"ok": not err, "error": err, "events": events, "game": board})
+            if path in ("/api/azul/create", "/api/azul/move"):
+                try:
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                except Exception:
+                    return self._send(400, {"ok": False, "error": "bad json"})
+                iu = init_user(body.get("init_data", ""))
+                if iu is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                uid, name, start_param, chat_instance = iu
+                if path == "/api/azul/create":
+                    chat_id = None
+                    for cand in (start_param, str(body.get("chat_id") or ""), chat_instance):
+                        cand = str(cand)
+                        if cand.startswith("azul"):
+                            cand = cand[len("azul"):]
+                        try:
+                            chat_id = int(cand)
+                            break
+                        except (TypeError, ValueError):
+                            continue
+                    if not chat_id:
+                        return self._send(400, {"ok": False, "error": "open the Mini App from a chat (startapp link)"})
+                    with STATE_LOCK:
+                        g = azul_get(state, chat_id)
+                        if g and g["phase"] != "game_end":
+                            return self._send(200, {"ok": True, "game": azul_board_json(g, uid), "created": False})
+                        g = AZ.new_game(chat_id, uid, name)
+                        g["chat_type"] = "supergroup" if chat_id < 0 else "private"
+                        state.setdefault("azul", {})[str(chat_id)] = g
+                        azul_render(g, [f"🔷 Azul game created by {name} via Mini App!"])
+                        save_state(state)
+                        board = azul_board_json(g, uid)
+                    return self._send(200, {"ok": True, "game": board, "created": True})
+                chat_id = body.get("chat_id")
+                if not chat_id and str(start_param).startswith("azul"):
+                    try:
+                        chat_id = int(str(start_param)[len("azul"):])
+                    except ValueError:
+                        pass
+                with STATE_LOCK:
+                    events, err = azul_api_move(state, chat_id, uid, body)
+                    g = azul_get(state, chat_id)
+                    board = azul_board_json(g, uid) if g else None
                     save_state(state)
                 return self._send(200 if not err else 400,
                                   {"ok": not err, "error": err, "events": events, "game": board})

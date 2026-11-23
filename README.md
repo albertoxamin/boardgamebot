@@ -279,9 +279,32 @@ Text commands: `/fotr` (create), `/fotr_join`, `/fotr_join_npc`,
 `?startapp=fellowship<chat>` (same Main Mini App, routed by `start_param`).
 Engine: `fellowship.py` + `test_fellowship.py`.
 
+## Azul (same bot, tile-drafting wall builder)
+
+Azul (Michael Kiesling, 2017), 2–4 players. Each round 5/7/9 factory displays
+(2/3/4 players) are filled with four tiles; on your turn you take every tile
+of one colour from a factory (the rest slide into the centre) or from the
+centre (also taking the ⭐ first-player marker; a centre holding only ⭐ is not a
+pick). Tiles go onto one of your pattern
+lines (1–5 spaces, one colour per line, never a colour already on that wall
+row); overflow lands on the floor line, whose seven spaces cost
+-1,-1,-2,-2,-2,-3,-3 at the end of the round. Full lines tile the wall and
+score the connected row + column groups; the game ends after the round in
+which anyone completes a wall row, then +2/row, +7/column, +10/colour set
+decide the winner (ties break on completed rows).
+
+Text commands: `/azul` (create), `/azul_join`, `/azul_join_npc`,
+`/azul_start`, `/azul_take <factory N|center> <colour>`,
+`/azul_place <1-5|floor>`, `/azul_rules`, `/azul_cancel` (creator),
+`/azul_rematch`. Mini App: board button =
+`?startapp=azul<chat>` (same Main Mini App, routed by `start_param`).
+Engine: `azul.py` + `test_azul.py` (drafting, wall scoring/floor penalties,
+final bonuses, full-game simulation).
+
 ## Files
 
 - `game.py` – pure engine: deck, scoring, bust/Flip 7, actions, rounds.
+- `azul.py` – pure engine: factories, pattern lines, wall scoring, final bonuses.
 - `yahtzee.py` – pure engine: dice, scorecard, turns, scoring.
 - `fliptoons.py` – pure engine: deck, grid, abilities, market, final flip.
 - `tornado.py` – pure engine: boats, decks, courses, ranks, movement, Grand Prix.
@@ -302,6 +325,7 @@ Engine: `fellowship.py` + `test_fellowship.py`.
 - `web/artichokes.js` – Abandon All Artichokes Mini App view (synced)
 - `web/fellowship.js` – Fellowship Mini App view (synced, viewer-filtered hands)
 - `web/fellowship_cards/` – Fellowship card/character sprite sheets from the TTS save
+- `web/azul.js` – Azul Mini App view (synced)
 - `web/artichokes_cards/` – BGA card art (0–9 vegetables, 10–14 Artichokes, 15 Rhubarb, 16 back)
 - `web/covers/*.jpg` – box art shown as the lobby photo for each game
 - `web/server.py` – static server for the HTML game (needs HTTPS tunnel for in-Telegram use)
@@ -316,6 +340,7 @@ python3 test_fliptoons.py   # Fliptoons engine/ability tests
 python3 test_tornado.py     # Tornado Splash engine tests
 python3 test_artichokes.py  # Abandon All Artichokes engine tests
 python3 test_fellowship.py  # Fellowship engine tests
+python3 test_azul.py        # Azul engine tests
 ```
 A full 3-player game was also simulated end-to-end (hits/stays/actions/
 round rotation → a winner at 200+ in 13 rounds) with the Telegram layer

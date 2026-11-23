@@ -13,6 +13,7 @@ import game as G
 import artichokes as AT
 import regicide as R
 import odin as O
+import leaves as LV
 import lsd as D
 import spots as SP
 import yahtzee as Y
@@ -291,13 +292,14 @@ def _npc_player():
     return {"user_id": NPC_ID, "name": "🤖 NPC", "npc": True}
 
 
-NPC_MAX = {"games": 6, "regicide": 4, "odin": 6, "lsd": 5, "spots": 4,
+NPC_MAX = {"games": 6, "regicide": 4, "odin": 6, "leaves": 6, "lsd": 5, "spots": 4,
            "yahtzee": Y.MAX_PLAYERS, "tornado": TS.MAX_PLAYERS, "fliptoons": 4,
            "castlecombo": CC.MAX_PLAYERS, "artichokes": AT.MAX_PLAYERS}
 NPC_FULL = {
     "games": "⛔ Game is full.",
     "regicide": "⛔ Regicide is 2-4 players (full).",
     "odin": "⛔ Odin is 2-6 players (full).",
+    "leaves": "⛔ 13 Leaves is 3-6 players (full).",
     "lsd": "⛔ Let's Summon Demons is 2-5 players (full).",
     "spots": "⛔ Spots is 1-4 players (full).",
     "yahtzee": f"⛔ Yahtzee is 2-{Y.MAX_PLAYERS} players (full).",
@@ -1073,6 +1075,179 @@ def handle_odin(state, msg, cmd, text, uid, name):
         return True
     return False
 
+
+
+# ---------- 13 Leaves (I'm Out style) ----------
+LEAVES_RULES = """🍃 <b>13 Leaves rules</b> (short): shed your hand by playing sets onto the row ends.
+• 3–6 players (dealt 12/11/10/9). First lead plays any set of same value.
+• After that, play onto left/right end: play >= count of that end stack, and value is <= lowest (left) or >= highest (right), or stack equal to that end value.
+• If you can’t/won’t play: Pass (and you’re out for this round in many variants) — see buttons. First to empty hand wins the game.
+Use the Mini App for easier play, or commands like <code>/leaves_play 5 2</code> (play two 5s)."""
+
+
+def leaves_get(state, chat_id):
+    return state.setdefault("leaves", {}).get(str(chat_id))
+
+
+def leaves_board_text(g):
+    if g.get("phase") == "lobby":
+        return f"🍃 <b>13 Leaves lobby</b> - {len(g['players'])} player(s). Friends: /leaves_join, anyone: /leaves_start"
+    if g.get("phase") == "game_end":
+        w = next((p["name"] for p in g["players"] if p["user_id"] == g.get("winner_id")), "?")
+        return f"🏆 <b>13 Leaves</b> - winner: <b>{html.escape(w)}</b>"
+    row = g.get("row") or []
+    row_s = " · ".join([f"{s['value']}×{s['count']}" for s in row]) if row else "(empty, lead any set)"
+    lines = [f"🍃 <b>13 Leaves</b> — row: {row_s}"]
+    for i, p in enumerate(g["players"]):
+        mark = " 👈" if i == g.get("current_index") and g.get("phase") == "playing" else ""
+        passed = " (passed)" if p["user_id"] in (g.get("passed") or set()) else ""
+        lines.append(f"• {html.escape(p['name'])}: {len(p['hand'])} cards{passed}{mark}")
+    return "\n".join(lines)
+
+
+def leaves_keyboard(g):
+    if g.get("phase") == "game_end":
+        return [[{"text": "🔄 Rematch!", "callback_data": "lv:rematch"}]]
+    ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
+    wk = web_keyboard(ct, g["chat_id"], game="leaves")
+    if g.get("phase") == "lobby":
+        kb = [[{"text": "🙋 Join 13 Leaves", "callback_data": "lv:join"}]]
+        if not any(p.get("npc") for p in g["players"]):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "lv:npc"}])
+        return kb + (wk or [])
+    kb = []
+    if g.get("phase") == "playing":
+        row = g.get("row") or []
+        if row:
+            # one button per stack to take from (1..len)
+            for i, sst in enumerate(row):
+                kb.append([{"text": f"⏭ Pass (take {sst['value']} from #{i+1})", "callback_data": f"lv:pass{i}"}])
+        else:
+            kb.append([{"text": "⏭ Pass", "callback_data": "lv:pass"}])
+    if wk:
+        kb.extend(wk)
+    return kb or None
+
+
+def leaves_render(g, events=None):
+    if events is None:
+        events = []
+    lines = [html.escape(e) for e in events]
+    if g.get("players") and g.get("phase") == "playing":
+        cur = g["players"][g["current_index"]]
+        ping = "👉 🤖 NPC to move" if cur.get("npc") else f"👉 {html.escape(cur['name'])}'s turn"
+        lines.append(ping)
+    text = "\n".join(lines + [leaves_board_text(g)]) if lines else leaves_board_text(g)
+    kb = leaves_keyboard(g)
+    r = send_board(g, "leaves", text, kb)
+    if r.get("ok"):
+        old = g.get("board_message_id")
+        g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=g["chat_id"], message_id=old)
+
+
+def handle_leaves(state, msg, cmd, text, uid, name):
+    chat_id = msg["chat"]["id"]
+    g = leaves_get(state, chat_id)
+    if cmd == "/leaves_rules":
+        send(chat_id, LEAVES_RULES)
+        return True
+    if cmd == "/leaves":
+        if not g:
+            g = LV.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state.setdefault("leaves", {})[str(chat_id)] = g
+            leaves_render(g, [f"🍃 13 Leaves created by {name}!"])
+        else:
+            leaves_render(g)
+        return True
+    if not g:
+        send(chat_id, "No 13 Leaves game here - send /leaves to create one.")
+        return True
+    g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd == "/leaves_join_npc":
+        err = add_npc("leaves", g)
+        if err:
+            send(chat_id, err)
+        else:
+            send(chat_id, "🤖 NPC joined!")
+            leaves_render(g)
+        return True
+    if cmd == "/leaves_join":
+        if g.get("phase") != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p["user_id"] == uid for p in g["players"]):
+            send(chat_id, "You're already in!")
+        elif len(g["players"]) >= 6:
+            send(chat_id, "⛔ 13 Leaves is 3-6 players (full).")
+        else:
+            g["players"].append(LV.new_player(uid, msg.get("from", {}).get("first_name") or "Player"))
+            send(chat_id, f"🙋 <b>{name}</b> joined ({len(g['players'])}).")
+            leaves_render(g)
+        return True
+    if cmd == "/leaves_start":
+        if g.get("phase") != "lobby":
+            send(chat_id, "Already started.")
+        elif len(g["players"]) < 3:
+            send(chat_id, "⛔ Need at least 3 players.")
+        else:
+            ev = []
+            err = LV.start_game(g, ev)
+            if err:
+                send(chat_id, f"⛔ {err}")
+            else:
+                leaves_render(g, ev)
+        return True
+    if cmd == "/leaves_cancel":
+        if uid != g["created_by"]:
+            send(chat_id, "⛔ Only the creator can cancel.")
+        else:
+            del state["leaves"][str(chat_id)]
+            send(chat_id, "🗑 13 Leaves cancelled.")
+        return True
+    if cmd == "/leaves_pass":
+        idx = _actor_idx(g, uid, g["current_index"])
+        if idx is None:
+            send(chat_id, "⛔ Not in this game.")
+            return True
+        parts = text.split()[1:]
+        take_index = None
+        if parts:
+            try:
+                take_index = int(parts[0]) - 1
+            except Exception:
+                send(chat_id, "Usage: /leaves_pass [row_stack_number] (1 = leftmost).")
+                return True
+        ev = []
+        err = LV.pass_turn(g, idx, ev, take_index=take_index)
+        if err:
+            send(chat_id, f"⛔ {err}")
+        else:
+            leaves_render(g, ev)
+        return True
+    if cmd == "/leaves_play":
+        idx = _actor_idx(g, uid, g["current_index"])
+        if idx is None:
+            send(chat_id, "⛔ Not in this game.")
+            return True
+        parts = text.split()[1:]
+        if len(parts) < 2:
+            send(chat_id, "Usage: /leaves_play <value> <count>  e.g. /leaves_play 5 2")
+            return True
+        try:
+            val = int(parts[0]); cnt = int(parts[1])
+        except Exception:
+            send(chat_id, "Usage: /leaves_play <value> <count>")
+            return True
+        ev = []
+        err = LV.play(g, idx, val, cnt, ev)
+        if err:
+            send(chat_id, f"⛔ {err}")
+        else:
+            leaves_render(g, ev)
+        return True
+    return False
 
 # ---------- Let's Summon Demons (dice activation, market, demons) ----------
 LSD_RULES = """😈 <b>Let's Summon Demons rules</b> (Cryptozoic, 2-5 players): be first to 3 summoned Demons AND 10 Souls.
@@ -3495,7 +3670,7 @@ def handle_command(state, msg):
         # Reply-targeted cancel: cancels the one game whose board message
         # was replied to (searches every game type in this chat).
         _mid = msg["reply_to_message"].get("message_id")
-        for _key in ("games", "regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes"):
+        for _key in ("games", "regicide", "odin", "leaves", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes"):
             _gg = state.get(_key, {}).get(str(chat_id))
             if _gg is not None and _gg.get("board_message_id") == _mid:
                 del state[_key][str(chat_id)]
@@ -3508,6 +3683,9 @@ def handle_command(state, msg):
         return
     if cmd.startswith("/odin"):
         handle_odin(state, msg, cmd, text, uid, name)
+        return
+    if cmd.startswith("/leaves"):
+        handle_leaves(state, msg, cmd, text, uid, name)
         return
     if cmd.startswith("/lsd"):
         handle_lsd(state, msg, cmd, text, uid, name)
@@ -3620,7 +3798,7 @@ def handle_callback(state, cb):
     uid = cb.get("from", {}).get("id")
     chat_id = cb.get("message", {}).get("chat", {}).get("id")
     if data.endswith(":npc"):
-        key = {"f7": "games", "rg": "regicide", "od": "odin", "lsd": "lsd",
+        key = {"f7": "games", "rg": "regicide", "od": "odin", "lv": "leaves", "lsd": "lsd",
                "spots": "spots", "yz": "yahtzee", "ts": "tornado",
                 "ft": "fliptoons", "cc": "castlecombo", "at": "artichokes"}.get(data.split(":")[0])
         g = state.get(key, {}).get(str(chat_id)) if key else None
@@ -3690,6 +3868,66 @@ def handle_callback(state, cb):
             answer_cb(cb["id"], err or "Done")
             if not err:
                 spots_render(sp, ev)
+        elif parts == ["lv", "join"]:
+            g = leaves_get(state, chat_id)
+            if not g:
+                return answer_cb(cb["id"], "No 13 Leaves game here.")
+            if g["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            if any(p["user_id"] == uid for p in g["players"]):
+                return answer_cb(cb["id"], "Already in!")
+            if len(g["players"]) >= 6:
+                return answer_cb(cb["id"], "Full.")
+            g["players"].append(LV.new_player(uid, cb["from"].get("first_name") or "Player"))
+            answer_cb(cb["id"], "Joined!")
+            leaves_render(g, [f"🙋 {cb['from'].get('first_name')} joined."])
+            save_state(state)
+            return
+        elif parts == ["lv", "start"]:
+            g = leaves_get(state, chat_id)
+            if not g:
+                return answer_cb(cb["id"], "No game.")
+            if g["phase"] != "lobby":
+                return answer_cb(cb["id"], "Already started.")
+            if len(g["players"]) < 3:
+                return answer_cb(cb["id"], "Need >=3 players.")
+            ev = []
+            err = LV.start_game(g, ev)
+            if err:
+                answer_cb(cb["id"], err)
+            else:
+                answer_cb(cb["id"], "Started!")
+                leaves_render(g, ev)
+                save_state(state)
+            return
+        elif parts[0] == "lv" and len(parts) == 2 and parts[1].startswith("pass"):
+            g = leaves_get(state, chat_id)
+            if not g:
+                return answer_cb(cb["id"], "No game.")
+            idx = _actor_idx(g, uid, g.get("current_index", 0))
+            if idx is None:
+                return answer_cb(cb["id"], "Not in game.")
+            take_index = None
+            if parts[1] != "pass":
+                try:
+                    take_index = int(parts[1][4:])  # pass0 -> 0
+                except Exception:
+                    take_index = None
+            ev = []
+            err = LV.pass_turn(g, idx, ev, take_index=take_index)
+            if err:
+                answer_cb(cb["id"], err)
+            else:
+                answer_cb(cb["id"], "Passed.")
+                leaves_render(g, ev)
+                save_state(state)
+            return
+        elif parts == ["lv", "rematch"]:
+            ev, err = rematch_game(state, "leaves", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
+            return
         elif parts == ["od", "rematch"]:
             ev, err = rematch_game(state, "odin", chat_id, uid)
             answer_cb(cb["id"], err or "Rematch!")
@@ -4559,6 +4797,71 @@ def odin_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
+def leaves_board_json(g, viewer_id=None):
+    me = next((p for p in g["players"] if p["user_id"] == viewer_id), None)
+    return {
+        "chat_id": g["chat_id"], "phase": g["phase"], "created_by": g["created_by"],
+        "current_index": g.get("current_index", 0), "leader_index": g.get("leader_index", 0),
+        "winner_id": g.get("winner_id"),
+        "is_player": me is not None,
+        "row": g.get("row", []),
+        "passed_ids": list(g.get("passed", set())),
+        "players": [{"user_id": p["user_id"], "name": p["name"], "npc": bool(p.get("npc")), "hand_count": len(p["hand"])}
+                    for p in g["players"]],
+        "my_hand": sorted(me["hand"]) if me else [],
+    }
+
+
+def leaves_api_move(state, chat_id, user_id, body):
+    g = leaves_get(state, chat_id)
+    if not g:
+        return [], "no 13 leaves game in that chat"
+    action = body.get("action")
+    if action == "join":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        if any(p["user_id"] == user_id for p in g["players"]):
+            return [], None
+        if len(g["players"]) >= 6:
+            return [], "full"
+        iu_name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
+        g["players"].append(LV.new_player(user_id, iu_name))
+        return ["🙋 joined."], None
+    if action == "start":
+        if g["phase"] != "lobby":
+            return [], "already started"
+        ev = []
+        err = LV.start_game(g, ev)
+        if err:
+            return [], err
+        return ev, None
+    idx = _actor_idx(g, user_id, g.get("current_index", 0))
+    if idx is None:
+        return [], "not in this game"
+    ev = []
+    if action == "play":
+        try:
+            val = int(body.get("value")); cnt = int(body.get("count"))
+        except Exception:
+            return [], "bad value/count"
+        err = LV.play(g, idx, val, cnt, ev)
+        if err:
+            return [], err
+    elif action == "pass":
+        take_index = body.get("take_index")
+        if take_index is not None:
+            try:
+                take_index = int(take_index)
+            except Exception:
+                return [], "bad take_index"
+        err = LV.pass_turn(g, idx, ev, take_index=take_index)
+        if err:
+            return [], err
+    else:
+        return [], "unknown action"
+    leaves_render(g, ev)
+    return ev, None
+
 def lsd_board_json(g, viewer_id=None):
     """LSD board; Demon hands are private (only counts are public)."""
     me = next((p for p in g["players"] if p["user_id"] == viewer_id), None)
@@ -5062,6 +5365,9 @@ def start_web_server(state):
             if u.path == "/odin-cards.webp":
                 p = os.path.join(os.path.dirname(JS_PATH), "odin-cards.webp")
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
+            if u.path == "/13leaves.png":
+                p = os.path.join(os.path.dirname(JS_PATH), "13leaves.png")
+                return self._send(200, open(p, "rb").read(), "image/png", cache="public, max-age=86400")
             if u.path.startswith("/fliptoons/") and u.path.endswith(".webp"):
                 p = os.path.join(os.path.dirname(JS_PATH), "fliptoons", os.path.basename(u.path))
                 if os.path.exists(p):
@@ -5258,6 +5564,26 @@ def start_web_server(state):
                 with STATE_LOCK:
                     g = odin_get(state, chat_id)
                     board = odin_board_json(g, uid) if g else None
+                return self._send(200 if board else 404, {"ok": bool(board), "game": board})
+
+            if u.path == "/api/leaves/mygames":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                with STATE_LOCK:
+                    games = [leaves_board_json(g, uid) for g in state.get("leaves", {}).values()
+                             if any(p["user_id"] == uid for p in g["players"])]
+                return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/leaves/game":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                chat_id = q.get("chat_id", [""])[0]
+                with STATE_LOCK:
+                    g = leaves_get(state, chat_id)
+                    board = leaves_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/regicide/mygames":
                 q = urllib.parse.parse_qs(u.query)
@@ -5616,6 +5942,45 @@ def start_web_server(state):
                     events, err = lsd_api_move(state, chat_id, uid, body)
                     g = lsd_get(state, chat_id)
                     board = lsd_board_json(g, uid) if g else None
+                    save_state(state)
+                return self._send(200 if not err else 400,
+                                  {"ok": not err, "error": err, "events": events, "game": board})
+            if path in ("/api/leaves/create", "/api/leaves/move"):
+                try:
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                except Exception:
+                    return self._send(400, {"ok": False, "error": "bad json"})
+                iu = init_user(body.get("init_data", ""))
+                if iu is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                uid, name, start_param, chat_instance = iu
+                if path == "/api/leaves/create":
+                    chat_id = None
+                    for cand in (chat_instance, start_param, str(body.get("chat_id") or "")):
+                        cand = str(cand)
+                        try:
+                            chat_id = int(cand)
+                            break
+                        except (TypeError, ValueError):
+                            continue
+                    if not chat_id:
+                        return self._send(400, {"ok": False, "error": "open the Mini App from a chat (startapp link)"})
+                    with STATE_LOCK:
+                        g = leaves_get(state, chat_id)
+                        if g and g.get("phase") != "game_end":
+                            return self._send(200, {"ok": True, "game": leaves_board_json(g, uid), "created": False})
+                        g = LV.new_game(chat_id, uid, name)
+                        g["chat_type"] = "supergroup" if chat_id < 0 else "private"
+                        state.setdefault("leaves", {})[str(chat_id)] = g
+                        leaves_render(g, [f"🍃 13 Leaves created by {name} via Mini App!"])
+                        save_state(state)
+                        board = leaves_board_json(g, uid)
+                    return self._send(200, {"ok": True, "game": board, "created": True})
+                chat_id = body.get("chat_id")
+                with STATE_LOCK:
+                    events, err = leaves_api_move(state, chat_id, uid, body)
+                    g = leaves_get(state, chat_id)
+                    board = leaves_board_json(g, uid) if g else None
                     save_state(state)
                 return self._send(200 if not err else 400,
                                   {"ok": not err, "error": err, "events": events, "game": board})

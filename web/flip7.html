@@ -26,6 +26,24 @@ h1{font-size:22px;margin:6px 0} .card{background:#1e293b;border-radius:12px;padd
 .pcard{width:32px;height:44px;border-radius:5px;background:#f8fafc;color:#111;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:1px 2px 3px #0008;border:1px solid #cbd5e1}
 .cardimg{height:44px;width:auto;border-radius:5px;box-shadow:1px 2px 3px #0008}
 .cardimg.back{width:32px}
+.ftr-card{width:42px;height:59px;border-radius:5px;background-repeat:no-repeat;box-shadow:1px 2px 3px #0008;flex:none;display:inline-block;vertical-align:middle}
+.ftr-card.dim{opacity:.35;filter:grayscale(.6)}
+.ftr-card.click{cursor:pointer}.ftr-card.click:hover{transform:scale(1.18);z-index:5;position:relative}
+.ftr-char{width:72px;height:101px;border-radius:6px;background-repeat:no-repeat;box-shadow:1px 2px 3px #0008;flex:none;display:inline-block;vertical-align:middle}
+.ftr-char.small{width:66px;height:93px}.ftr-char.big{width:144px;height:203px}
+.ftr-char.fallback{background:#334155;color:#e2e8f0;font-size:15px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;text-align:center;padding:2px;overflow:hidden}
+.ftr-char.tap{cursor:pointer}
+.ftr-char.full{width:min(86vw,360px);height:auto;aspect-ratio:5/7;border-radius:10px}
+.ftr-seat-body{display:flex;gap:8px;align-items:center}
+.ftr-seats{flex-direction:row;flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch}
+.ftr-seats .seat{flex:0 0 auto;min-height:0;padding:6px;min-width:0}
+.ftr-seats .seat-head{font-size:12px;gap:4px}
+.ftr-seats .seat-head span:first-child{overflow:hidden;text-overflow:ellipsis;max-width:90px;white-space:nowrap}
+.ftr-seats .ftr-seat-body{gap:6px}
+.ftr-seats .ftr-seat-body .small{font-size:12px;white-space:nowrap}
+.ftr-choices{display:flex;flex-wrap:wrap;gap:6px}.ftr-choice{display:flex;align-items:center;padding:4px}
+.ftr-lightbox{position:fixed;inset:0;background:#000d;z-index:1000;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:12px}
+.ftr-lightbox.hidden{display:none}.ftr-lightbox .small{color:#e2e8f0}
 /* Flip 7 sprite sheet: 7 cols x 4 rows, cell 130x204 */
 .fcard{width:44px;height:69px;border-radius:5px;background-image:url(flip7-cards.webp);background-size:308px 276px;box-shadow:1px 2px 3px #0008;flex:none}
 .fcard.back{width:44px}
@@ -34,7 +52,7 @@ h1{font-size:22px;margin:6px 0} .card{background:#1e293b;border-radius:12px;padd
 .rcard.sel{outline:3px solid #f59e0b;transform:translateY(-4px)}
 /* Regicide sprite sheet: 14 cols (Jester/back, A..K) x 4 rows (spade,heart,club,diamond), cell 240x336 */
 .rcimg{width:48px;height:67px;border-radius:6px;background-image:url(regicide-cards.webp);background-size:672px 268px;box-shadow:1px 2px 3px #0008;cursor:pointer;flex:none}
-.seats.reg-row{flex-direction:row;flex-wrap:wrap}.seats.reg-row .seat{flex:1 1 140px;min-height:0}
+.seats.reg-row{flex-direction:row;flex-wrap:wrap}.seats.reg-row .seat{flex:1 1 180px;min-height:0}
 .handbacks{display:flex;margin-top:6px}.handbacks .rcimg{width:24px;height:34px;background-size:336px 134px;margin-right:-14px;cursor:default}
 .rcimg.big{width:72px;height:101px;background-size:1008px 404px}
 .rcimg.small{width:36px;height:50px;background-size:504px 202px}
@@ -283,6 +301,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .atchoiceimg{width:26px;height:38px;object-fit:cover;border-radius:3px;flex:none}
 .lvcard{transition:transform .15s ease,outline-color .15s ease}
 .lvcard.sel{outline:3px solid #f59e0b;transform:translateY(-4px);animation:selPop .3s ease}
+.lvcard.dim{opacity:.32;filter:grayscale(1);cursor:not-allowed;transform:none}
+.lvrow{display:flex;flex-wrap:wrap;gap:8px;align-items:flex-start}
+.lvrow-item{text-align:center;cursor:pointer}
+.lvstack{position:relative;flex:none}
 </style></head><body>
 <h1>🎴 Flip 7</h1>
 <div id="regicide" class="hidden">
@@ -411,6 +433,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <button class="primary hidden" id="ftrRestart">↺ Restart chapter</button>
 <button class="primary hidden" id="ftrNext">📖 Next chapter</button>
 <div class="log" id="ftrLog"></div>
+<div id="ftrLightbox" class="ftr-lightbox hidden" onclick="ftrCloseArt()"><div id="ftrLightboxCard"></div><div class="small">Tap to close</div></div>
 </div>
 <div id="synced">
 <div id="syncBoard"></div>
@@ -446,7 +469,7 @@ const FX={capture(sel,attr){let m={};document.querySelectorAll(sel).forEach(el=>
  <script data-cfasync="false" src="flip7.js?v=27"></script>
  <script data-cfasync="false" src="regicide.js?v=19"></script>
  <script data-cfasync="false" src="odin.js?v=10"></script>
- <script data-cfasync="false" src="leaves.js?v=4"></script>
+ <script data-cfasync="false" src="leaves.js?v=6"></script>
  <script data-cfasync="false" src="lsd.js?v=5"></script>
  <script data-cfasync="false" src="spots.js?v=15"></script>
  <script data-cfasync="false" src="yahtzee.js?v=4"></script>
@@ -455,5 +478,5 @@ const FX={capture(sel,attr){let m={};document.querySelectorAll(sel).forEach(el=>
 <script data-cfasync="false" src="castlecombo.js?v=7"></script>
 <script data-cfasync="false" src="tornado.js?v=3"></script>
 <script data-cfasync="false" src="artichokes.js?v=11"></script>
-<script data-cfasync="false" src="fellowship.js?v=1"></script>
+<script data-cfasync="false" src="fellowship.js?v=6"></script>
 </body></html>

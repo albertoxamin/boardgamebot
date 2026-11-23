@@ -1,5 +1,46 @@
 // Fellowship Mini App (synced). Loaded by flip7.html router.
-const FTR = {user_id: 0, chat_id: null, board: null, timer: null, init: '', target: null};
+const FTR = {user_id: 0, chat_id: null, board: null, timer: null, init: '', target: null, sig: ''};
+const FTR_CARD_SHEET = 'fellowship_cards/cards.jpg';
+const FTR_CHAR_SHEETS = {
+  early: 'fellowship_cards/characters-early.jpg',
+  late: 'fellowship_cards/characters-late.jpg',
+  legolas: 'fellowship_cards/characters-legolas.jpg'
+};
+const FTR_CHAR_GRIDS = {early: {w: 5, h: 5}, late: {w: 10, h: 4}, legolas: {w: 10, h: 4}};
+const FTR_CARD_SUITS = {
+  H: {name: 'Hill', row: 1}, M: {name: 'Mountain', row: 0},
+  F: {name: 'Forest', row: 2}, S: {name: 'Shadow', row: 3}, R: {name: 'Ring', row: 4}
+};
+const FTR_CHAR_ART = {
+  frodo: {sheet: 'early', id: 900, name: 'Frodo'},
+  bilbo: {sheet: 'early', id: 901, name: 'Bilbo'},
+  gandalf: {sheet: 'early', id: 905, name: 'Gandalf'},
+  pippin: {sheet: 'early', id: 906, name: 'Pippin'},
+  sam: {sheet: 'early', id: 907, name: 'Sam'},
+  merry: {sheet: 'early', id: 902, name: 'Merry'},
+  gildor: {sheet: 'late', id: 17903, name: 'Gildor Inglorion'},
+  maggot: {sheet: 'early', id: 908, name: 'Farmer Maggot'},
+  fatty: {sheet: 'early', id: 904, name: 'Fatty Bolger'},
+  tom: {sheet: 'late', id: 17909, name: 'Tom Bombadil'},
+  goldberry: {sheet: 'early', id: 911, name: 'Goldberry'},
+  underhill: {sheet: 'early', id: 913, name: 'Mr. Underhill'},
+  barliman: {sheet: 'early', id: 912, name: 'Barliman Butterbur'},
+  strider: {sheet: 'early', id: 910, name: 'Strider'},
+  aragorn: {sheet: 'early', id: 919, name: 'Aragorn'},
+  legolas: {sheet: 'legolas', id: 2826, name: 'Legolas'},
+  gimli: {sheet: 'late', id: 4438, name: 'Gimli son of Glóin'},
+  boromir: {sheet: 'early', id: 921, name: 'Boromir'},
+  bill: {sheet: 'late', id: 17915, name: 'Bill the Pony'},
+  glorfindel: {sheet: 'late', id: 17914, name: 'Glorfindel'},
+  elrond: {sheet: 'late', id: 17918, name: 'Elrond'},
+  gollum: {name: 'Gollum'},
+  arwen: {sheet: 'late', id: 17917, name: 'Arwen'},
+  gloin: {sheet: 'late', id: 17916, name: 'Glóin'},
+  shadowfax: {sheet: 'early', id: 923, name: 'Shadowfax'},
+  radagast: {sheet: 'late', id: 17922, name: 'Radagast'},
+  galadriel: {sheet: 'late', id: 17931, name: 'Galadriel'},
+  celeborn: {sheet: 'late', id: 17930, name: 'Celeborn'}
+};
 
 function ftrEsc(s) {
   return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
@@ -22,17 +63,43 @@ function ftrInit() {
     chat_instance: tg && tg.initDataUnsafe ? String(tg.initDataUnsafe.chat_instance || '') : ''
   };
 }
-function ftrSuitColor(code) {
-  let s = String(code || '')[0];
-  return s === 'H' ? '#fca5a5' : s === 'M' ? '#fdba74' : s === 'F' ? '#86efac' : s === 'S' ? '#c4b5fd' : '#fcd34d';
+function ftrSpriteStyle(sheet, w, h, index) {
+  let col = index % w;
+  let row = Math.floor(index / w);
+  let x = w > 1 ? col * 100 / (w - 1) : 0;
+  let y = h > 1 ? row * 100 / (h - 1) : 0;
+  return `background-image:url(${sheet});background-size:${w * 100}% ${h * 100}%;` +
+    `background-position:${x}% ${y}%`;
+}
+function ftrCardName(code) {
+  let text = String(code || '');
+  let info = FTR_CARD_SUITS[text[0]];
+  return info ? `${text.slice(1)} - ${info.name}` : text;
 }
 function ftrCard(code, dim, click) {
-  let label = String(code).replace('R', 'Ring ').replace('H', 'Hills ').replace('M', 'Mountains ')
-    .replace('F', 'Forests ').replace('S', 'Shadows ');
-  let style = `display:inline-block;min-width:34px;padding:4px 6px;margin:2px;border-radius:6px;font-weight:800;` +
-    `background:${ftrSuitColor(code)};color:#111;box-shadow:1px 2px 3px #0008;` +
-    (dim ? 'opacity:.35;' : '') + (click ? 'cursor:pointer;' : '');
-  return `<span class="ftr-card" style="${style}" ${click || ''}>${ftrEsc(label)}</span>`;
+  let text = String(code || '');
+  let info = FTR_CARD_SUITS[text[0]];
+  let label = ftrCardName(code);
+  let style = info ? ftrSpriteStyle(FTR_CARD_SHEET, 8, 5, info.row * 8 + parseInt(text.slice(1), 10) - 1) : '';
+  let cls = 'ftr-card' + (dim ? ' dim' : '') + (click ? ' click' : '');
+  return `<span class="${cls}" style="${style}" title="${ftrEsc(label)}" aria-label="${ftrEsc(label)}" ${click || ''}></span>`;
+}
+function ftrCharArt(key) {
+  return FTR_CHAR_ART[key] || {name: key ? String(key) : '?'};
+}
+function ftrCharName(key) {
+  return ftrCharArt(key).name;
+}
+function ftrChar(key, cls, click) {
+  let art = ftrCharArt(key);
+  let extra = cls ? ' ' + cls : '';
+  let attr = click ? ` onclick="${click}"` : '';
+  if (!art.sheet) {
+    return `<span class="ftr-char fallback${extra}" title="${ftrEsc(art.name)}"${attr}>${ftrEsc(art.name)}</span>`;
+  }
+  let grid = FTR_CHAR_GRIDS[art.sheet];
+  let style = ftrSpriteStyle(FTR_CHAR_SHEETS[art.sheet], grid.w, grid.h, art.id % 100);
+  return `<span class="ftr-char${extra}" style="${style}" title="${ftrEsc(art.name)}" aria-label="${ftrEsc(art.name)}"${attr}></span>`;
 }
 async function ftrLoad() {
   let tg = ftrInit();
@@ -60,6 +127,7 @@ async function ftrLoad() {
 }
 async function ftrSelect(chat_id) {
   FTR.chat_id = chat_id;
+  FTR.sig = '';
   await ftrRefresh();
   if (FTR.timer) clearInterval(FTR.timer);
   FTR.timer = setInterval(ftrRefresh, 3000);
@@ -68,7 +136,13 @@ async function ftrRefresh() {
   if (!FTR.chat_id) return;
   let r = await fetch('/api/fellowship/game?chat_id=' + encodeURIComponent(FTR.chat_id) +
     '&init_data=' + encodeURIComponent(FTR.init)).then(x => x.json());
-  if (r.ok) { FTR.board = r.game; ftrRender(); }
+  if (r.ok) {
+    let sig = JSON.stringify(r.game);
+    if (sig === FTR.sig) return;
+    FTR.sig = sig;
+    FTR.board = r.game;
+    ftrRender();
+  }
 }
 async function ftrMove(action, extra) {
   let body = Object.assign({chat_id: FTR.chat_id, action: action, init_data: FTR.init}, extra || {});
@@ -77,7 +151,12 @@ async function ftrMove(action, extra) {
   }).then(x => x.json());
   if (r.events) r.events.forEach(e => ftrLog(e.replace(/<[^>]+>/g, '')));
   if (r.error) ftrLog('⛔ ' + r.error);
-  if (r.game) { FTR.board = r.game; FTR.target = null; ftrRender(); }
+  if (r.game) {
+    FTR.sig = JSON.stringify(r.game);
+    FTR.board = r.game;
+    FTR.target = null;
+    ftrRender();
+  }
 }
 function ftrRender() {
   let b = FTR.board;
@@ -100,13 +179,13 @@ function ftrRender() {
 
   let head = `<b>Chapter ${b.chapter}: ${ftrEsc(b.chapter_title)}</b> · round ${b.round} · ${ftrEsc(b.victory)}` +
     `<div class="small">Lost: ${ftrEsc(b.lost || 'taken')} · Rings: ${b.ring_broken ? 'BROKEN' : 'sealed'}</div>`;
-  let seats = '<div class="seats reg-row">' + (b.players || []).map((p, i) => {
+  let seats = '<div class="seats ftr-seats">' + (b.players || []).map((p, i) => {
     let cls = 'seat' + (b.current === i || (b.pending && b.pending.actor === i) ? ' current' : '');
     let g = (b.goals || []).find(x => x.player === i);
     let goal = g ? (g.ok ? '✅' : '❌') : '';
-    let ch = p.character ? ftrEsc(p.character) : '?';
+    let portrait = p.character ? ftrChar(p.character, 'small tap', `ftrShowArt('${p.character}')`) : '';
     return `<div class="${cls}"><div class="seat-head"><span>${p.npc ? '🤖 ' : ''}${ftrEsc(p.name)}${i === b.ring_holder ? ' 💍' : ''}</span><span class="score">${p.hand_count}</span></div>` +
-      `<div class="small">${ch} · ${p.tricks} tricks · ${p.won_count} cards ${goal}</div></div>`;
+      `<div class="ftr-seat-body">${portrait}<div class="small">${p.tricks} tricks<br>${p.won_count} cards ${goal}</div></div></div>`;
   }).join('') + '</div>';
   let trickHtml = '';
   if (b.trick && b.trick.plays && b.trick.plays.length) {
@@ -114,17 +193,12 @@ function ftrRender() {
       ftrEsc(b.trick.suit || '?') + '</div><div>' + b.trick.plays.map(pl =>
         ftrEsc((b.players[pl.player] || {}).name || '?') + ': ' + ftrCard(pl.card)).join(' ') + '</div></div>';
   }
-  let goalsHtml = '';
-  if (b.goals && b.goals.length) {
-    goalsHtml = '<div class="small">Goals: ' + b.goals.map(v =>
-      ftrEsc(v.name) + ' ' + (v.ok ? '✅' : '❌') + ' (' + ftrEsc(v.goal || '') + ')').join(' · ') + '</div>';
-  }
-  document.getElementById('ftrBoard').innerHTML = '<div class="card">' + head + seats + trickHtml + goalsHtml + '</div>';
+  document.getElementById('ftrBoard').innerHTML = '<div class="card">' + head + seats + trickHtml + '</div>';
 
   let actions = '';
   if (b.phase === 'choosing' && b.current != null && (b.current === myIdx || b.players[b.current].npc)) {
-    actions += '<div class="small">Choose a character:</div><div>' + (b.available || []).map(c =>
-      `<button class="primary" onclick="ftrMove('choose',{character:'${c}'})">${ftrEsc(c)}</button>`).join('') + '</div>';
+    actions += '<div class="small">Choose a character:</div><div class="ftr-choices">' + (b.available || []).map(c =>
+      `<button class="primary ftr-choice" onclick="ftrMove('choose',{character:'${c}'})">${ftrChar(c, 'small')}</button>`).join('') + '</div>';
   }
   if (b.phase === 'setup' && isPendingMine && b.pending) {
     if (b.pending.kind === 'exchange_out') {
@@ -174,6 +248,17 @@ function ftrRender() {
   show('ftrNext', b.phase === 'chapter_end');
 }
 window.ftrTarget = function (t) { FTR.target = t; ftrRender(); };
+window.ftrShowArt = function (key) {
+  let box = document.getElementById('ftrLightbox');
+  let card = document.getElementById('ftrLightboxCard');
+  if (!box || !card) return;
+  card.innerHTML = ftrChar(key, 'full');
+  box.classList.remove('hidden');
+};
+window.ftrCloseArt = function () {
+  let box = document.getElementById('ftrLightbox');
+  if (box) box.classList.add('hidden');
+};
 window.ftrMove = ftrMove;
 window.ftrCardClick = function (c) {
   let b = FTR.board;

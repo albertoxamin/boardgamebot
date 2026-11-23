@@ -18,10 +18,20 @@ function lvCardBg(val, big){
   let px=-(col*LV_TILE_W*scaleX), py=-(row*LV_TILE_H*scaleY);
   return {style:`width:${w}px;height:${h}px;background-image:url(13leaves.png);background-size:${bgW}px ${bgH}px;background-position:${px}px ${py}px;border-radius:6px;box-shadow:1px 2px 3px #0008;flex:none;cursor:pointer`};
 }
-function lvCardEl(val, selected, big){
+function lvCardEl(val, selected, big, disabled, top){
   let b=lvCardBg(val,big);
-  let cls='lvcard'+(selected?' sel':'')+(big?' big':'');
-  return `<div class="${cls}" title="${val}" style="${b.style}"></div>`;
+  let cls='lvcard'+(selected?' sel':'')+(big?' big':'')+(disabled?' dim':'');
+  let stack=top==null?'':`position:absolute;left:0;top:${top}px;z-index:${top+1};`;
+  return `<div class="${cls}" title="${val}" style="${stack}${b.style}"></div>`;
+}
+function lvRowStack(s,i){
+  let count=Math.max(1,Math.min(3,parseInt(s.count,10)||1));
+  let extra=(parseInt(s.count,10)||1)-count;
+  let offset=22, height=88+(count-1)*offset, cards='';
+  for(let k=0;k<count;k++) cards+=lvCardEl(s.value,false,false,false,k*offset);
+  return `<div class="lvrow-item" onclick="lvPassFrom(${i})" title="Tap to pass taking from this stack (pos ${i+1})">`+
+    `<div class="lvstack" style="width:56px;height:${height}px">${cards}</div>`+
+    `<div class="small">×${s.count}<br>#${i+1}${extra>0?'<br>+'+extra:''}</div></div>`;
 }
 function lvChatId(raw){let s=String(raw||'');if(s.startsWith('leaves'))s=s.slice(6);
  let n=parseInt(s,10);return isNaN(n)?0:n;}
@@ -54,7 +64,7 @@ function lvRender(){
   let b=LV.board; if(!b)return;
   let isMyTurn = b.phase==='playing' && b.current_index>=0 && b.players[b.current_index] && (b.players[b.current_index].user_id===LV.user_id || b.players[b.current_index].npc);
   // row
-  let rowHtml = (b.row&&b.row.length) ? '<div class="lvrow">'+b.row.map((s,i)=>`<div style="display:inline-block;text-align:center;margin:2px;cursor:pointer" onclick="lvPassFrom(${i})" title="Tap to pass taking from this stack (pos ${i+1})">${lvCardEl(s.value,false)}<div class="small">×${s.count}<br>#${i+1}</div></div>`).join('')+'</div>' : '<div class="small">Row empty — lead any set</div>';
+  let rowHtml = (b.row&&b.row.length) ? '<div class="lvrow">'+b.row.map(lvRowStack).join('')+'</div>' : '<div class="small">Row empty — lead any set</div>';
   // players
   let seats = '<div class="seats reg-row">'+(b.players||[]).map((p,i)=>{
     let turn=(b.phase==='playing'&&i===b.current_index)?' current':'';
@@ -64,10 +74,16 @@ function lvRender(){
   document.getElementById('lvBoard').innerHTML = '<div class="table"><div class="small">Row (tap a stack to pass taking from it)</div>'+rowHtml+seats+'</div>';
   // my hand
   let hand=b.my_hand||[];
+  let picked=LV.sel.length?hand[LV.sel[0]]:null;
   let mh=document.getElementById('lvHand');
   if(!b.is_player){ mh.innerHTML='<div class="small">👁 Spectating</div>'; }
   else {
-    mh.innerHTML='<b>My hand ('+hand.length+') — tap cards to select</b><div class="pile">'+hand.map((v,i)=>`<div onclick="lvPick(${i})">${lvCardEl(v,LV.sel.includes(i))}</div>`).join('')+'</div>';
+    let hint=picked===null?'tap cards to select':'only '+picked+' can be selected — deselect to choose another value';
+    mh.innerHTML='<b>My hand ('+hand.length+') — '+hint+'</b><div class="pile">'+hand.map((v,i)=>{
+      let selected=LV.sel.includes(i);
+      let disabled=picked!==null&&v!==picked&&!selected;
+      return `<div onclick="${disabled?'':'lvPick('+i+')'}">${lvCardEl(v,selected,false,disabled)}</div>`;
+    }).join('')+'</div>';
   }
   let selText=LV.sel.length?(LV.sel.map(i=>hand[i]).join(',')+' selected'):'none';
   let t=document.getElementById('lvTurn');
@@ -83,7 +99,9 @@ window.lvPick=function(i){
   let hand=(LV.board&&LV.board.my_hand)||[];
   if(i<0||i>=hand.length)return;
   let at=LV.sel.indexOf(i);
-  if(at>=0)LV.sel.splice(at,1); else LV.sel.push(i);
+  if(at>=0){LV.sel.splice(at,1);lvRender();return;}
+  if(LV.sel.length&&hand[LV.sel[0]]!==hand[i]){lvLog('one card value at a time — deselect first');return;}
+  LV.sel.push(i);
   lvRender();
 };
 window.lvPassFrom=function(i){ lvMove('pass',{take_index:i}); };

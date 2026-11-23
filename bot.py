@@ -33,7 +33,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 16
+WEB_VER = 22
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -501,6 +501,12 @@ def do_action_choice(g, target_idx, events):
 def mention(g, user_id):
     """Telegram ping link for a player (tg://user?id= opens their chat)."""
     return f'<a href="tg://user?id={user_id}">{html.escape(G.name_of(g, user_id))}</a>'
+
+
+def player_mention(g, user_id):
+    """Telegram ping link by player name, usable by any game board."""
+    name = next((p["name"] for p in g.get("players", []) if p["user_id"] == user_id), "?")
+    return f'<a href="tg://user?id={user_id}">{html.escape(name)}</a>'
 
 
 def turn_ping(g):
@@ -1131,7 +1137,7 @@ def leaves_render(g, events=None):
     lines = [html.escape(e) for e in events]
     if g.get("players") and g.get("phase") == "playing":
         cur = g["players"][g["current_index"]]
-        ping = "👉 🤖 NPC to move" if cur.get("npc") else f"👉 {html.escape(cur['name'])}'s turn"
+        ping = "👉 🤖 NPC to move" if cur.get("npc") else f"👉 {player_mention(g, cur['user_id'])} - your turn"
         lines.append(ping)
     text = "\n".join(lines + [leaves_board_text(g)]) if lines else leaves_board_text(g)
     kb = leaves_keyboard(g)
@@ -1532,7 +1538,7 @@ def fotr_render(g, events=None):
         idx = FTR.current_player(g)
         if idx is not None:
             who = g["players"][idx]
-            lines.append("👉 🤖 NPC to move" if who.get("npc") else f"👉 {html.escape(who['name'])}'s turn")
+            lines.append("👉 🤖 NPC to move" if who.get("npc") else f"👉 {player_mention(g, who['user_id'])} - your turn")
     text = "\n".join(lines + [fotr_board_text(g)])
     r = send_board(g, "fellowship", text, fotr_keyboard(g))
     if r.get("ok"):

@@ -1,10 +1,12 @@
 import json
 import os
+import re
 import tempfile
 import unittest
 from unittest.mock import patch
 
 import bot
+import fellowship as FTR
 import game_registry as GR
 import web_assets
 from game_modules.leaves import LEAVES_MODULE
@@ -42,6 +44,14 @@ class RegistryTests(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(web_dir, asset)), asset)
             self.assertEqual(web_assets.resolve("/" + asset), os.path.join(web_dir, asset))
 
+    def test_fellowship_art_map_covers_every_character(self):
+        with open(os.path.join(web_assets.WEB_DIR, "fellowship.js"), encoding="utf-8") as handle:
+            text = handle.read()
+        for key in FTR.CHARACTERS:
+            self.assertRegex(text, rf"\b{re.escape(key)}:\s*\{{")
+        for letter in FTR.LETTERS.values():
+            self.assertRegex(text, rf"\b{letter}:\s*\{{name:")
+
     def test_state_json_accept_sets(self):
         state = {"leaves": {"-1": {"passed": {1, 2}, "nested": {"x": {3}}}}}
         with tempfile.TemporaryDirectory() as tmp:
@@ -75,6 +85,38 @@ class RegistryTests(unittest.TestCase):
         )
         self.assertEqual(game["passed"], [1])
         json.dumps(game)
+
+    def test_player_mention_uses_player_name(self):
+        game = {"players": [{"user_id": 42, "name": "A<b>"}]}
+        self.assertEqual(
+            bot.player_mention(game, 42),
+            '<a href="tg://user?id=42">A&lt;b&gt;</a>',
+        )
+
+    def test_leaves_render_pings_current_player(self):
+        game = LEAVES_MODULE.new_game(1, 42, "A&B")
+        for user_id in (43, 44):
+            game["players"].append(LEAVES_MODULE.new_player(user_id, str(user_id)))
+        game["phase"] = "playing"
+        game["row"] = [{"value": 5, "count": 1}]
+        game["current_index"] = 0
+        for player in game["players"]:
+            player["hand"] = [5, 6]
+        with patch.object(bot, "send_board", return_value={"ok": True, "result": {"message_id": 1}}) as send:
+            bot.leaves_render(game)
+        text = send.call_args.args[2]
+        self.assertIn('<a href="tg://user?id=42">A&amp;B</a>', text)
+
+    def test_fellowship_render_pings_current_player(self):
+        game = FTR.new_game(1, 42, "A&B")
+        game["players"].append(FTR.new_player(43, "B"))
+        game["phase"] = "choosing"
+        game["selection_order"] = [0]
+        game["selection_pos"] = 0
+        with patch.object(bot, "send_board", return_value={"ok": True, "result": {"message_id": 1}}) as send:
+            bot.fotr_render(game)
+        text = send.call_args.args[2]
+        self.assertIn('<a href="tg://user?id=42">A&amp;B</a>', text)
 
 
 if __name__ == "__main__":

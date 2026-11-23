@@ -263,6 +263,13 @@ printed chapter cards are not all available in digital form. The 2-player
 mode also simplifies the printed "pyramid" hand into a normal two-handed game
 (the One Ring is moved into a player's hand when it would be undealt).
 
+Source reference: `sources/fellowship_of_the_ring_tts_scripted.tts`, a scripted
+Tabletop Simulator mod save (v13.3) downloaded from
+`https://cdn.steamusercontent.com/ugc/16687564503860619417/1E3511BEE3071CC159ABF49A2ECF013D501BDA2F/`.
+The Mini App uses card and character art extracted from that save's sprite
+sheets into `web/fellowship_cards/`; playable card names and character names
+are taken from the save's card nicknames.
+
 Text commands: `/fotr` (create), `/fotr_join`, `/fotr_join_npc`,
 `/fotr_start [chapter]`, `/fotr_chapter <1-18>`, `/fotr_choose <key>`,
 `/fotr_exchange <card> [target]`, `/fotr_back <card>`, `/fotr_play <card>`,
@@ -293,6 +300,7 @@ Engine: `fellowship.py` + `test_fellowship.py`.
 - `web/tornado.js` – Tornado Splash Mini App view (synced)
 - `web/artichokes.js` – Abandon All Artichokes Mini App view (synced)
 - `web/fellowship.js` – Fellowship Mini App view (synced, viewer-filtered hands)
+- `web/fellowship_cards/` – Fellowship card/character sprite sheets from the TTS save
 - `web/artichokes_cards/` – BGA card art (0–9 vegetables, 10–14 Artichokes, 15 Rhubarb, 16 back)
 - `web/covers/*.jpg` – box art shown as the lobby photo for each game
 - `web/server.py` – static server for the HTML game (needs HTTPS tunnel for in-Telegram use)

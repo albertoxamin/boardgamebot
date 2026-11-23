@@ -33,7 +33,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 22
+WEB_VER = 23
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -245,6 +245,99 @@ def web_keyboard(chat_type="private", chat_id=None, game="flip7"):
             url += ("&" if "?" in url else "?") + f"chat_id={chat_id}"
         btn = {"text": label, "web_app": {"url": url}}
     return [[btn]]
+
+
+def open_lobbies(state, chat_id):
+    """Joinable lobbies for one chat, in catalog order."""
+    rows = []
+    for spec in GR.GAME_SPECS:
+        game = state.get(spec.key, {}).get(str(chat_id))
+        if game and game.get("phase") == "lobby":
+            rows.append({"key": spec.key, "name": spec.name,
+                         "join": spec.join_command,
+                         "players": len(game.get("players") or [])})
+    return rows
+
+
+def game_chat_status(key, game):
+    """Short status of one game in the current chat."""
+    if game is None:
+        return "not started here"
+    if game.get("phase") == "lobby":
+        return f"lobby ({len(game.get('players') or [])} in)"
+    if game.get("phase") in ("game_end", "won", "lost") or (
+            key == "tornado" and game.get("phase") == "race_end" and not game.get("gp")):
+        return "finished - start a new one"
+    return "in progress"
+
+
+def games_text_message(state, chat_id):
+    lines = ["🎮 <b>Games you can start:</b>"]
+    for key, name, new, join, desc in GR.CATALOG_ROWS:
+        game = state.get(key, {}).get(str(chat_id))
+        status = game_chat_status(key, game)
+        if status.startswith("lobby"):
+            status += f" - {join}"
+        lines.append(f"• {name} — {new} ({desc}) · {status}")
+    lines.append("🟢 <b>Open lobbies in this chat:</b>")
+    lobbies = open_lobbies(state, chat_id)
+    for lobby in lobbies:
+        lines.append(f"• {lobby['name']} — {lobby['players']} in · {lobby['join']}")
+    if not lobbies:
+        lines.append("none — start one above")
+    lines.append("🤖 Add a mock player: tap Add NPC in a lobby, or use /join_npc (Flip 7) / /&lt;game&gt;_join_npc.")
+    return "\n".join(lines)
+
+
+def games_rich_table(cols, rows):
+    cells = [[{"text": c, "is_header": True} for c in cols]]
+    cells.extend([{"text": c} for c in row] for row in rows)
+    return {"type": "table", "cells": cells, "is_bordered": True,
+            "is_striped": True, "is_compact": True}
+
+
+def games_rich_message(state, chat_id):
+    """Rich /games catalog using the Castle Combo scorecard table style."""
+    rows = []
+    for key, name, new, join, _desc in GR.CATALOG_ROWS:
+        game = state.get(key, {}).get(str(chat_id))
+        status = game_chat_status(key, game)
+        if status.startswith("lobby"):
+            status += f" - {join}"
+        rows.append([name, new, status])
+    blocks = [
+        {"type": "paragraph", "text": ["🎮 ", {"type": "bold", "text": "Games you can start"}]},
+        games_rich_table(["Game", "Start", "In this chat"], rows),
+        {"type": "paragraph", "text": ["🟢 ", {"type": "bold", "text": "Open lobbies in this chat"}]},
+    ]
+    lobbies = open_lobbies(state, chat_id)
+    if lobbies:
+        blocks.append(games_rich_table(
+            ["Game", "Players", "Join"],
+            [[l["name"], str(l["players"]), l["join"]] for l in lobbies]))
+    else:
+        blocks.append({"type": "paragraph",
+                       "text": ["No open lobbies here - start one with a command above."]})
+    blocks.append({"type": "paragraph",
+                   "text": ["🤖 Add a mock player: tap Add NPC in a lobby, "
+                            "or use /join_npc (Flip 7) / /<game>_join_npc."]})
+    return {"blocks": blocks}
+
+
+def games_spectate_keyboard(state, chat_id, chat_type="private"):
+    """Mini App spectate buttons for games currently in progress here."""
+    rows = []
+    for key, name, _new, _join, _desc in GR.CATALOG_ROWS:
+        game = state.get(key, {}).get(str(chat_id))
+        if game_chat_status(key, game) != "in progress":
+            continue
+        row = web_keyboard(chat_type, chat_id, game=key)
+        if not row or not row[0]:
+            continue
+        btn = dict(row[0][0])
+        btn["text"] = f"👁 Spectate {name}"
+        rows.append([btn])
+    return rows or None
 
 
 # ---------- State ----------
@@ -3997,6 +4090,15 @@ RULES_BY_KEY = {"games": RULES, "regicide": REGICIDE_RULES, "odin": ODIN_RULES,
                 "tornado": TORNADO_RULES, "castlecombo": CASTLECOMBO_RULES,
                 "artichokes": ARTICHOKES_RULES, "fellowship": FTR_RULES}
 
+
+def guide_payload(key):
+    """Mini App guide for one game, reusing the canonical Telegram rules."""
+    spec = GR.GAMES_BY_KEY.get(key)
+    guide = RULES_BY_KEY.get(key)
+    if not spec or not guide:
+        return None
+    return {"ok": True, "key": key, "name": spec.name, "guide": guide}
+
 PLAYER_MAKERS = {
     "games": lambda u, n: G.new_player(u, n),
     "regicide": lambda u, n: {"user_id": u, "name": n, "hand": []},
@@ -4084,22 +4186,11 @@ def handle_command(state, msg):
         g["chat_type"] = msg.get("chat", {}).get("type", g.get("chat_type", "private"))
 
     if cmd == "/games":
-        _catalog = GR.CATALOG_ROWS
-        lines = ["🎮 <b>Games you can start:</b>"]
-        for _key, _name, _new, _join, _desc in _catalog:
-            _g = state.get(_key, {}).get(str(chat_id))
-            if _g is None:
-                _st = "not started here"
-            elif _g["phase"] == "lobby":
-                _st = f"lobby ({len(_g['players'])} in) - {_join}"
-            elif _g["phase"] in ("game_end", "won", "lost") or (
-                    _key == "tornado" and _g["phase"] == "race_end" and not _g.get("gp")):
-                _st = "finished - start a new one"
-            else:
-                _st = "in progress"
-            lines.append(f"• {_name} — {_new} ({_desc}) · {_st}")
-        lines.append("🤖 Add a mock player: tap Add NPC in a lobby, or use /join_npc (Flip 7) / /&lt;game&gt;_join_npc.")
-        send(chat_id, "\n".join(lines))
+        chat_type = msg.get("chat", {}).get("type", "private")
+        kb = games_spectate_keyboard(state, chat_id, chat_type)
+        rich = send_rich(chat_id, games_rich_message(state, chat_id), kb)
+        if not rich.get("ok"):
+            send(chat_id, games_text_message(state, chat_id), kb)
         return
     if cmd == "/cancel" and msg.get("reply_to_message"):
         # Reply-targeted cancel: cancels the one game whose board message
@@ -5661,6 +5752,11 @@ def start_web_server(state):
             if u.path in HEALTH_PATHS:
                 return self._send(200, {"ok": True, "version": WEB_VER,
                                         "games": len(GR.GAME_KEYS)})
+            if u.path == "/api/guide":
+                key = urllib.parse.parse_qs(u.query).get("key", [""])[0]
+                payload = guide_payload(key)
+                return self._send(200 if payload else 404,
+                                  payload or {"ok": False, "error": "unknown game"})
             if u.path in ("/", "/flip7.html"):
                 return self._send(200, open(HTML_PATH, "rb").read(), "text/html")
             if u.path in GAME_JS_FILES:

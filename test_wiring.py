@@ -52,6 +52,85 @@ class RegistryTests(unittest.TestCase):
         for letter in FTR.LETTERS.values():
             self.assertRegex(text, rf"\b{letter}:\s*\{{name:")
 
+    def test_guide_payload_covers_every_game(self):
+        for key in GR.GAME_KEYS:
+            payload = bot.guide_payload(key)
+            self.assertIsNotNone(payload, key)
+            self.assertEqual(payload["key"], key)
+            self.assertEqual(payload["name"], GR.GAMES_BY_KEY[key].name)
+            self.assertTrue(payload["guide"].strip(), key)
+        self.assertIsNone(bot.guide_payload("missing"))
+
+    def test_web_guide_controls_present(self):
+        with open(os.path.join(web_assets.WEB_DIR, "flip7.html"), encoding="utf-8") as handle:
+            html = handle.read()
+        self.assertIn('id="guideBtn"', html)
+        self.assertIn('id="guideOverlay"', html)
+        with open(os.path.join(web_assets.WEB_DIR, "flip7.js"), encoding="utf-8") as handle:
+            js = handle.read()
+        self.assertIn("/api/guide?key=", js)
+
+    def test_open_lobbies_filters_chat_and_phase(self):
+        state = {key: {} for key in GR.GAME_KEYS}
+        state["leaves"]["7"] = {"phase": "lobby", "players": [{}, {}]}
+        state["fellowship"]["7"] = {"phase": "playing", "players": [{}]}
+        state["regicide"]["8"] = {"phase": "lobby", "players": [{}]}
+        rows = bot.open_lobbies(state, 7)
+        self.assertEqual([(r["key"], r["players"]) for r in rows], [("leaves", 2)])
+        self.assertEqual(rows[0]["join"], "/leaves_join")
+
+    def test_games_rich_message_uses_scorecard_table_style(self):
+        state = {key: {} for key in GR.GAME_KEYS}
+        state["leaves"]["7"] = {"phase": "lobby", "players": [{}, {}]}
+        rich = bot.games_rich_message(state, 7)
+        tables = [b for b in rich["blocks"] if b["type"] == "table"]
+        self.assertEqual(len(tables), 2)
+        self.assertTrue(all(t["is_bordered"] and t["is_striped"] and t["is_compact"]
+                            for t in tables))
+        cells = tables[0]["cells"]
+        self.assertEqual([c["text"] for c in cells[0]],
+                         ["Game", "Start", "In this chat"])
+        row = next(r for r in cells if r[0]["text"] == "🍃 13 Leaves")
+        self.assertEqual([c["text"] for c in row],
+                         ["🍃 13 Leaves", "/leaves", "lobby (2 in) - /leaves_join"])
+        lobby_rows = [[c["text"] for c in r] for r in tables[1]["cells"]]
+        self.assertIn(["🍃 13 Leaves", "2", "/leaves_join"], lobby_rows)
+
+    def test_games_spectate_keyboard_only_in_progress(self):
+        state = {key: {} for key in GR.GAME_KEYS}
+        state["leaves"]["7"] = {"phase": "lobby", "players": [{}]}
+        state["fellowship"]["7"] = {"phase": "playing", "players": [{}]}
+        state["regicide"]["8"] = {"phase": "playing", "players": [{}]}
+        with patch.object(bot, "WEB_URL", "https://example.test/app"):
+            kb = bot.games_spectate_keyboard(state, 7, "private")
+        self.assertEqual(len(kb), 1)
+        btn = kb[0][0]
+        self.assertEqual(btn["text"], "👁 Spectate 💍 Fellowship of the Ring")
+        self.assertIn("app=fellowship", btn["web_app"]["url"])
+        self.assertIn("chat_id=7", btn["web_app"]["url"])
+
+    def test_games_command_sends_rich_with_text_fallback(self):
+        state = {key: {} for key in GR.GAME_KEYS}
+        state["leaves"]["7"] = {"phase": "lobby", "players": [{}, {}]}
+        state["fellowship"]["7"] = {"phase": "playing", "players": [{}]}
+        msg = {"chat": {"id": 7, "type": "private"},
+               "from": {"id": 42, "first_name": "A"}, "text": "/games"}
+        with patch.object(bot, "WEB_URL", "https://example.test/app"), \
+                patch.object(bot, "send_rich", return_value={"ok": True}) as rich, \
+                patch.object(bot, "send") as send:
+            bot.handle_command(state, msg)
+        rich.assert_called_once()
+        send.assert_not_called()
+        self.assertEqual(rich.call_args.args[2][0][0]["text"],
+                         "👁 Spectate 💍 Fellowship of the Ring")
+        with patch.object(bot, "WEB_URL", "https://example.test/app"), \
+                patch.object(bot, "send_rich", return_value={"ok": False}), \
+                patch.object(bot, "send") as send:
+            bot.handle_command(state, msg)
+        text = send.call_args.args[1]
+        self.assertIn("Open lobbies in this chat", text)
+        self.assertIn("🍃 13 Leaves — 2 in · /leaves_join", text)
+
     def test_state_json_accept_sets(self):
         state = {"leaves": {"-1": {"passed": {1, 2}, "nested": {"x": {3}}}}}
         with tempfile.TemporaryDirectory() as tmp:

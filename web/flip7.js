@@ -1,5 +1,6 @@
 const WIN=200;
 let G=null;
+let guideKey='games';
 // Router: same Main Mini App serves both games. startapp=regicide<chat_id>
 // (or ?app=regicide in private) shows Regicide, else Flip 7.
 (function router(){
@@ -16,7 +17,38 @@ let G=null;
    else if(String(start).startsWith('castlecombo')){document.getElementById('castlecombo').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='🏰 Castle Combo';}
    else if(String(start).startsWith('artichokes')){document.getElementById('artichokes').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='🥬 Abandon All Artichokes';}
    else if(String(start).startsWith('fellowship')){document.getElementById('fellowship').classList.remove('hidden');document.getElementById('synced').classList.add('hidden');document.querySelector('h1').textContent='💍 Fellowship of the Ring';}
-  }catch(e){}})();
+     }catch(e){}
+  let panelKeys={regicide:'regicide',odin:'odin',leaves:'leaves',lsd:'lsd',spots:'spots',
+    yahtzee:'yahtzee',fliptoons:'fliptoons',castlecombo:'castlecombo',tornado:'tornado',
+    artichokes:'artichokes',fellowship:'fellowship'};
+  for(let panel in panelKeys){let el=document.getElementById(panel);
+    if(el&&!el.classList.contains('hidden')){guideKey=panelKeys[panel];break;}}
+  let btn=document.getElementById('guideBtn');if(btn)btn.classList.remove('hidden');
+ })();
+(function guide(){
+ let btn=document.getElementById('guideBtn'),box=document.getElementById('guideOverlay'),
+     closeBtn=document.getElementById('guideClose'),title=document.getElementById('guideTitle'),
+     body=document.getElementById('guideBody'),cache={};
+ if(!btn||!box||!closeBtn||!title||!body)return;
+ function hide(){box.classList.add('hidden');}
+ async function load(){
+  let key=guideKey;
+  title.textContent='How to play';
+  if(cache[key]){title.textContent='How to play — '+cache[key].name;body.innerHTML=cache[key].guide;return;}
+  body.textContent='Loading…';
+  try{
+   let r=await fetch('/api/guide?key='+encodeURIComponent(key),{cache:'no-store'}).then(x=>x.json());
+   if(!r.ok)throw new Error('not found');
+   cache[key]={name:r.name,guide:r.guide};
+   title.textContent='How to play — '+r.name;
+   body.innerHTML=r.guide;
+  }catch(e){body.textContent='Guide unavailable for this game.';}
+ }
+ btn.addEventListener('click',()=>{box.classList.remove('hidden');load();});
+ closeBtn.addEventListener('click',hide);
+ box.addEventListener('click',e=>{if(e.target===box)hide();});
+ document.addEventListener('keydown',e=>{if(e.key==='Escape')hide();});
+})();
 function buildDeck(){let d=[{k:'n',v:0}];for(let n=1;n<=12;n++)for(let i=0;i<n;i++)d.push({k:'n',v:n});
 ['+2','+4','+6','+8','+10','x2'].forEach(m=>d.push({k:'m',v:m}));
 ['Freeze','Flip Three','Second Chance'].forEach(a=>{for(let i=0;i<3;i++)d.push({k:'a',v:a})});return d;}

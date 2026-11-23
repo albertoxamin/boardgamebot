@@ -272,8 +272,15 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .atbump{animation:atbump .5s ease-out}
 @keyframes atbump{0%{transform:scale(1)}35%{transform:scale(1.6);color:#84cc16}100%{transform:scale(1)}}
 .atfly{position:fixed;z-index:1002;border:1px solid #000;border-radius:10px;box-shadow:0 8px 22px #000b;pointer-events:none;transition:transform .65s cubic-bezier(.2,.8,.2,1),opacity .65s ease-in}
+.fxbump{display:inline-block;animation:fxbump .5s ease-out}
+@keyframes fxbump{0%{transform:scale(1)}35%{transform:scale(1.6);color:#84cc16}100%{transform:scale(1)}}
+.fxfly{position:fixed;z-index:1002;border:1px solid #000;border-radius:8px;box-shadow:0 8px 22px #000b;pointer-events:none;transition:transform .65s cubic-bezier(.2,.8,.2,1),opacity .65s ease-in}
+.fxpopup{position:fixed;left:50%;top:12%;transform:translateX(-50%);z-index:1003;background:#0f172a;border:2px solid #84cc16;border-radius:14px;padding:10px 14px;box-shadow:0 12px 34px #000c;pointer-events:none;text-align:center}
+.fxpopupin{animation:fxpopin .25s ease-out both}
+@keyframes fxpopin{from{opacity:0;transform:translateX(-50%) scale(.8)}to{opacity:1;transform:translateX(-50%) scale(1)}}
 .athandcard{width:126px;height:189px;flex-basis:126px}
-.atchoice{background:#1e293b;color:#e2e8f0;border:2px solid #475569;border-radius:9px;padding:7px 10px;font-size:13px;font-weight:700;margin:0}
+.atchoice{background:#1e293b;color:#e2e8f0;border:2px solid #475569;border-radius:9px;padding:7px 10px;font-size:13px;font-weight:700;margin:0;display:inline-flex;align-items:center;gap:6px}
+.atchoiceimg{width:26px;height:38px;object-fit:cover;border-radius:3px;flex:none}
 </style></head><body>
 <h1>🎴 Flip 7</h1>
 <div id="regicide" class="hidden">
@@ -398,18 +405,38 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <button class="primary hidden" id="syncJoin">🙋 Join game</button>
 <button class="primary hidden" id="syncStart">🎮 Start game</button>
 <button class="primary hidden" id="syncRematch">🔄 Rematch!</button>
-<div class="log" id="syncLog"></div>
-</div>
-<script data-cfasync="false" src="flip7.js?v=26"></script>
-<script data-cfasync="false" src="regicide.js?v=18"></script>
-<script data-cfasync="false" src="odin.js?v=9"></script>
-<script data-cfasync="false" src="leaves.js?v=1"></script>
-<script data-cfasync="false" src="lsd.js?v=4"></script>
-<script data-cfasync="false" src="spots.js?v=14"></script>
-<script data-cfasync="false" src="yahtzee.js?v=3"></script>
-<script data-cfasync="false" src="fliptoons.js?v=9"></script>
+  <div class="log" id="syncLog"></div>
+ </div>
+ <div id="fxPopup" class="fxpopup hidden"></div>
+ <script>
+const FX={capture(sel,attr){let m={};document.querySelectorAll(sel).forEach(el=>{let k=el.getAttribute(attr);if(k!==null)m[k]=el.getBoundingClientRect();});return m;},
+ fly(src,from,to,scale){if(!from||!to)return;let img=document.createElement('img');img.className='fxfly';img.src=src;
+ let cx=from.left+from.width/2,cy=from.top+from.height/2,tx=to.left+to.width/2,ty=to.top+to.height/2;
+ img.style.left=from.left+'px';img.style.top=from.top+'px';img.style.width=from.width+'px';img.style.height=from.height+'px';
+ document.body.appendChild(img);requestAnimationFrame(()=>{img.style.transform='translate('+(tx-cx)+'px,'+(ty-cy)+'px) scale('+(scale||.25)+') rotate(10deg)';img.style.opacity='.12';});
+ setTimeout(()=>img.remove(),700);},
+ tile(html,from,to,scale){if(!from||!to)return;let box=document.createElement('div');box.innerHTML=html;let el=box.firstElementChild;
+ if(!el)return;let cx=from.left+from.width/2,cy=from.top+from.height/2,tx=to.left+to.width/2,ty=to.top+to.height/2;
+ el.classList.add('fxfly');el.style.position='fixed';el.style.margin='0';el.style.left=from.left+'px';el.style.top=from.top+'px';
+ el.style.width=from.width+'px';el.style.height=from.height+'px';document.body.appendChild(el);
+ requestAnimationFrame(()=>{el.style.transform='translate('+(tx-cx)+'px,'+(ty-cy)+'px) scale('+(scale||.35)+') rotate(8deg)';el.style.opacity='.12';});
+ setTimeout(()=>el.remove(),700);},
+ bump(root,attr,oldCounts,newCounts){oldCounts=oldCounts||{};newCounts=newCounts||{};
+ (root||document).querySelectorAll('[data-fx-count]').forEach(el=>{let k=el.getAttribute(attr||'data-fx-count');
+ if(oldCounts[k]!==undefined&&oldCounts[k]!==newCounts[k]){el.classList.remove('fxbump');void el.offsetWidth;el.classList.add('fxbump');}});},
+ popup(html,ms){let p=document.getElementById('fxPopup');if(!p)return;p.innerHTML=html;p.classList.remove('hidden','fxpopupin');void p.offsetWidth;p.classList.add('fxpopupin');
+ clearTimeout(FX._timer);FX._timer=setTimeout(()=>p.classList.add('hidden'),ms||2800);}};
+</script>
+ <script data-cfasync="false" src="flip7.js?v=27"></script>
+ <script data-cfasync="false" src="regicide.js?v=19"></script>
+ <script data-cfasync="false" src="odin.js?v=10"></script>
+ <script data-cfasync="false" src="leaves.js?v=1"></script>
+ <script data-cfasync="false" src="lsd.js?v=5"></script>
+ <script data-cfasync="false" src="spots.js?v=15"></script>
+ <script data-cfasync="false" src="yahtzee.js?v=4"></script>
+ <script data-cfasync="false" src="fliptoons.js?v=10"></script>
 <script data-cfasync="false" src="castlecombo-faces.js?v=2"></script>
-<script data-cfasync="false" src="castlecombo.js?v=6"></script>
-<script data-cfasync="false" src="tornado.js?v=2"></script>
-<script data-cfasync="false" src="artichokes.js?v=10"></script>
+<script data-cfasync="false" src="castlecombo.js?v=7"></script>
+<script data-cfasync="false" src="tornado.js?v=3"></script>
+<script data-cfasync="false" src="artichokes.js?v=11"></script>
 </body></html>

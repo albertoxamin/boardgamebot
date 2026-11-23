@@ -30,7 +30,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 10
+WEB_VER = 12
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -3229,8 +3229,8 @@ def artichokes_board_text(g):
         mine = ""
         if i == actor and p["hand"] and int(g.get("chat_id", 0)) > 0:
             mine = f" · hand: {_at_hand_text(p)}"
-        lines.append(f"• <b>{html.escape(p['name'])}</b> - hand {len(p['hand'])} · "
-                     f"deck {len(p['deck'])} · discard {len(p['discard'])}{mine}{mark}")
+        lines.append(f"• <b>{html.escape(p['name'])}</b> - 🥬 {AT.artichokes(p)} · "
+                     f"hand {len(p['hand'])} · deck {len(p['deck'])} · discard {len(p['discard'])}{mine}{mark}")
     pend = g.get("pending")
     if pend:
         lines.append(f"❓ {html.escape(pend['prompt'])}")

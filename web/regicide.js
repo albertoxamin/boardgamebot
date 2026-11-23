@@ -1,5 +1,8 @@
 // Regicide Mini App (synced, initData auto-login). Loaded by flip7.html router.
-const RG={user_id:0,chat_id:null,board:null,timer:null,init:'',selected:[],prevPlayed:[],prevHand:[],prevEnemyKey:'',prevDamage:0,prevCounts:{}};
+const RG={user_id:0,chat_id:null,board:null,timer:null,init:'',selected:[],prevPlayed:[],prevHand:[],prevEnemyKey:'',prevDamage:0,prevCounts:{},prevAll:null};
+function rgHp(b){let e=b.enemy,max=e?(e.rank==='K'?40:e.rank==='Q'?30:20):0;return max-(b.enemy_damage||0);}
+function rgCounts(b){let c={'g:castle':(b.castle||[]).length,'g:tavern':b.tavern_count,'g:discard':b.discard_count,'g:kills':b.kills,'g:hp':rgHp(b)};
+ (b.players||[]).forEach((p,i)=>{c['r:'+i+':hand']=p.hand_count;});return c;}
 const SUIT_COLOR={'♥':'#dc2626','♦':'#dc2626','♠':'#111827','♣':'#111827'};
 function rgLog(s){let e=document.getElementById('rgLog');if(e)e.textContent+=s+'\n';}
 const RG_COL={Jester:0,A:1,'2':2,'3':3,'4':4,'5':5,'6':6,'7':7,'8':8,'9':9,'10':10,J:11,Q:12,K:13};
@@ -41,17 +44,18 @@ async function rgMove(action,extra){
  if(r.events)r.events.forEach(e=>rgLog(e)); if(r.error)rgLog('⛔ '+r.error);
  if(r.game){RG.board=r.game; RG.selected=[]; rgRender();}}
 function rgRender(){let b=RG.board; if(!b)return;
+ let old=RG.prevAll,oldCounts=old&&old.counts||{};
  RG.spectating=b.is_player===false&&!((b.players[b.current_index]||{}).npc);
  let e=b.enemy, atk=e?(e.rank==='K'?20:e.rank==='Q'?15:10):0, hp=e?(e.rank==='K'?40:e.rank==='Q'?30:20):0;
  let enemyKey=e?e.rank+e.suit:'';
  let enemyAnim=enemyKey!==RG.prevEnemyKey?'card-in':(e&&b.enemy_damage>RG.prevDamage?'hit-shake':'');
- let head=e? '<div class="deckpile" style="justify-content:flex-start;align-items:flex-start">'+rgSprite(e,true,enemyAnim)+'<div class="vstack" style="font-size:18px"><b>'+e.rank+e.suit+'</b><span>⚔️ '+b.effective_attack+'</span><span>❤️ '+(hp-b.enemy_damage)+'</span></div></div>'
+ let head=e? '<div class="deckpile" style="justify-content:flex-start;align-items:flex-start">'+rgSprite(e,true,enemyAnim)+'<div class="vstack" style="font-size:18px"><b>'+e.rank+e.suit+'</b><span>⚔️ '+b.effective_attack+'</span><span>❤️ <span data-fx-count="g:hp">'+(hp-b.enemy_damage)+'</span></span></div></div>'
   : (b.phase==='won'?'<div class="lobby-note">🏆 Team wins!</div>':b.phase==='lost'?'<div class="lobby-note">💀 Team loses.</div>':'');
- let castleBack='<div class="castle-tr"><div class="vstack"><b>Castle ('+(b.castle||[]).length+')</b>'+((b.castle||[]).length?'<span>Next: <b>'+b.castle[0]+'</b> '+(b.next_suits||[]).join('')+'</span>':'')+'<span class="small">Tavern '+b.tavern_count+'</span><span class="small">Discard '+b.discard_count+'</span><span class="small">Kills '+b.kills+'/12</span></div><div class="rcimg small" title="castle" style="background-position:0 -101px"></div></div>';
+  let castleBack='<div class="castle-tr"><div class="vstack"><b>Castle (<span data-fx-count="g:castle">'+(b.castle||[]).length+'</span>)</b>'+((b.castle||[]).length?'<span>Next: <b>'+b.castle[0]+'</b> '+(b.next_suits||[]).join('')+'</span>':'')+'<span class="small">Tavern <span data-fx-count="g:tavern">'+b.tavern_count+'</span></span><span class="small">Discard <span data-fx-count="g:discard">'+b.discard_count+'</span></span><span class="small">Kills <span data-fx-count="g:kills">'+b.kills+'</span>/12</span></div><div class="rcimg small" title="castle" style="background-position:0 -101px"></div></div>';
  let seats='<div class="seats reg-row">'+b.players.map((p,i)=>{
    let isTurn=['playing','discard'].includes(b.phase)&&i===b.current_index;
    let grew=p.hand_count>(RG.prevCounts[p.name]||0); let backs='<div class="handbacks">'+Array.from({length:Math.min(p.hand_count,10)},(_,bi)=>'<div class="rcimg'+(grew&&bi===Math.min(p.hand_count,10)-1?' card-in':'')+'" title="hand" style="background-position:0 -67px"></div>').join('')+'</div>';
-   return '<div class="seat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score">'+p.hand_count+'</span></div>'+backs+(isTurn?'<div class="small"><b>▶ Turn</b></div>':'')+'</div>';}).join('')+'</div>';
+   return '<div class="seat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score"><span data-fx-count="r:'+i+':hand">'+p.hand_count+'</span></span></div>'+backs+(isTurn?'<div class="small"><b>▶ Turn</b></div>':'')+'</div>';}).join('')+'</div>';
  let playedKeys=(b.played||[]).map(c=>c.rank+c.suit), newPlayed=rgNew(RG.prevPlayed,playedKeys);
  document.getElementById('rgBoard').innerHTML='<div class="table" style="position:relative">'+(RG.spectating?'<div class="lobby-note">👁 Spectating — view only (join in Telegram to play)</div>':'')+head
   +castleBack
@@ -82,8 +86,10 @@ function rgRender(){let b=RG.board; if(!b)return;
  else if(b.phase==='discard') t.textContent=emptyDiscard?'💀 No cards left to cover the attack - concede the loss':(myDiscard? '💥 Discard ≥'+b.discard_needed+' (done '+b.discard_total+') - select card(s), then Discard' : '💥 '+b.players[b.current_index].name+' is discarding');
  else if(b.phase==='jester_next'){t.textContent='🎯 Pick who goes next:';
    b.players.forEach((p,i)=>{let btn=document.createElement('button');btn.className='targetbtn';btn.textContent='➡️ '+p.name;btn.addEventListener('click',()=>rgMove('jester_next',{target_index:i}));ab.appendChild(btn);});}
- else if(b.phase==='lobby') t.textContent='🪑 Lobby - anyone taps Start';
- else t.textContent='';
+  else if(b.phase==='lobby') t.textContent='🪑 Lobby - anyone taps Start';
+  else t.textContent='';
+  if(old)FX.bump(document.getElementById('rgBoard'),'data-fx-count',oldCounts,rgCounts(b));
+  RG.prevAll={counts:rgCounts(b)};
 }
 function rgPreview(){
  let b=RG.board, pv=document.getElementById('rgPreview');

@@ -1,5 +1,11 @@
 // Spots Mini App (synced, initData auto-login). Loaded by flip7.html router.
-const SP={user_id:0,chat_id:null,board:null,timer:null,init:'',dieSel:null,rerollSel:new Set()};
+const SP={user_id:0,chat_id:null,board:null,timer:null,init:'',dieSel:null,rerollSel:new Set(),prev:null,flyInfo:null};
+function spCounts(b){let c={};(b.players||[]).forEach((p,i)=>{c['s:'+i+':score']=p.scored.length;c['s:'+i+':treats']=p.treats;});return c;}
+function spOldRects(){let dice={},yards={},spots={};
+ document.querySelectorAll('#spotsBoard .card .sdice[data-i]').forEach(el=>dice[el.dataset.i]=el.getBoundingClientRect());
+ document.querySelectorAll('#spotsBoard .tyard[data-yard]').forEach(el=>yards[el.dataset.yard]=el.getBoundingClientRect());
+ document.querySelectorAll('#spotsBoard .spotbox[data-dog][data-spot]').forEach(el=>spots[el.dataset.dog+':'+el.dataset.spot]=el.getBoundingClientRect());
+ return {dice:dice,yards:yards,spots:spots};}
 function spLog(s){let e=document.getElementById('spotsLog');if(e)e.textContent+=s+'\n';}
 const DOG_ORDER=["leif-mudge-bucky","bristles","sundrop-nori","goliath","gumbo","bongo","pebble","wilbur","eloise","cabbage-taters-ham","honcho","ursula","mayor","burt","wolfgang","raya","doog","tolene","rogue","nutmeg","xerxes","rupert","louise","missy-maam","mirabelle","lil-beth","pierogi-gyota-momo","handsome","frankie","zipper","bitsy","gretchen"];
 function spDogImg(dog,scored){
@@ -32,9 +38,13 @@ async function spRefresh(){ if(!SP.chat_id)return;
 async function spMove(action,extra){
  let body=Object.assign({chat_id:SP.chat_id,action:action,init_data:SP.init},extra||{});
  let r=await spApi('/api/spots/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
- if(r.events)r.events.forEach(e=>spLog(e)); if(r.error)spLog('⛔ '+r.error);
- if(r.game){SP.board=r.game; SP.dieSel=(action==='place'&&r.game.trick&&r.game.trick.dice&&r.game.trick.dice.length)?0:null; SP.rerollSel=new Set(); spRender();}}
+  if(r.events)r.events.forEach(e=>{spLog(e);let m=/🃏 Draws (.+?)\./.exec(e);
+   if(m){let d=((r.game&&r.game.players)||[]).flatMap(p=>p.dogs||[]).find(x=>x.name===m[1]);
+    if(d)FX.popup('<div class="small">🐕 New dog!</div>'+spDogImg(d,false)+'<b>'+escapeHtml(d.name)+'</b>');}});
+  if(r.error){spLog('⛔ '+r.error);SP.flyInfo=null;}
+  if(r.game){SP.board=r.game; SP.dieSel=(action==='place'&&r.game.trick&&r.game.trick.dice&&r.game.trick.dice.length)?0:null; SP.rerollSel=new Set(); spRender();}}
 function spRender(){let b=SP.board; if(!b)return;
+ let old=SP.prev,oldCounts=old&&old.counts||{},rects=spOldRects();
  SP.spectating=b.is_player===false&&!(cur&&cur.npc);
  let me=b.players.find(p=>p.user_id===SP.user_id);
  let cur=b.players[b.current_index]; let myTurn=(b.phase==='playing'&&cur&&(cur.user_id===SP.user_id||cur.npc)&&!b.pending);
@@ -42,7 +52,7 @@ function spRender(){let b=SP.board; if(!b)return;
   + b.tiles.map(t=>'<span class="tiley'+(t.faceup?'':' tilety')+'" data-slug="'+t.slug+'" title="'+escapeHtml(t.slug)+'"><img src="spots-tiles/'+t.slug+'.jpg?v=2" alt="'+escapeHtml(t.slug)+'">'+(t.treat_on?'<div class="tiletreats">'+Array.from({length:t.treat_on},()=>'<img class="treatic" src="treat.png" alt="treat">').join('')+'</div>':'')+'</span>').join('') + '</div>';
  let seats=b.players.map((p,i)=>{
    let isTurn=b.current_index===i&&b.phase==='playing';
-   return '<div class="lsdseat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score">'+p.scored.length+'/6🏅 · '+p.treats+'🦴</span></div>'
+   return '<div class="lsdseat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score"><span data-fx-count="s:'+i+':score">'+p.scored.length+'</span>/6🏅 · <span data-fx-count="s:'+i+':treats">'+p.treats+'</span>🦴</span></div>'
     +'<div style="display:flex;gap:8px;align-items:flex-start"><div class="tyard" data-yard="'+i+'" style="background-position:-'+(i*84)+'px 0" title="yard (buried dice)"><div class="yardice">'+(p.yard.length?p.yard.map(v=>'<img class="sdice" src="spots-dice/'+v+'.png" alt="buried die '+v+'" title="buried die '+v+'" style="width:22px;height:23px">').join(''):'<span class="small" style="color:#fff">empty</span>')+'</div></div><div class="small">Yard total: '+p.yard.reduce((a,c)=>a+c,0)+' / bust at 8+</div></div>'
     +'<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px">'
     + [...p.dogs, ...p.scored].sort((a,b)=>(a.pack??99)-(b.pack??99)).map(d=>{
@@ -98,7 +108,7 @@ function spRender(){let b=SP.board; if(!b)return;
      else {SP.dieSel=SP.dieSel===i?null:i; spRender();}
    }));
    let buryBtn=document.getElementById('spBury');
-   if(buryBtn)buryBtn.addEventListener('click',()=>{if(SP.dieSel===null){spLog('Select a die first');return;} spMove('place',{die_pos:SP.dieSel,target:['yard']});});
+   if(buryBtn)buryBtn.addEventListener('click',()=>{if(SP.dieSel===null){spLog('Select a die first');return;} SP.flyInfo={die:(b.trick?b.trick.dice:[])[SP.dieSel],diePos:SP.dieSel,player:b.players.indexOf(me),kind:'yard'}; spMove('place',{die_pos:SP.dieSel,target:['yard']});});
    let rrBtn=document.getElementById('spReroll');
    if(rrBtn)rrBtn.addEventListener('click',()=>spMove('reroll',{indices:b.trick&&b.trick.tile==='track'?[...SP.rerollSel]:null}));
    let dnBtn=document.getElementById('spDone');
@@ -107,7 +117,7 @@ function spRender(){let b=SP.board; if(!b)return;
    document.querySelectorAll('#spotsBoard .tyard').forEach(el=>el.addEventListener('click',()=>{
      if(parseInt(el.dataset.yard)!==b.players.indexOf(me))return; // only your own yard
      if(SP.dieSel===null){spLog('Select a die first');return;}
-     spMove('place',{die_pos:SP.dieSel,target:['yard']});
+     SP.flyInfo={die:(b.trick?b.trick.dice:[])[SP.dieSel],diePos:SP.dieSel,player:b.players.indexOf(me),kind:'yard'}; spMove('place',{die_pos:SP.dieSel,target:['yard']});
    }));
    // dog spot taps
    document.querySelectorAll('#spotsBoard .spotbox').forEach(el=>el.addEventListener('click',()=>{
@@ -118,10 +128,17 @@ function spRender(){let b=SP.board; if(!b)return;
        diePos=(b.trick?b.trick.dice:[]).findIndex(v=>v===need);
        if(diePos<0){spLog('No rolled die matches that spot ('+need+')');return;}
      }
-     spMove('place',{die_pos:diePos,target:['dog',parseInt(el.dataset.dog),parseInt(el.dataset.spot)]});
+     SP.flyInfo={die:(b.trick?b.trick.dice:[])[diePos],diePos:diePos,dog:parseInt(el.dataset.dog),spot:parseInt(el.dataset.spot),kind:'dog'}; spMove('place',{die_pos:diePos,target:['dog',parseInt(el.dataset.dog),parseInt(el.dataset.spot)]});
    }));
  }
- document.getElementById('spotsScore').classList.add('hidden'); // score action lives in the top strip now
+  let fresh=spCounts(b);
+  if(old)FX.bump(document.getElementById('spotsBoard'),'data-fx-count',oldCounts,fresh);
+  if(SP.flyInfo&&old){let f=SP.flyInfo,from=rects.dice[String(f.diePos)],to=null;
+   if(f.kind==='yard'){let el=document.querySelector('#spotsBoard .tyard[data-yard="'+f.player+'"]');if(el)to=el.getBoundingClientRect();}
+   else {let el=document.querySelector('#spotsBoard .spotbox[data-dog="'+f.dog+'"][data-spot="'+f.spot+'"]');if(el)to=el.getBoundingClientRect();}
+   if(from&&to)FX.fly('spots-dice/'+f.die+'.png',from,to,.45);}
+  SP.flyInfo=null; SP.prev={counts:fresh};
+  document.getElementById('spotsScore').classList.add('hidden'); // score action lives in the top strip now
  document.getElementById('spotsStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.players.some(p=>p.user_id===SP.user_id)));
  document.getElementById('spotsRematch').classList.toggle('hidden',!(b.phase==='game_end'&&b.is_player));
  let t=document.getElementById('spotsTurn');

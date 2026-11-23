@@ -1,5 +1,6 @@
 // Fliptoons Mini App (synced, initData auto-login). Loaded by flip7.html router.
-const FLP={user_id:0,chat_id:null,board:null,timer:null,init:'',err:''};
+const FLP={user_id:0,chat_id:null,board:null,timer:null,init:'',err:'',prevAll:null};
+function ftCounts(b){let c={};(b.players||[]).forEach((p,i)=>{c['t:'+i+':fame']=p.fame;c['t:'+i+':deck']=p.deck;c['t:'+i+':discarded']=p.discarded;});return c;}
 function ftLog(s){let e=document.getElementById('ftLog');if(e)e.textContent+=s+'\n';}
 function ftApi(path,opts){return fetch(path,opts).then(r=>r.json());}
 function ftChatId(raw){let s=String(raw||'');if(s.startsWith('fliptoons'))s=s.slice(9);
@@ -203,6 +204,7 @@ function ftArt(c){
  function ftZoomClose(){let z=document.getElementById('ftZoom');if(z){z.classList.remove('open');z.innerHTML='';}}
 function ftRender(){
  let b=FLP.board; if(!b)return;
+ let old=FLP.prevAll,oldCounts=old&&old.counts||{};
  let t=document.getElementById('ftTurn'), board=document.getElementById('ftBoard');
  let cur=b.actor!=null?b.players[b.actor]:null;
  let isActor=b.actor!=null&&(cur.user_id===FLP.user_id||cur.npc);
@@ -242,8 +244,8 @@ function ftRender(){
    if(minePend){act=act||{};act.opt={};b.pending.options.forEach(o=>{act.opt[String(o.v)]=o;});}
    let grid=ftGrid(p,act);
    let unmatched=minePend?b.pending.options.filter(o=>act.opt[String(o.v)]!==undefined):[];
-   ph+='<div class="ftpc'+(p.is_current?' current':'')+'"><div style="display:flex;justify-content:space-between"><b>'+escapeHtml(p.name)+(p.npc?' 🤖':'')+'</b>'+badges+'<span class="score">'+p.fame+'</span></div>'+
-    '<div class="small">deck '+p.deck+' · discarded '+p.discarded+(p.is_current&&b.stage==='market'?' · budget '+p.budget:'')+'</div>'+grid+
+   ph+='<div class="ftpc'+(p.is_current?' current':'')+'"><div style="display:flex;justify-content:space-between"><b>'+escapeHtml(p.name)+(p.npc?' 🤖':'')+'</b>'+badges+'<span class="score"><span data-fx-count="t:'+i+':fame">'+p.fame+'</span></span></div>'+
+    '<div class="small">deck <span data-fx-count="t:'+i+':deck">'+p.deck+'</span> · discarded <span data-fx-count="t:'+i+':discarded">'+p.discarded+'</span>'+(p.is_current&&b.stage==='market'?' · budget '+p.budget:'')+'</div>'+grid+
     (minePend?'<div class="ftprompt">'+escapeHtml(b.pending.prompt)+'</div>'+
      (unmatched.length?'<div class="ftopts">'+unmatched.map(o=>'<button class="hit" data-choose="'+escapeHtml(String(o.v))+'">'+escapeHtml(o.label)+'</button>').join('')+'</div>':''):'')+
     '</div>';
@@ -260,7 +262,9 @@ function ftRender(){
  board.querySelectorAll('[data-hire]').forEach(el=>el.addEventListener('click',()=>ftMove('hire',{slot:parseInt(el.dataset.hire)})));
  board.querySelectorAll('[data-zoom]').forEach(el=>el.addEventListener('click',()=>ftZoom(el.dataset.zoom,el.dataset.zslot)));
  board.querySelectorAll('[data-choose]').forEach(el=>el.addEventListener('click',()=>ftMove('choose',{choice:el.dataset.choose})));
- board.querySelectorAll('[data-dismiss]').forEach(el=>el.addEventListener('click',()=>ftMove('dismiss',{iid:parseInt(el.dataset.dismiss)})));
+  board.querySelectorAll('[data-dismiss]').forEach(el=>el.addEventListener('click',()=>ftMove('dismiss',{iid:parseInt(el.dataset.dismiss)})));
+  if(old)FX.bump(board,'data-fx-count',oldCounts,ftCounts(b));
+  FLP.prevAll={counts:ftCounts(b)};
 }
 document.getElementById('ftJoin').addEventListener('click',()=>ftMove('join'));
 document.getElementById('ftStart').addEventListener('click',()=>ftMove('start'));

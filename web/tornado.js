@@ -1,5 +1,6 @@
 // Tornado Splash Mini App (synced, initData auto-login). Loaded by flip7.html router.
-const TSV={user_id:0,chat_id:null,board:null,timer:null,init:'',sel:new Set(),boost:false,prevKey:''};
+const TSV={user_id:0,chat_id:null,board:null,timer:null,init:'',sel:new Set(),boost:false,prevKey:'',prevAll:null};
+function tsCounts(b){let c={};(b.players||[]).forEach((p,i)=>{c['s:'+i+':hand']=p.hand_count;c['s:'+i+':pos']=p.pos;c['s:'+i+':points']=p.points;});return c;}
 function tsLog(s){let e=document.getElementById('tsLog');if(e)e.textContent+=s+'\n';}
 function tsApi(path,opts){return fetch(path,opts).then(r=>r.json());}
 // The scanned running-card faces have no printed values, so this mapping of the
@@ -51,6 +52,7 @@ function tsMyTurn(b){
 }
 function tsRender(){
  let b=TSV.board; if(!b)return;
+ let old=TSV.prevAll,oldCounts=old&&old.counts||{};
  let me=b.my_index!=null?b.players[b.my_index]:null;
  let cur=b.current_index!=null?b.players[b.current_index]:null;
  let myTurn=tsMyTurn(b);
@@ -81,10 +83,10 @@ function tsRender(){
   let pct=Math.min(100,Math.round(100*p.pos/b.course.length));
   let cps=b.course.checkpoints.map(cp=>'<span class="tscp" style="left:'+Math.round(100*cp.space/b.course.length)+'%"></span>').join('');
   let cls='tsracer'+(i===b.current_index&&b.phase==='playing'?' current':'')+(i===b.my_index?' me':'');
-  let right=(p.finished?'🏁 '+p.finish_rank+'/'+b.players.length:'')+(b.gp?' · '+p.points+' pts':'')+' · 🃏'+p.hand_count;
+  let right=(p.finished?'🏁 '+p.finish_rank+'/'+b.players.length:'')+(b.gp?' · <span data-fx-count="s:'+i+':points">'+p.points+'</span> pts':'')+' · 🃏<span data-fx-count="s:'+i+':hand">'+p.hand_count+'</span>';
   return '<div class="'+cls+'"><div class="tsrhead"><span>'+escapeHtml(p.name)+(p.npc?' 🤖':'')+(p.boost_used?'':' ⚡')+'</span><span>'+right+'</span></div>'
    +'<div class="tstrack"><div class="tsfill" style="width:'+pct+'%"></div>'+cps+'</div>'
-   +'<div class="small">'+(p.boat_name||'no boat yet')+' · space '+p.pos+'/'+b.course.length+' · checkpoints '+b.course.checkpoints.map(c=>c.space+c.dir[0]).join(' ')+'</div></div>';
+   +'<div class="small">'+(p.boat_name||'no boat yet')+' · space <span data-fx-count="s:'+i+':pos">'+p.pos+'</span>/'+b.course.length+' · checkpoints '+b.course.checkpoints.map(c=>c.space+c.dir[0]).join(' ')+'</div></div>';
  }).join('');
  let head='<div class="tsbar"><b>🌊 '+escapeHtml(b.course.name)+'</b> <span class="small">'+b.course.length+' spaces</span></div>';
  document.getElementById('tsBoard').innerHTML=specBar+head+rows;
@@ -132,10 +134,12 @@ function tsRender(){
   document.querySelectorAll('#tsHand .tscard').forEach(el=>el.addEventListener('click',()=>{
    let i=parseInt(el.dataset.i); if(TSV.sel.has(i))TSV.sel.delete(i); else TSV.sel.add(i); tsRender();}));
  }
- if(b.phase==='picking'){
-  document.querySelectorAll('#tsActions .tsboat').forEach(el=>el.addEventListener('click',()=>{
-   if(el.disabled)return; tsMove('pick',{boat:parseInt(el.dataset.boat)});}));
- }
+  if(b.phase==='picking'){
+   document.querySelectorAll('#tsActions .tsboat').forEach(el=>el.addEventListener('click',()=>{
+    if(el.disabled)return; tsMove('pick',{boat:parseInt(el.dataset.boat)});}));
+  }
+  if(old)FX.bump(document.getElementById('tsBoard'),'data-fx-count',oldCounts,tsCounts(b));
+  TSV.prevAll={counts:tsCounts(b)};
 }
 document.getElementById('tsJoin').addEventListener('click',()=>tsMove('join'));
 document.getElementById('tsStart').addEventListener('click',()=>tsMove('start',{gp:false}));

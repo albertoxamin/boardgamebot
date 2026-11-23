@@ -6,6 +6,10 @@ const AT_COLOR={beet:'#9f2645',broccoli:'#33762f',carrot:'#ef9131',corn:'#f3d80d
  eggplant:'#7c3883',leek:'#6e8d51',onion:'#b66d36',peas:'#72b146',pepper:'#f3b637',
    potato:'#a27c3e',artichoke:'#c9d336',rhubarb:'#cb4f6b'};
 function atCardName(v){return String(v||'').replace(/^./,c=>c.toUpperCase());}
+function atChoiceCard(label){let s=String(label||'').toLowerCase();
+ let v=Object.keys(AT_SPRITE).find(k=>k!=='back'&&s.indexOf(k)>=0);
+ if(!v)return '';
+ return '<img class="atchoiceimg" src="/artichokes_cards/'+AT_SPRITE[v]+'.jpg?v='+AT_VER+'" alt="'+escapeHtml(atCardName(v))+'">';}
 function atCardDesc(c){
  let fromBoard=(ATAPP.board&&ATAPP.board.descriptions&&ATAPP.board.descriptions[c.v])||'';
  return fromBoard||String(c.desc||'');}
@@ -169,11 +173,11 @@ function atRender(){
     '<div class="small">Selected '+n+' / '+need+'</div><div class="atchoices">'+
     opts.map(o=>{
      let on=ATAPP.pass.has(String(o.v));
-     return '<button class="atchoice'+(on?' atsel':'')+'" data-at-pass="'+escapeHtml(String(o.v))+'">'+escapeHtml(o.label)+'</button>';
+      return '<button class="atchoice'+(on?' atsel':'')+'" data-at-pass="'+escapeHtml(String(o.v))+'">'+atChoiceCard(o.label)+'<span>'+escapeHtml(o.label)+'</span></button>';
     }).join('')+'</div>'+(b.can_act?'<button class="hit" id="atPassGo"'+(n!==need?' disabled':'')+'>✅ Pass selected ('+n+'/'+need+')</button>':'')+'</div>';
   }else{
    choice.innerHTML='<div class="table"><b>'+escapeHtml(pend.prompt)+'</b><div class="atchoices">'+
-    opts.map(o=>'<button class="atchoice" data-at-ch="'+escapeHtml(String(o.v))+'">'+escapeHtml(o.label)+'</button>').join('')+'</div></div>';
+     opts.map(o=>'<button class="atchoice" data-at-ch="'+escapeHtml(String(o.v))+'">'+atChoiceCard(o.label)+'<span>'+escapeHtml(o.label)+'</span></button>').join('')+'</div></div>';
   }
  }
   let a='';

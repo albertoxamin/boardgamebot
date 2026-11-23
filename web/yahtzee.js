@@ -1,5 +1,6 @@
 // Yahtzee Mini App (synced, initData auto-login). Loaded by flip7.html router.
-const YZ={user_id:0,chat_id:null,board:null,timer:null,init:'',reroll:[false,false,false,false,false],prevDice:[]};
+const YZ={user_id:0,chat_id:null,board:null,timer:null,init:'',reroll:[false,false,false,false,false],prevDice:[],prevAll:null};
+function yzCounts(b){let c={};(b.players||[]).forEach((p,i)=>{c['y:'+i+':total']=p.total;c['y:'+i+':filled']=p.filled;});return c;}
 const YZ_UPPER=['ones','twos','threes','fours','fives','sixes'];
 function yzLog(s){let e=document.getElementById('yzLog');if(e)e.textContent+=s+'\n';}
 function yzApi(path,opts){return fetch(path,opts).then(r=>r.json());}
@@ -36,6 +37,7 @@ async function yzMove(action,extra){
  if(r.game){YZ.board=r.game; YZ.reroll=[false,false,false,false,false]; yzRender();}}
 function yzRender(){
  let b=YZ.board; if(!b)return;
+ let old=YZ.prevAll,oldCounts=old&&old.counts||{};
  let t=b.turn||null, cur=b.players[b.current_index]||null;
  let myTurn=(b.phase==='playing'&&cur&&(cur.user_id===YZ.user_id||cur.npc));
  let spect=b.is_player===false&&!myTurn;
@@ -72,9 +74,11 @@ function yzRender(){
   let i=parseInt(el.dataset.i); YZ.reroll[i]=!YZ.reroll[i]; yzRender();}));
  // Score taps on current player's open boxes
  if(myTurn&&t&&t.rolls>=1){
-  document.querySelectorAll('#yzBoard .yscore.free').forEach(el=>el.addEventListener('click',()=>{
-   yzMove('score',{category:el.dataset.cat});}));
- }
+   document.querySelectorAll('#yzBoard .yscore.free').forEach(el=>el.addEventListener('click',()=>{
+    yzMove('score',{category:el.dataset.cat});}));
+  }
+  if(old)FX.bump(document.getElementById('yzBoard'),'data-fx-count',oldCounts,yzCounts(b));
+  YZ.prevAll={counts:yzCounts(b)};
 }
 function yzScorecard(p,i,b){
  let isCur=(b.phase==='playing'&&i===b.current_index);
@@ -89,9 +93,9 @@ function yzScorecard(p,i,b){
   let label=c.label+(pts!==null?' <span class="pts">'+pts+'</span>':'');
   return '<div class="'+cls+'"'+(used?'':' data-cat="'+c.key+'"')+'>'+label+'<b>'+(used?v:'–')+'</b></div>';
  };
- return '<div class="yscard'+(isCur?' current':'')+'"><div class="yshead"><span>'+escapeHtml(p.name)+(p.npc?' 🤖':'')+'</span><span class="score">'+p.total+'</span></div>'
+ return '<div class="yscard'+(isCur?' current':'')+'"><div class="yshead"><span>'+escapeHtml(p.name)+(p.npc?' 🤖':'')+'</span><span class="score"><span data-fx-count="y:'+i+':total">'+p.total+'</span></span></div>'
   +'<div class="ysgrid">'+b.categories.map(cell).join('')+'</div>'
-  +'<div class="small">Upper '+upper+'/63'+(upper>=63?' · +35 ✓':'')+' · Yahtzee bonus +'+(p.yahtzee_bonus||0)+' · '+p.filled+'/13 filled</div></div>';
+  +'<div class="small">Upper '+upper+'/63'+(upper>=63?' · +35 ✓':'')+' · Yahtzee bonus +'+(p.yahtzee_bonus||0)+' · <span data-fx-count="y:'+i+':filled">'+p.filled+'</span>/13 filled</div></div>';
 }
 document.getElementById('yzRoll').addEventListener('click',()=>yzMove('roll',{keep:YZ.reroll.map(x=>!x)}));
 document.getElementById('yzStart').addEventListener('click',()=>yzMove('start'));

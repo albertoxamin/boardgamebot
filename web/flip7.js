@@ -120,7 +120,13 @@ let saved=localStorage.getItem('flip7_save');
 if(saved){try{G=JSON.parse(saved);document.getElementById('setup').classList.add('hidden');document.getElementById('game').classList.remove('hidden');log('↩️ Restored saved game');render();}catch(e){}}
 
 // ---------- Synced mode: live Telegram games via /api (Mini App auto-login) ----------
-const SYNC={user_id:0,chat_id:null,board:null,timer:null,name:'',init:'',prevPiles:{},prevDeck:-1};
+const SYNC={user_id:0,chat_id:null,board:null,timer:null,name:'',init:'',prevPiles:{},prevDeck:-1,prevAll:null};
+function f7Counts(b){let c={'f:deck':b.deck_count};(b.players||[]).forEach((p,i)=>{
+ let hs=0;if(p.status!=='busted'){hs=(p.numbers||[]).reduce((a,x)=>a+x,0);
+  if((p.modifiers||[]).includes('x2'))hs*=2;
+  hs+=(p.modifiers||[]).filter(m=>m[0]==='+').reduce((a,m)=>a+parseInt(m.slice(1)),0);
+  if((p.numbers||[]).length===7)hs+=15;}
+ c['f:'+i+':total']=p.total;c['f:'+i+':hand']=hs;c['f:'+i+':handtotal']=p.total+hs;});return c;}
 function syncLog(s){document.getElementById('syncLog').textContent+=s+'\n';}
 function tgInit(){try{let id=Telegram.WebApp.initData||'';
  let p=new URLSearchParams(id);let u=p.get('user');if(u){let o=JSON.parse(u);
@@ -182,13 +188,14 @@ function seatHtml(p,i,b){
   +'<div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)
   +(isDealer?'<span class="badge dealer">🎩 Dealer</span>':'')+(isTurn?'<span class="badge turn">▶ Turn</span>':'')
   +(isFlip3?'<span class="badge flip3">🎲 '+(isFlipping?'Flipping '+b.flip3.remaining+'…':'Flip Three')+'</span>':'')+statusBadge+'</span>'
-  +'<span class="score">'+p.total+'</span></div>'
+   +'<span class="score"><span data-fx-count="f:'+i+':total">'+p.total+'</span></span></div>'
   +'<div class="pile">'+pile+'</div>'
   +(isFlip3&&!isFlipping?'<div class="small">🎲 Subjected to Flip Three this round — forced card(s) have a dashed outline</div>':'')
-  +'<div class="small">Hand <b>'+handScore(p)+'</b> → total <b>'+(p.total+handScore(p))+'</b>'+(p.status==='busted'?' (bust: hand 0)':'')+'</div>'
+   +'<div class="small">Hand <b><span data-fx-count="f:'+i+':hand">'+handScore(p)+'</span></b> → total <b><span data-fx-count="f:'+i+':handtotal">'+(p.total+handScore(p))+'</span></b>'+(p.status==='busted'?' (bust: hand 0)':'')+'</div>'
   +(p.last_round!==null&&p.last_round!==undefined?'<div class="small">last round: +'+p.last_round+'</div>':'')
   +'</div>';}
 function renderSync(){let b=SYNC.board; if(!b)return;
+ let old=SYNC.prevAll,oldCounts=old&&old.counts||{};
  let _ch=b.pending_action?b.players.find(p=>p.user_id===b.pending_action.chooser_id):null;
  SYNC.spectating=b.is_player===false&&!((b.players[b.current_index]||{}).npc)&&!(_ch&&_ch.npc);
  let deckAnim=(SYNC.prevDeck>=0&&b.deck_count<SYNC.prevDeck)?'card-in':''; SYNC.prevDeck=b.deck_count;
@@ -197,7 +204,7 @@ function renderSync(){let b=SYNC.board; if(!b)return;
  if(b.phase==='lobby'){
   document.getElementById('syncBoard').innerHTML='<div class="table">'+specBar+'<div class="lobby-note"><b>🎴 Lobby</b> — '+b.players.length+' player(s) seated<br><span class="small">Anyone can tap Start (or send <b>/startgame</b> in Telegram).</span></div>'+seats+'</div>';
  } else {
-  document.getElementById('syncBoard').innerHTML='<div class="table">'+specBar+'<div class="deckpile"><div class="fcard" title="deck" style="background-position:-44px -138px"></div><div><b>Deck</b> ×'+b.deck_count+'<br><span class="small">Round '+b.round+' · Dealer '+escapeHtml(b.dealer)+'</span></div></div>'+seats+'</div>';
+  document.getElementById('syncBoard').innerHTML='<div class="table">'+specBar+'<div class="deckpile"><div class="fcard" title="deck" style="background-position:-44px -138px"></div><div><b>Deck</b> ×<span data-fx-count="f:deck">'+b.deck_count+'</span><br><span class="small">Round '+b.round+' · Dealer '+escapeHtml(b.dealer)+'</span></div></div>'+seats+'</div>';
  }
  let me=b.players.find(p=>p.user_id===SYNC.user_id); let cur=b.players[b.current_index]; let myTurn=b.phase==='playing'&&!b.pending_action&&cur&&(cur.user_id===SYNC.user_id||cur.npc);
  document.getElementById('syncHit').classList.toggle('hidden',!myTurn);
@@ -214,7 +221,9 @@ function renderSync(){let b=SYNC.board; if(!b)return;
  else if(b.phase==='playing') t.textContent=myTurn? '👉 Your turn - Hit or Stay?' : '👉 '+b.players[b.current_index].name+"'s turn";
  else if(b.phase==='lobby') t.textContent='🪑 Lobby - tap Start';
  else if(b.phase==='round_end') t.textContent='Round scored!';
- else if(b.phase==='game_end') t.textContent='🏆 Game over!';
+  else if(b.phase==='game_end') t.textContent='🏆 Game over!';
+  if(old)FX.bump(document.getElementById('syncBoard'),'data-fx-count',oldCounts,f7Counts(b));
+  SYNC.prevAll={counts:f7Counts(b)};
 }
 async function move(action,target){ if(!SYNC.chat_id)return;
  let r=await api('/api/move',{method:'POST',headers:{'Content-Type':'application/json'},

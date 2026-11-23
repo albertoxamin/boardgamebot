@@ -53,6 +53,16 @@ def test_card_descriptions():
     assert "Don't break my heart!" in A.card_desc({"v": "artichoke"})
 
 
+def test_board_text_shows_public_artichoke_counts():
+    import bot
+    g, ev = mk(3)
+    set_hand(g, 0, ["artichoke", "artichoke", "carrot"])
+    set_hand(g, 1, ["pepper", "artichoke"])
+    text = bot.artichokes_board_text(g)
+    assert "🥬 2" in text
+    assert "🥬 1" in text
+
+
 def test_eggplant_pending_hides_other_hands():
     import bot
     g, ev = mk(3)

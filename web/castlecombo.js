@@ -1,5 +1,11 @@
 // Castle Combo Mini App (synced, initData auto-login). Loaded by flip7.html router.
-const CCAPP={user_id:0,chat_id:null,board:null,timer:null,init:'',err:''};
+const CCAPP={user_id:0,chat_id:null,board:null,timer:null,init:'',err:'',prev:null};
+function ccCounts(b){let c={};(b.players||[]).forEach((p,i)=>{c['c:'+i+':gold']=p.gold;c['c:'+i+':keys']=p.keys;c['c:'+i+':cards']=p.cards;});return c;}
+function ccZones(b){let z={};[1,2].forEach(loc=>{let sec=b.rows&&b.rows[String(loc)];if(sec&&sec.live)(sec.cards||[]).forEach(c=>z[ccKey(c)]='row:'+loc);});
+ (b.players||[]).forEach((p,i)=>(p.tableau||[]).forEach(c=>z[ccKey(c)]='tableau:'+i));return z;}
+function ccOldRects(){let m={};document.querySelectorAll('#ccBoard .cctile[data-key]').forEach(el=>{
+ let zone=el.closest('.ccrow')?'row':el.closest('.ccgrid')?'tableau':'';
+ m[el.dataset.key]={rect:el.getBoundingClientRect(),zone:zone,html:el.outerHTML};});return m;}
 const CC_SHEET='/castlecombo-cards.webp';
 // BGA sprite sheet: 10 cols x 8 rows, cell 286x400 served at 132x186.
 // Card id == sprite position t (1-39 Castle, 41-79 Village; t0/t40 = backs).
@@ -226,6 +232,7 @@ function ccPlaceGrid(b){
 }
 function ccRender(){
  let b=CCAPP.board; if(!b)return;
+ let old=CCAPP.prev,rects=ccOldRects(),rectMem=Object.assign({},old&&old.rectMem||{},rects);
  let t=document.getElementById('ccTurn'), board=document.getElementById('ccBoard');
  let cur=b.actor!=null?b.players[b.actor]:null;
  let isActor=b.actor!=null&&(cur.user_id===CCAPP.user_id||cur.npc);
@@ -262,7 +269,7 @@ function ccRender(){
    '<button class="stay" data-renew="1">🔑 Renew display</button></div></div>');
   let ph='<div class="table"><div class="small">Players · round '+b.round+'/9</div><div class="ftplayers">';
   b.players.forEach((p,i)=>{
-   ph+='<div class="ftpc'+(p.is_current?' current':'')+'"><div style="display:flex;justify-content:space-between"><b>'+escapeHtml(p.name)+(p.npc?' 🤖':'')+'</b><span class="score">'+p.gold+'💰 '+p.keys+'🔑 · '+p.cards+'/9</span></div>'+ccGrid(p)+'</div>';
+   ph+='<div class="ftpc'+(p.is_current?' current':'')+'"><div style="display:flex;justify-content:space-between"><b>'+escapeHtml(p.name)+(p.npc?' 🤖':'')+'</b><span class="score"><span data-fx-count="c:'+i+':gold">'+p.gold+'</span>💰 <span data-fx-count="c:'+i+':keys">'+p.keys+'</span>🔑 · <span data-fx-count="c:'+i+':cards">'+p.cards+'</span>/9</span></div>'+ccGrid(p)+'</div>';
   });
   ph+='</div></div>'; parts.push(ph);
  }
@@ -278,9 +285,17 @@ function ccRender(){
  board.querySelectorAll('[data-move]').forEach(el=>el.addEventListener('click',()=>ccMove('move')));
  board.querySelectorAll('[data-renew]').forEach(el=>el.addEventListener('click',()=>ccMove('renew')));
  // zoom on display/tableau tiles (skip face-down + empties)
- board.querySelectorAll('.cctile[data-key]:not(.ccfd)').forEach(el=>{
-  el.addEventListener('click',()=>ccZoom(el.dataset.key));
- });
+  board.querySelectorAll('.cctile[data-key]:not(.ccfd)').forEach(el=>{
+   el.addEventListener('click',()=>ccZoom(el.dataset.key));
+  });
+  let fresh=ccCounts(b),zones=ccZones(b),zoneMem=Object.assign({},old&&old.zoneMem||{},old&&old.zones||{},zones);
+  if(old){
+   FX.bump(board,'data-fx-count',old.counts,fresh);
+   board.querySelectorAll('.cctile[data-key]').forEach(el=>{let k=el.dataset.key,prev=(old.zones&&old.zones[k])||(old.zoneMem&&old.zoneMem[k]);
+    if(prev&&prev.indexOf('row:')===0&&zones[k]&&zones[k].indexOf('tableau:')===0&&rectMem[k])
+     FX.tile(rectMem[k].html,rectMem[k].rect,el.getBoundingClientRect(),.45);});
+  }
+  CCAPP.prev={counts:fresh,zones:zones,zoneMem:zoneMem,rectMem:rectMem};
 }
 document.getElementById('ccJoin').addEventListener('click',()=>ccMove('join'));
 document.getElementById('ccStart').addEventListener('click',()=>ccMove('start'));

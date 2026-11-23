@@ -1,10 +1,24 @@
 // Let's Summon Demons Mini App (synced, initData auto-login). Loaded by flip7.html router.
-const SD={user_id:0,chat_id:null,board:null,timer:null,init:'',sacSel:[],demonSel:null,summonMode:false,replaceSel:[],prevMarket:[]};
+const SD={user_id:0,chat_id:null,board:null,timer:null,init:'',sacSel:[],demonSel:null,summonMode:false,replaceSel:[],prevMarket:[],prev:null};
+function sdCounts(b){let c={};(b.players||[]).forEach((p,i)=>{c['d:'+i+':souls']=p.souls;c['d:'+i+':demons']=p.demons.length;});return c;}
+function sdPublic(b){let z={};(b.players||[]).forEach((p,i)=>{
+ (p.in_play||[]).forEach(c=>z[c.iid]={card:c,zone:'play:'+i});
+ (p.demons||[]).forEach(c=>z[c.iid]={card:c,zone:'demon:'+i});});
+ (b.market||[]).forEach(c=>z[c.iid]={card:c,zone:'market'});return z;}
+function sdOldRects(){let cards={};document.querySelectorAll('#lsdBoard .lsdcard[data-iid]').forEach(el=>cards[el.dataset.iid]=el.getBoundingClientRect());return {cards:cards};}
+function sdEventName(e){let m;
+ if((m=/summons (.+?) for free!/.exec(e)))return m[1].replace(/^the top Demon \(/,'').replace(/\)$/,'');
+ if((m=/summons (.+?)!/.exec(e)))return m[1];
+ if((m=/buys (.+?) for /.exec(e)))return m[1];
+ if((m=/gains (.+?) from THE BLOCK/.exec(e)))return m[1];
+ if((m=/steals (.+?) from /.exec(e)))return m[1];
+ if((m=/hatches (.+?)!/.exec(e)))return m[1];
+ return null;}
 function sdLog(s){let e=document.getElementById('lsdLog');if(e)e.textContent+=s+'\n';}
-function sdCard(c,selected,extra,big){
- if(!c)return '';
- return '<img class="lsdcard'+(big?' big':'')+(selected?' sel':'')+(extra?' '+extra:'')
-  +'" src="lsd-cards/'+c.slug+'.jpg" data-iid="'+c.iid+'" title="'+escapeHtml(c.name)+' ('+(c.num!==null&&c.num!==undefined?c.num:(c.nums?c.nums.join('/'):'∞'))+')" alt="'+escapeHtml(c.name)+'">';}
+function sdCard(c,selected,extra,big,zone){
+  if(!c)return '';
+  return '<img class="lsdcard'+(big?' big':'')+(selected?' sel':'')+(extra?' '+extra:'')
+   +'" src="lsd-cards/'+c.slug+'.jpg" data-iid="'+c.iid+'"'+(zone?' data-zone="'+zone+'"':'')+' title="'+escapeHtml(c.name)+' ('+(c.num!==null&&c.num!==undefined?c.num:(c.nums?c.nums.join('/'):'∞'))+')" alt="'+escapeHtml(c.name)+'">';}
 function sdNew(prev,keys){let pool=[...prev],out=new Set();keys.forEach((k,i)=>{let j=pool.indexOf(k);if(j>=0)pool.splice(j,1);else out.add(i);});return out;}
 function sdApi(path,opts){return fetch(path,opts).then(r=>r.json());}
 async function sdLoad(){
@@ -32,27 +46,30 @@ async function sdRefresh(){ if(!SD.chat_id)return;
 async function sdMove(action,extra){
  let body=Object.assign({chat_id:SD.chat_id,action:action,init_data:SD.init},extra||{});
  let r=await sdApi('/api/lsd/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
- if(r.events)r.events.forEach(e=>sdLog(e)); if(r.error)sdLog('⛔ '+r.error);
+ if(r.events)r.events.forEach(e=>{sdLog(e);let name=sdEventName(e);if(name&&r.game){let entry=Object.values(sdPublic(r.game)).find(x=>x.card.name===name);
+  if(entry)FX.popup('<div class="small">'+escapeHtml(e)+'</div><img src="lsd-cards/'+entry.card.slug+'.jpg" style="width:110px;height:150px;border:2px solid #84cc16;border-radius:8px"><div><b>'+escapeHtml(name)+'</b></div>');}});
+ if(r.error)sdLog('⛔ '+r.error);
  if(r.game){SD.board=r.game; SD.sacSel=[]; SD.demonSel=null; SD.summonMode=false; SD.replaceSel=[]; sdRender();}}
 function summonCost(b){
  for(let j=0;j<b.players.length;j++){ if(j===b.current_index)continue;
   if((b.players[j].demons||[]).some(c=>c.eff==='baphometal')) return 4; }
  return 3;}
 function sdRender(){let b=SD.board; if(!b)return;
+ let old=SD.prev,oldCounts=old&&old.counts||{},rects=sdOldRects();
  SD.spectating=b.is_player===false&&!((b.players[b.current_index]||{}).npc)&&!((b.players[b.pending?b.pending.player:-1]||{}).npc);
  let me=b.players.find(p=>p.user_id===SD.user_id);
  let cur=b.players[b.current_index]; let myTurn=(b.phase==='playing'&&cur&&(cur.user_id===SD.user_id||cur.npc)&&!b.pending);
  let cost=summonCost(b);
  let marketKeys=(b.market||[]).map(c=>c.iid), newMarket=sdNew(SD.prevMarket,marketKeys); SD.prevMarket=marketKeys;
  let market='<div class="small"><b>THE BLOCK</b> (buy for 3 👻) · Supply '+b.supply+'</div><div class="lsdrow">'
-  + (b.market||[]).map((c,i)=>sdCard(c,false,newMarket.has(i)?'card-in':'',true)).join('') + '</div>';
+   + (b.market||[]).map((c,i)=>sdCard(c,false,newMarket.has(i)?'card-in':'',true,'market')).join('') + '</div>';
  if(b.dice) market+='<div class="small">🎲 Last roll: '+b.dice[0]+'+'+b.dice[1]+'='+b.last_total+'</div>';
  let seats=b.players.map((p,i)=>{
    let isTurn=b.current_index===i&&b.phase==='playing';
-   return '<div class="lsdseat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score">'+p.souls+'👻 · '+p.demons.length+'😈</span></div>'
+   return '<div class="lsdseat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score"><span data-fx-count="d:'+i+':souls">'+p.souls+'</span>👻 · <span data-fx-count="d:'+i+':demons">'+p.demons.length+'</span>😈</span></div>'
     +(p.candle?'<div class="small">Candle: '+escapeHtml(p.candle.name)+' ('+(p.candle.nums||[]).join('/')+')</div>':'')
-    +'<div class="lsdrow">'+p.in_play.map(c=>sdCard(c,SD.summonMode&&me&&p.user_id===SD.user_id&&SD.sacSel.includes(c.iid))).join('')+'</div>'
-    +(p.demons.length?'<div class="small">Demons:</div><div class="lsdrow">'+p.demons.map(c=>sdCard(c)).join('')+'</div>':'')
++'<div class="lsdrow">'+p.in_play.map(c=>sdCard(c,SD.summonMode&&me&&p.user_id===SD.user_id&&SD.sacSel.includes(c.iid),'','','play:'+i)).join('')+'</div>'
+     +(p.demons.length?'<div class="small">Demons:</div><div class="lsdrow">'+p.demons.map(c=>sdCard(c,false,'','','demon:'+i)).join('')+'</div>':'')
     +(isTurn?'<div class="small"><b>▶ Turn</b></div>':'')+'</div>';}).join('');
  document.getElementById('lsdBoard').innerHTML='<div class="table" style="position:relative">'
   +(SD.spectating?'<div class="lobby-note">👁 Spectating — view only (join in Telegram to play)</div>':'')
@@ -119,7 +136,15 @@ function sdRender(){let b=SD.board; if(!b)return;
    }
    ch.appendChild(box);
  }
- let t=document.getElementById('lsdTurn');
+  let fresh=sdCounts(b),zones=sdPublic(b);
+  if(old){
+   FX.bump(document.getElementById('lsdBoard'),'data-fx-count',oldCounts,fresh);
+   Object.keys(zones).forEach(iid=>{let prev=old.zones&&old.zones[iid];
+    if(prev&&prev.zone!==zones[iid].zone){let el=document.querySelector('#lsdBoard .lsdcard[data-iid="'+iid+'"]');
+     if(el&&rects.cards[iid])FX.fly('lsd-cards/'+zones[iid].card.slug+'.jpg',rects.cards[iid],el.getBoundingClientRect(),.35);}});
+  }
+  SD.prev={counts:fresh,zones:zones};
+  let t=document.getElementById('lsdTurn');
  if(b.phase==='playing') t.textContent=b.pending? '👉 '+nameOf(b,b.pending.player)+' to choose' : (myTurn?'👉 Your turn - Roll, Buy (tap a BLOCK card), Summon, End':'👉 '+b.players[b.current_index].name+"'s turn");
  else if(b.phase==='lobby') t.textContent='🪑 Lobby - anyone taps Start';
  else if(b.phase==='game_end') t.textContent='🏆 Game over!';

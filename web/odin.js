@@ -1,5 +1,11 @@
 // Odin Mini App (synced, initData auto-login). Loaded by flip7.html router.
-const OD={user_id:0,chat_id:null,board:null,timer:null,init:'',selected:[],pickupSel:null,prevTable:[],prevHand:[]};
+const OD={user_id:0,chat_id:null,board:null,timer:null,init:'',selected:[],pickupSel:null,prevTable:[],prevHand:[],prev:null,flyCards:null};
+function odCounts(b){let c={};(b.players||[]).forEach((p,i)=>{c['o:'+i+':score']=p.score;c['o:'+i+':hand']=p.hand_count;});return c;}
+function odOldRects(){let cards={},seats={},table=null;
+ document.querySelectorAll('#odHand .ocard[data-rank][data-suit],#odBoard .ocard[data-rank][data-suit]').forEach(el=>{cards[el.dataset.rank+el.dataset.suit]={rect:el.getBoundingClientRect(),html:el.outerHTML};});
+ let t=document.querySelector('#odBoard .odtable .ocard');if(t)table=t.getBoundingClientRect();
+ document.querySelectorAll('#odBoard .seat[data-seat]').forEach(el=>seats[el.dataset.seat]=el.getBoundingClientRect());
+ return {cards:cards,seats:seats,table:table};}
 // BGA sprite: 10 cols x 6 rows (sheet 1813x2048, cell ~181x341); cols 1-9, rows = colours in order below. Col 9: empty except [9,5] Grumpy Goat bonus (unused).
 const OD_SUIT_ORDER={blue:0,red:1,pink:2,green:3,black:4,orange:5};
 function odLog(s){let e=document.getElementById('odLog');if(e)e.textContent+=s+'\n';}
@@ -37,9 +43,10 @@ async function odRefresh(){ if(!OD.chat_id)return;
 async function odMove(action,extra){
  let body=Object.assign({chat_id:OD.chat_id,action:action,init_data:OD.init},extra||{});
  let r=await odApi('/api/odin/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
- if(r.events)r.events.forEach(e=>odLog(e)); if(r.error)odLog('⛔ '+r.error);
+  if(r.events)r.events.forEach(e=>odLog(e)); if(r.error){odLog('⛔ '+r.error);OD.flyCards=null;}
  if(r.game){OD.board=r.game; OD.selected=[]; OD.pickupSel=null; odRender();}}
 function odRender(){let b=OD.board; if(!b)return;
+ let old=OD.prev,oldCounts=old&&old.counts||{},rects=odOldRects();
  OD.spectating=b.is_player===false&&!((b.players[b.current_index]||{}).npc)&&!((b.players[b.pickup_player]||{}).npc);
  let tableKeys=(b.table||[]).map(c=>c.rank+c.suit), newTable=odNew(OD.prevTable,tableKeys); OD.prevTable=tableKeys;
  let tableHtml=b.table&&b.table.length
@@ -51,7 +58,7 @@ function odRender(){let b=OD.board; if(!b)return;
  let seats='<div class="seats reg-row">'+b.players.map((p,i)=>{
    let isTurn=(b.phase==='playing'&&i===b.current_index)||(b.phase==='pickup'&&i===b.pickup_player);
    let backs='<div class="handbacks">'+Array.from({length:Math.min(p.hand_count,10)},()=>'<img class="ocard" src="cards/odin_back.svg" alt="hand">').join('')+'</div>';
-   return '<div class="seat'+(isTurn?' current':'')+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score">'+p.score+'</span></div>'+backs
+    return '<div class="seat'+(isTurn?' current':'')+'" data-seat="'+i+'"><div class="seat-head"><span><span class="avatar">'+escapeHtml(p.name.slice(0,1).toUpperCase())+'</span>'+escapeHtml(p.name)+'</span><span class="score"><span data-fx-count="o:'+i+':score">'+p.score+'</span> · <span data-fx-count="o:'+i+':hand">'+p.hand_count+'</span>🃏</span></div>'+backs
     +(isTurn?'<div class="small"><b>▶ Turn</b></div>':'')+'</div>';}).join('')+'</div>';
  document.getElementById('odBoard').innerHTML='<div class="table" style="position:relative">'+(OD.spectating?'<div class="lobby-note">👁 Spectating — view only (join in Telegram to play)</div>':'')+tableHtml+pendingHtml+seats+'</div>';
  // My hand (only mine, private), sorted by suit then rank for grouping sets
@@ -85,7 +92,16 @@ function odRender(){let b=OD.board; if(!b)return;
  else if(b.phase==='pickup') t.textContent=myPickup? '✋ You played - tap 1 card from the previous set to take' : '✋ '+b.players[b.pickup_player].name+' is taking a card';
  else if(b.phase==='lobby') t.textContent='🪑 Lobby - anyone taps Start';
  else if(b.phase==='game_end') t.textContent='🏆 Game over - first to 0 wins';
- else t.textContent='';
+  else t.textContent='';
+  let fresh=odCounts(b);
+  if(old){
+   FX.bump(document.getElementById('odBoard'),'data-fx-count',oldCounts,fresh);
+   (OD.flyCards||[]).forEach(k=>{let snap=rects.cards[k],el=document.querySelector('#odBoard .ocard[data-rank="'+k[0]+'"][data-suit="'+k.slice(1)+'"]');
+    if(snap&&el)FX.tile(snap.html,snap.rect,el.getBoundingClientRect(),.4);});
+   if(old.phase==='pickup'&&b.phase==='playing'&&b.current_index!=null){let seat=document.querySelector('#odBoard .seat[data-seat="'+b.current_index+'"]');
+    if(seat&&rects.table)FX.fly('cards/odin_back.svg',rects.table,seat.getBoundingClientRect(),.3);}
+  }
+  OD.prev={counts:fresh,phase:b.phase}; OD.flyCards=null;
 }
 function odPreview(){
  let b=OD.board, pv=document.getElementById('odPreview'), pb=document.getElementById('odPlay');
@@ -116,8 +132,8 @@ function odRenderHandOnly(){
  odPreview();}
 document.getElementById('odPlay').addEventListener('click',()=>{
  let cards=(OD.handSorted||[]).filter(c=>OD.selected.includes(c.rank+c.suit));
- if(!cards.length){odLog('Select a card first');return;}
- odMove('play',{cards:cards});});
+  if(!cards.length){odLog('Select a card first');return;}
+  OD.flyCards=cards.map(c=>c.rank+c.suit); odMove('play',{cards:cards});});
 document.getElementById('odPass').addEventListener('click',()=>odMove('pass'));
 document.getElementById('odStart').addEventListener('click',()=>odMove('start'));
 document.getElementById('odRematch').addEventListener('click',()=>odMove('rematch'));

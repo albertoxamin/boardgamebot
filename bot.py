@@ -13,7 +13,6 @@ import game as G
 import artichokes as AT
 import regicide as R
 import odin as O
-import leaves as LV
 import lsd as D
 import spots as SP
 import yahtzee as Y
@@ -21,6 +20,9 @@ import fliptoons as FT
 import castlecombo as CC
 import tornado as TS
 import fellowship as FTR
+import game_registry as GR
+import web_assets
+from game_modules.leaves import LEAVES_MODULE
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT_TOKEN", "")
 API = f"https://api.telegram.org/bot{TOKEN}" if TOKEN else ""
@@ -31,7 +33,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 15
+WEB_VER = 16
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -39,29 +41,21 @@ HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 JS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                        "web", "flip7.js")
 WEB_PORT = int(os.environ.get("FLIP7_WEB_PORT", "8080"))
+HEALTH_PATHS = ("/healthz", "/health")
+GAME_JS_FILES = {
+    route: os.path.join(os.path.dirname(JS_PATH), name)
+    for route, name in GR.WEB_JS_ROUTES.items()
+}
 STATE_LOCK = threading.Lock()  # polling loop + HTTP API share one state
 _STATE = {"state": None}
 
-HELP = """🎴 <b>Boardgame bot</b>
-/games - list the games you can start (and what's running here)
-/flip7 - press-your-luck Flip 7 (also /flip7_join /flip7_start /flip7_rules /join_npc)
-/rules - how to play (reply to a board for that game's rules)   /cancel - reply to a board to cancel that game
-/regicide - co-op Regicide (also /regicide_join /regicide_start /regicide_play /regicide_yield /regicide_discard /regicide_rules /regicide_cancel)
-/odin - card-shedding Odin (also /odin_join /odin_start /odin_play /odin_pass /odin_pickup /odin_score /odin_cancel /odin_rules)
-/leaves - shed sets in 13 Leaves (also /leaves_join /leaves_start /leaves_play /leaves_pass /leaves_rules /leaves_cancel)
-/spots - push-your-luck dog dice (also /spots_join /spots_start /spots_trick /spots_place /spots_reroll /spots_score /spots_cancel /spots_rules)
-/yahtzee - dice scorecard classic (also /yahtzee_join /yahtzee_start /yahtzee_roll /yahtzee_score /yahtzee_cancel /yahtzee_rules)
-/fliptoons - grid-building card market (also /fliptoons_join /fliptoons_start /fliptoons_hire /fliptoons_dismiss /fliptoons_skip /fliptoons_choose /fliptoons_cancel /fliptoons_rules)
-/castlecombo - deck-building Castle Combo (also /castlecombo_join /castlecombo_start /castlecombo_buy /castlecombo_flip /castlecombo_key /castlecombo_choose /castlecombo_cancel /castlecombo_rules)
-/tornado - jet-ski racing Tornado Splash (also /tornado_join /tornado_start /tornado_pick /tornado_play /tornado_wait /tornado_hand /tornado_next /tornado_cancel /tornado_rules)
-/artichokes - deck-wrecking Abandon All Artichokes (also /artichokes_join /artichokes_start /artichokes_harvest /artichokes_play /artichokes_end /artichokes_choose /artichokes_cancel /artichokes_rules)
-/fotr - co-op Lord of the Rings trick-taking (also /fotr_join /fotr_start /fotr_chapter /fotr_choose /fotr_play /fotr_ring /fotr_rules /fotr_cancel)
-/games - list the games you can start (and what's running here)
-🤖 /join_npc (or /&lt;game&gt;_join_npc) - add a mock player anyone can control, in the lobby
-/lsd - dice game Let's Summon Demons (also /lsd_join /lsd_start /lsd_roll /lsd_buy /lsd_summon /lsd_end /lsd_score /lsd_cancel /lsd_rules)
-Play: on your turn tap <b>Hit</b> to flip a card or <b>Stay</b> to bank.
-Duplicate number = bust (0 pts). 7 unique numbers = Flip 7 (+15), round ends.
-First to 200 wins. Cards are face-up/public, just like the physical game."""
+HELP = GR.help_text(tail=(
+    "/rules - how to play (reply to a board for that game's rules)   /cancel - reply to a board to cancel that game",
+    "🤖 /join_npc (or /&lt;game&gt;_join_npc) - add a mock player anyone can control, in the lobby",
+    "Play: on your turn tap <b>Hit</b> to flip a card or <b>Stay</b> to bank.",
+    "Duplicate number = bust (0 pts). 7 unique numbers = Flip 7 (+15), round ends.",
+    "First to 200 wins. Cards are face-up/public, just like the physical game.",
+))
 
 RULES = """<b>Flip 7 rules</b> (deck 94: numbers 0×1,1×1,2×2…12×12; +2/+4/+6/+8/+10/x2; 3× Freeze, Flip Three, Second Chance)
 • Dealer deals 1 face-up to each (actions resolved as dealt). Then in turn order: <b>Hit</b> or <b>Stay</b> (Stay needs ≥1 card, banks and sits out).
@@ -118,11 +112,8 @@ def send(chat_id, text, kb=None):
 
 
 COVERS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "covers")
-COVERS = {"games": "flip7.jpg", "flip7": "flip7.jpg", "regicide": "regicide.jpg",
-          "odin": "odin.jpg", "lsd": "lsd.jpg", "spots": "spots.jpg",
-          "yahtzee": "yahtzee.jpg", "fliptoons": "fliptoons.jpg",
-           "tornado": "tornado.jpg", "castlecombo": "castlecombo.jpg",
-           "artichokes": "artichokes.jpg", "fellowship": "fellowship.png"}
+COVERS = {"flip7": "flip7.jpg"}
+COVERS.update({spec.key: spec.cover for spec in GR.GAME_SPECS if spec.cover})
 
 
 def cover_path(game):
@@ -240,16 +231,16 @@ def web_keyboard(chat_type="private", chat_id=None, game="flip7"):
     startapp=<game><chat_id> (no second BotFather app needed)."""
     if not WEB_URL:
         return None
-    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "leaves": "🎮 Play 13 Leaves (HTML)", "lsd": "🎮 Play Summon Demons (HTML)", "spots": "🎮 Play Spots (HTML)", "yahtzee": "🎮 Play Yahtzee (HTML)", "fliptoons": "🎮 Play Fliptoons (HTML)", "tornado": "🎮 Play Tornado Splash (HTML)", "castlecombo": "🎮 Play Castle Combo (HTML)", "artichokes": "🎮 Play Abandon All Artichokes (HTML)", "fellowship": "🎮 Play Fellowship (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
+    label = GR.keyboard_label(game)
     if chat_type in ("group", "supergroup", "channel"):
         if chat_id:
-            start = f"{game}{chat_id}" if game in ("regicide", "odin", "leaves", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes", "fellowship") else str(chat_id)
+            start = GR.GAMES_BY_KEY.get(game, GR.GAMES_BY_KEY["games"]).start_param(chat_id)
             url = f"https://t.me/flip7groupbot?startapp={start}&v={WEB_VER}"
         else:
             url = f"{WEB_URL}?v={WEB_VER}"
         btn = {"text": label, "url": url}
     else:
-        url = WEB_URL + f"?v={WEB_VER}" + (f"&app={game}" if game in ("regicide", "odin", "leaves", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes", "fellowship") else "")
+        url = WEB_URL + f"?v={WEB_VER}" + (f"&app={game}" if GR.supports_web_routing(game) else "")
         if chat_id:
             url += ("&" if "?" in url else "?") + f"chat_id={chat_id}"
         btn = {"text": label, "web_app": {"url": url}}
@@ -258,25 +249,15 @@ def web_keyboard(chat_type="private", chat_id=None, game="flip7"):
 
 # ---------- State ----------
 def load_state():
-    s = {"games": {}, "regicide": {}, "odin": {}, "leaves": {}, "lsd": {}, "spots": {}, "yahtzee": {}, "fliptoons": {}, "tornado": {}, "castlecombo": {}, "artichokes": {}, "fellowship": {}}
+    s = {key: {} for key in GR.GAME_KEYS}
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE) as f:
                 s.update(json.load(f))
         except Exception:
             pass
-    s.setdefault("games", {})
-    s.setdefault("regicide", {})  # migrate old state files
-    s.setdefault("odin", {})
-    s.setdefault("leaves", {})
-    s.setdefault("lsd", {})
-    s.setdefault("spots", {})
-    s.setdefault("yahtzee", {})
-    s.setdefault("fliptoons", {})
-    s.setdefault("tornado", {})
-    s.setdefault("castlecombo", {})
-    s.setdefault("artichokes", {})
-    s.setdefault("fellowship", {})
+    for key in GR.GAME_KEYS:
+        s.setdefault(key, {})
     return s
 
 
@@ -303,23 +284,54 @@ def _npc_player():
     return {"user_id": NPC_ID, "name": "🤖 NPC", "npc": True}
 
 
-NPC_MAX = {"games": 6, "regicide": 4, "odin": 6, "leaves": 6, "lsd": 5, "spots": 4,
-           "yahtzee": Y.MAX_PLAYERS, "tornado": TS.MAX_PLAYERS, "fliptoons": 4,
-           "castlecombo": CC.MAX_PLAYERS, "artichokes": AT.MAX_PLAYERS,
-           "fellowship": FTR.MAX_PLAYERS}
-NPC_FULL = {
-    "games": "⛔ Game is full.",
-    "regicide": "⛔ Regicide is 2-4 players (full).",
-    "odin": "⛔ Odin is 2-6 players (full).",
-    "leaves": "⛔ 13 Leaves is 3-6 players (full).",
-    "lsd": "⛔ Let's Summon Demons is 2-5 players (full).",
-    "spots": "⛔ Spots is 1-4 players (full).",
-    "yahtzee": f"⛔ Yahtzee is 2-{Y.MAX_PLAYERS} players (full).",
-    "tornado": f"⛔ Tornado Splash is 2-{TS.MAX_PLAYERS} players (full).",
-    "fliptoons": "⛔ Fliptoons is 2-4 players (full).",
-    "castlecombo": f"⛔ Castle Combo is 2-{CC.MAX_PLAYERS} players (full).",
-    "artichokes": f"⛔ Abandon All Artichokes is 2-{AT.MAX_PLAYERS} players (full).",
-    "fellowship": f"⛔ Fellowship is {FTR.MIN_PLAYERS}-{FTR.MAX_PLAYERS} players (full).",
+NPC_MAX = dict(GR.NPC_MAX)
+NPC_FULL = dict(GR.NPC_FULL)
+
+
+def _games_npc():
+    p = G.new_player(NPC_ID, "🤖 NPC")
+    p["npc"] = True
+    return p
+
+
+def _fliptoons_npc():
+    p = _ft_player(NPC_ID, "🤖 NPC")
+    p["npc"] = True
+    return p
+
+
+def _castlecombo_npc():
+    p = CC.new_player(NPC_ID, "🤖 NPC")
+    p["npc"] = True
+    return p
+
+
+def _artichokes_npc():
+    p = AT.new_player(NPC_ID, "🤖 NPC")
+    p["npc"] = True
+    return p
+
+
+def _fellowship_npc():
+    p = FTR.new_player(NPC_ID, "🤖 NPC")
+    p["npc"] = True
+    return p
+
+
+NPC_PLAYERS = {
+    "games": _games_npc,
+    "regicide": lambda: {**_npc_player(), "hand": []},
+    "odin": lambda: {**_npc_player(), "hand": [], "score": O.START_SCORE},
+    "leaves": LEAVES_MODULE.npc_player,
+    "lsd": lambda: {**_npc_player(), "souls": 5, "candle": None,
+                    "in_play": [], "demons": [], "demon_hand": []},
+    "spots": lambda: {**_npc_player(), "dogs": [], "scored": [], "yard": [], "treats": 1},
+    "yahtzee": lambda: {**_npc_player(), **Y.new_player(NPC_ID, "🤖 NPC")},
+    "tornado": lambda: {**_npc_player(), **TS.new_player(NPC_ID, "🤖 NPC")},
+    "fliptoons": _fliptoons_npc,
+    "castlecombo": _castlecombo_npc,
+    "artichokes": _artichokes_npc,
+    "fellowship": _fellowship_npc,
 }
 
 
@@ -332,37 +344,7 @@ def add_npc(key, g):
         return "🤖 NPC is already in this game."
     if len(g["players"]) >= NPC_MAX[key]:
         return NPC_FULL[key]
-    if key == "games":
-        p = G.new_player(NPC_ID, "🤖 NPC")
-        p["npc"] = True
-    elif key == "regicide":
-        p = {**_npc_player(), "hand": []}
-    elif key == "odin":
-        p = {**_npc_player(), "hand": [], "score": O.START_SCORE}
-    elif key == "leaves":
-        p = {**_npc_player(), **LV.new_player(NPC_ID, "🤖 NPC")}
-    elif key == "lsd":
-        p = {**_npc_player(), "souls": 5, "candle": None,
-             "in_play": [], "demons": [], "demon_hand": []}
-    elif key == "spots":
-        p = {**_npc_player(), "dogs": [], "scored": [], "yard": [], "treats": 1}
-    elif key == "yahtzee":
-        p = {**_npc_player(), **Y.new_player(NPC_ID, "🤖 NPC")}
-    elif key == "tornado":
-        p = {**_npc_player(), **TS.new_player(NPC_ID, "🤖 NPC")}
-    elif key == "fliptoons":
-        p = _ft_player(NPC_ID, "🤖 NPC")
-        p["npc"] = True
-    elif key == "castlecombo":
-        p = CC.new_player(NPC_ID, "🤖 NPC")
-        p["npc"] = True
-    elif key == "artichokes":
-        p = AT.new_player(NPC_ID, "🤖 NPC")
-        p["npc"] = True
-    elif key == "fellowship":
-        p = FTR.new_player(NPC_ID, "🤖 NPC")
-        p["npc"] = True
-    g["players"].append(p)
+    g["players"].append(NPC_PLAYERS[key]())
     return None
 
 
@@ -1096,11 +1078,7 @@ def handle_odin(state, msg, cmd, text, uid, name):
 
 
 # ---------- 13 Leaves (I'm Out style) ----------
-LEAVES_RULES = """🍃 <b>13 Leaves rules</b> (short): shed your hand by playing sets onto the row ends.
-• 3–6 players (dealt 12/11/10/9). First lead plays any set of same value.
-• After that, play onto left/right end: play >= count of that end stack, and value is <= lowest (left) or >= highest (right), or stack equal to that end value.
-• If you can’t/won’t play: Pass (and you’re out for this round in many variants) — see buttons. First to empty hand wins the game.
-Use the Mini App for easier play, or commands like <code>/leaves_play 5 2</code> (play two 5s)."""
+LEAVES_RULES = LEAVES_MODULE.rules()
 
 
 def leaves_get(state, chat_id):
@@ -1173,7 +1151,7 @@ def handle_leaves(state, msg, cmd, text, uid, name):
         return True
     if cmd == "/leaves":
         if not g:
-            g = LV.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
+            g = LEAVES_MODULE.new_game(chat_id, uid, msg.get("from", {}).get("first_name") or "Player")
             g["chat_type"] = msg.get("chat", {}).get("type", "private")
             state.setdefault("leaves", {})[str(chat_id)] = g
             leaves_render(g, [f"🍃 13 Leaves created by {name}!"])
@@ -1197,21 +1175,21 @@ def handle_leaves(state, msg, cmd, text, uid, name):
             send(chat_id, "⛔ Game already started.")
         elif any(p["user_id"] == uid for p in g["players"]):
             send(chat_id, "You're already in!")
-        elif len(g["players"]) >= 6:
-            send(chat_id, "⛔ 13 Leaves is 3-6 players (full).")
+        elif len(g["players"]) >= GR.GAMES_BY_KEY["leaves"].max_players:
+            send(chat_id, GR.NPC_FULL["leaves"])
         else:
-            g["players"].append(LV.new_player(uid, msg.get("from", {}).get("first_name") or "Player"))
+            g["players"].append(LEAVES_MODULE.new_player(uid, msg.get("from", {}).get("first_name") or "Player"))
             send(chat_id, f"🙋 <b>{name}</b> joined ({len(g['players'])}).")
             leaves_render(g)
         return True
     if cmd == "/leaves_start":
         if g.get("phase") != "lobby":
             send(chat_id, "Already started.")
-        elif len(g["players"]) < 3:
-            send(chat_id, "⛔ Need at least 3 players.")
+        elif len(g["players"]) < GR.GAMES_BY_KEY["leaves"].min_players:
+            send(chat_id, f"⛔ Need at least {GR.GAMES_BY_KEY['leaves'].min_players} players.")
         else:
             ev = []
-            err = LV.start_game(g, ev)
+            err = LEAVES_MODULE.start_game(g, ev)
             if err:
                 send(chat_id, f"⛔ {err}")
             else:
@@ -1238,7 +1216,7 @@ def handle_leaves(state, msg, cmd, text, uid, name):
                 send(chat_id, "Usage: /leaves_pass [row_stack_number] (1 = leftmost).")
                 return True
         ev = []
-        err = LV.pass_turn(g, idx, ev, take_index=take_index)
+        err = LEAVES_MODULE.pass_turn(g, idx, ev, take_index=take_index)
         if err:
             send(chat_id, f"⛔ {err}")
         else:
@@ -1259,13 +1237,69 @@ def handle_leaves(state, msg, cmd, text, uid, name):
             send(chat_id, "Usage: /leaves_play <value> <count>")
             return True
         ev = []
-        err = LV.play(g, idx, val, cnt, ev)
+        err = LEAVES_MODULE.play(g, idx, val, cnt, ev)
         if err:
             send(chat_id, f"⛔ {err}")
         else:
             leaves_render(g, ev)
         return True
     return False
+
+
+def handle_leaves_callback(state, cb, chat_id, uid):
+    data = cb.get("data", "")
+    parts = data.split(":")
+    g = leaves_get(state, chat_id)
+    if not g:
+        return answer_cb(cb["id"], "No 13 Leaves game here.")
+    if parts == ["lv", "join"]:
+        if g["phase"] != "lobby":
+            return answer_cb(cb["id"], "Game already started.")
+        if any(p["user_id"] == uid for p in g["players"]):
+            return answer_cb(cb["id"], "Already in!")
+        if len(g["players"]) >= GR.GAMES_BY_KEY["leaves"].max_players:
+            return answer_cb(cb["id"], "Full.")
+        name = cb["from"].get("first_name") or "Player"
+        g["players"].append(LEAVES_MODULE.new_player(uid, name))
+        leaves_render(g, [f"🙋 {name} joined."])
+        save_state(state)
+        return answer_cb(cb["id"], "Joined!")
+    if parts == ["lv", "start"]:
+        if g["phase"] != "lobby":
+            return answer_cb(cb["id"], "Already started.")
+        if len(g["players"]) < GR.GAMES_BY_KEY["leaves"].min_players:
+            return answer_cb(cb["id"], "Need >=3 players.")
+        ev = []
+        err = LEAVES_MODULE.start_game(g, ev)
+        if err:
+            return answer_cb(cb["id"], err)
+        leaves_render(g, ev)
+        save_state(state)
+        return answer_cb(cb["id"], "Started!")
+    if parts[0] == "lv" and len(parts) == 2 and parts[1].startswith("pass"):
+        idx = _actor_idx(g, uid, g.get("current_index", 0))
+        if idx is None:
+            return answer_cb(cb["id"], "Not in game.")
+        take_index = None
+        if parts[1] != "pass":
+            try:
+                take_index = int(parts[1][4:])
+            except ValueError:
+                take_index = None
+        ev = []
+        err = LEAVES_MODULE.apply_action(g, idx, "pass", {"take_index": take_index}, ev)
+        if err:
+            return answer_cb(cb["id"], err)
+        leaves_render(g, ev)
+        save_state(state)
+        return answer_cb(cb["id"], "Passed.")
+    if parts == ["lv", "rematch"]:
+        ev, err = rematch_game(state, "leaves", chat_id, uid)
+        answer_cb(cb["id"], err or "Rematch!")
+        if not err:
+            save_state(state)
+        return
+    return answer_cb(cb["id"], "Unknown button.")
 
 
 # ---------- The Fellowship of the Ring (cooperative trick-taking) ----------
@@ -3943,19 +3977,42 @@ def artichokes_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
-REMATCH_END_PHASES = {"games": ("game_end",), "regicide": ("won", "lost"),
-                     "odin": ("game_end",), "leaves": ("game_end",), "lsd": ("game_end",), "spots": ("game_end",),
-                     "yahtzee": ("game_end",), "fliptoons": ("game_end",),
-                      "tornado": ("race_end", "game_end"),
-                       "castlecombo": ("game_end",), "artichokes": ("game_end",),
-                      "fellowship": ("chapter_end", "game_end")}
-
+REMATCH_END_PHASES = dict(GR.REMATCH_END_PHASES)
 
 RENDERERS = {"games": render, "regicide": rg_render, "odin": odin_render,
              "leaves": leaves_render, "lsd": lsd_render, "spots": spots_render, "yahtzee": yahtzee_render,
              "fliptoons": fliptoons_render, "tornado": tornado_render,
               "castlecombo": castlecombo_render, "artichokes": artichokes_render,
               "fellowship": fotr_render}
+
+RULES_BY_KEY = {"games": RULES, "regicide": REGICIDE_RULES, "odin": ODIN_RULES,
+                "leaves": LEAVES_MODULE.rules(), "lsd": LSD_RULES, "spots": SPOTS_RULES,
+                "yahtzee": YAHTZEE_RULES, "fliptoons": FLIPTOONS_RULES,
+                "tornado": TORNADO_RULES, "castlecombo": CASTLECOMBO_RULES,
+                "artichokes": ARTICHOKES_RULES, "fellowship": FTR_RULES}
+
+PLAYER_MAKERS = {
+    "games": lambda u, n: G.new_player(u, n),
+    "regicide": lambda u, n: {"user_id": u, "name": n, "hand": []},
+    "odin": lambda u, n: {"user_id": u, "name": n, "hand": [], "score": O.START_SCORE},
+    "leaves": LEAVES_MODULE.new_player,
+    "lsd": lambda u, n: {"user_id": u, "name": n, "souls": 5, "candle": None,
+                         "in_play": [], "demons": [], "demon_hand": []},
+    "spots": lambda u, n: {"user_id": u, "name": n, "dogs": [], "scored": [],
+                           "yard": [], "treats": 1},
+    "yahtzee": lambda u, n: Y.new_player(u, n),
+    "fliptoons": lambda u, n: _ft_player(u, n),
+    "castlecombo": lambda u, n: CC.new_player(u, n),
+    "tornado": lambda u, n: TS.new_player(u, n),
+    "artichokes": lambda u, n: AT.new_player(u, n),
+    "fellowship": lambda u, n: FTR.new_player(u, n),
+}
+
+GAME_MAKERS = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
+               "leaves": LEAVES_MODULE.new_game, "lsd": D.new_game, "spots": SP.new_game,
+               "yahtzee": Y.new_game, "fliptoons": FT.new_game, "tornado": TS.new_game,
+               "castlecombo": CC.new_game, "artichokes": AT.new_game,
+               "fellowship": FTR.new_game}
 
 
 def rematch_game(state, key, chat_id, uid):
@@ -3970,27 +4027,8 @@ def rematch_game(state, key, chat_id, uid):
         return [], "only players of this game can rematch"
     keep = [(p["user_id"], p["name"], bool(p.get("npc"))) for p in g["players"]]
     creator = next((k for k in keep if k[0] != NPC_ID), keep[0])
-    makers = {
-        "games": lambda u, n: G.new_player(u, n),
-        "regicide": lambda u, n: {"user_id": u, "name": n, "hand": []},
-        "odin": lambda u, n: {"user_id": u, "name": n, "hand": [], "score": O.START_SCORE},
-        "leaves": lambda u, n: LV.new_player(u, n),
-        "lsd": lambda u, n: {"user_id": u, "name": n, "souls": 5, "candle": None,
-                             "in_play": [], "demons": [], "demon_hand": []},
-        "spots": lambda u, n: {"user_id": u, "name": n, "dogs": [], "scored": [],
-                               "yard": [], "treats": 1},
-        "yahtzee": lambda u, n: Y.new_player(u, n),
-        "fliptoons": lambda u, n: _ft_player(u, n),
-        "castlecombo": lambda u, n: CC.new_player(u, n),
-        "tornado": lambda u, n: TS.new_player(u, n),
-        "artichokes": lambda u, n: AT.new_player(u, n),
-        "fellowship": lambda u, n: FTR.new_player(u, n),
-    }
-    news = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
-            "leaves": LV.new_game, "lsd": D.new_game, "spots": SP.new_game, "yahtzee": Y.new_game,
-             "fliptoons": FT.new_game, "tornado": TS.new_game,
-              "castlecombo": CC.new_game, "artichokes": AT.new_game,
-              "fellowship": FTR.new_game}
+    makers = PLAYER_MAKERS
+    news = GAME_MAKERS
     chat_type = g.get("chat_type", "private")
     board_id = g.get("board_message_id")
     g.clear()
@@ -4040,20 +4078,7 @@ def handle_command(state, msg):
         g["chat_type"] = msg.get("chat", {}).get("type", g.get("chat_type", "private"))
 
     if cmd == "/games":
-        _catalog = (
-            ("games", "🎴 Flip 7", "/flip7", "/flip7_join", "press-your-luck dice, first to 200"),
-            ("regicide", "⚔️ Regicide", "/regicide", "/regicide_join", "co-op vs 12 royals, private hands"),
-            ("odin", "🛡️ Odin", "/odin", "/odin_join", "card shedding, fewest points wins"),
-            ("leaves", "🍃 13 Leaves", "/leaves", "/leaves_join", "shed sets, first to empty your hand"),
-            ("lsd", "😈 Let's Summon Demons", "/lsd", "/lsd_join", "dice activations, 3 demons + 10 souls"),
-            ("spots", "🐶 Spots", "/spots", "/spots_join", "dog dice push-your-luck, 6 scored wins"),
-            ("yahtzee", "🎲 Yahtzee", "/yahtzee", "/yahtzee_join", "dice scorecard, 13 boxes"),
-            ("fliptoons", "🦋 Fliptoons", "/fliptoons", "/fliptoons_join", "grid-building card market, first to 30 fame"),
-            ("castlecombo", "🏰 Castle Combo", "/castlecombo", "/castlecombo_join", "deck-building tableau, 3×3 shields & sets"),
-            ("tornado", "🛥️ Tornado Splash", "/tornado", "/tornado_join", "jet-ski racing cards, first to the finish"),
-            ("artichokes", "🥬 Abandon All Artichokes", "/artichokes", "/artichokes_join", "deck-wrecking veggies, draw a hand with no Artichokes"),
-            ("fellowship", "💍 Fellowship of the Ring", "/fotr", "/fotr_join", "co-op trick-taking through 18 chapters"),
-        )
+        _catalog = GR.CATALOG_ROWS
         lines = ["🎮 <b>Games you can start:</b>"]
         for _key, _name, _new, _join, _desc in _catalog:
             _g = state.get(_key, {}).get(str(chat_id))
@@ -4074,7 +4099,7 @@ def handle_command(state, msg):
         # Reply-targeted cancel: cancels the one game whose board message
         # was replied to (searches every game type in this chat).
         _mid = msg["reply_to_message"].get("message_id")
-        for _key in ("games", "regicide", "odin", "leaves", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes", "fellowship"):
+        for _key in GR.GAME_KEYS:
             _gg = state.get(_key, {}).get(str(chat_id))
             if _gg is not None and _gg.get("board_message_id") == _mid:
                 del state[_key][str(chat_id)]
@@ -4126,11 +4151,7 @@ def handle_command(state, msg):
         # rules; otherwise show the rules of every game present in this chat
         # (Flip 7 rules as the default when there are none).
         _mid = (msg.get("reply_to_message") or {}).get("message_id") if msg.get("reply_to_message") else None
-        _by_key = (("games", RULES), ("regicide", REGICIDE_RULES), ("odin", ODIN_RULES),
-                   ("leaves", LEAVES_RULES), ("lsd", LSD_RULES), ("spots", SPOTS_RULES), ("yahtzee", YAHTZEE_RULES),
-                    ("fliptoons", FLIPTOONS_RULES), ("tornado", TORNADO_RULES),
-                     ("castlecombo", CASTLECOMBO_RULES), ("artichokes", ARTICHOKES_RULES),
-                     ("fellowship", FTR_RULES))
+        _by_key = tuple(RULES_BY_KEY.items())
         if _mid:
             for _key, _rules in _by_key:
                 _gg = state.get(_key, {}).get(str(chat_id))
@@ -4206,10 +4227,7 @@ def handle_callback(state, cb):
     uid = cb.get("from", {}).get("id")
     chat_id = cb.get("message", {}).get("chat", {}).get("id")
     if data.endswith(":npc"):
-        key = {"f7": "games", "rg": "regicide", "od": "odin", "lv": "leaves", "lsd": "lsd",
-               "spots": "spots", "yz": "yahtzee", "ts": "tornado",
-                 "ft": "fliptoons", "cc": "castlecombo", "at": "artichokes",
-                 "fr": "fellowship"}.get(data.split(":")[0])
+        key = GR.CALLBACK_CODES.get(data.split(":")[0])
         g = state.get(key, {}).get(str(chat_id)) if key else None
         if not g:
             return answer_cb(cb["id"], "No game here.")
@@ -4219,6 +4237,8 @@ def handle_callback(state, cb):
         answer_cb(cb["id"], "🤖 NPC joined")
         RENDERERS[key](g, ["🤖 NPC joined - anyone can play for it!"])
         return
+    if data.startswith("lv:"):
+        return handle_leaves_callback(state, cb, chat_id, uid)
     if data.startswith("fotr:"):
         g = fotr_get(state, chat_id)
         if not g:
@@ -4301,66 +4321,6 @@ def handle_callback(state, cb):
             answer_cb(cb["id"], err or "Done")
             if not err:
                 spots_render(sp, ev)
-        elif parts == ["lv", "join"]:
-            g = leaves_get(state, chat_id)
-            if not g:
-                return answer_cb(cb["id"], "No 13 Leaves game here.")
-            if g["phase"] != "lobby":
-                return answer_cb(cb["id"], "Game already started.")
-            if any(p["user_id"] == uid for p in g["players"]):
-                return answer_cb(cb["id"], "Already in!")
-            if len(g["players"]) >= 6:
-                return answer_cb(cb["id"], "Full.")
-            g["players"].append(LV.new_player(uid, cb["from"].get("first_name") or "Player"))
-            answer_cb(cb["id"], "Joined!")
-            leaves_render(g, [f"🙋 {cb['from'].get('first_name')} joined."])
-            save_state(state)
-            return
-        elif parts == ["lv", "start"]:
-            g = leaves_get(state, chat_id)
-            if not g:
-                return answer_cb(cb["id"], "No game.")
-            if g["phase"] != "lobby":
-                return answer_cb(cb["id"], "Already started.")
-            if len(g["players"]) < 3:
-                return answer_cb(cb["id"], "Need >=3 players.")
-            ev = []
-            err = LV.start_game(g, ev)
-            if err:
-                answer_cb(cb["id"], err)
-            else:
-                answer_cb(cb["id"], "Started!")
-                leaves_render(g, ev)
-                save_state(state)
-            return
-        elif parts[0] == "lv" and len(parts) == 2 and parts[1].startswith("pass"):
-            g = leaves_get(state, chat_id)
-            if not g:
-                return answer_cb(cb["id"], "No game.")
-            idx = _actor_idx(g, uid, g.get("current_index", 0))
-            if idx is None:
-                return answer_cb(cb["id"], "Not in game.")
-            take_index = None
-            if parts[1] != "pass":
-                try:
-                    take_index = int(parts[1][4:])  # pass0 -> 0
-                except Exception:
-                    take_index = None
-            ev = []
-            err = LV.pass_turn(g, idx, ev, take_index=take_index)
-            if err:
-                answer_cb(cb["id"], err)
-            else:
-                answer_cb(cb["id"], "Passed.")
-                leaves_render(g, ev)
-                save_state(state)
-            return
-        elif parts == ["lv", "rematch"]:
-            ev, err = rematch_game(state, "leaves", chat_id, uid)
-            answer_cb(cb["id"], err or "Rematch!")
-            if not err:
-                save_state(state)
-            return
         elif parts == ["od", "rematch"]:
             ev, err = rematch_game(state, "odin", chat_id, uid)
             answer_cb(cb["id"], err or "Rematch!")
@@ -5231,18 +5191,7 @@ def odin_api_move(state, chat_id, user_id, body):
 
 
 def leaves_board_json(g, viewer_id=None):
-    me = next((p for p in g["players"] if p["user_id"] == viewer_id), None)
-    return {
-        "chat_id": g["chat_id"], "phase": g["phase"], "created_by": g["created_by"],
-        "current_index": g.get("current_index", 0), "leader_index": g.get("leader_index", 0),
-        "winner_id": g.get("winner_id"),
-        "is_player": me is not None,
-        "row": g.get("row", []),
-        "passed_ids": list(g.get("passed", set())),
-        "players": [{"user_id": p["user_id"], "name": p["name"], "npc": bool(p.get("npc")), "hand_count": len(p["hand"])}
-                    for p in g["players"]],
-        "my_hand": sorted(me["hand"]) if me else [],
-    }
+    return LEAVES_MODULE.board_json(g, viewer_id)
 
 
 def leaves_api_move(state, chat_id, user_id, body):
@@ -5250,48 +5199,35 @@ def leaves_api_move(state, chat_id, user_id, body):
     if not g:
         return [], "no 13 leaves game in that chat"
     action = body.get("action")
+    if action == "rematch":
+        return rematch_game(state, "leaves", chat_id, user_id)
     if action == "join":
         if g["phase"] != "lobby":
             return [], "game already started"
         if any(p["user_id"] == user_id for p in g["players"]):
             return [], None
-        if len(g["players"]) >= 6:
+        if len(g["players"]) >= GR.GAMES_BY_KEY["leaves"].max_players:
             return [], "full"
         iu_name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
-        g["players"].append(LV.new_player(user_id, iu_name))
+        g["players"].append(LEAVES_MODULE.new_player(user_id, iu_name))
+        leaves_render(g, ["🙋 joined."])
         return ["🙋 joined."], None
     if action == "start":
         if g["phase"] != "lobby":
             return [], "already started"
         ev = []
-        err = LV.start_game(g, ev)
+        err = LEAVES_MODULE.start_game(g, ev)
         if err:
             return [], err
+        leaves_render(g, ev)
         return ev, None
     idx = _actor_idx(g, user_id, g.get("current_index", 0))
     if idx is None:
         return [], "not in this game"
     ev = []
-    if action == "play":
-        try:
-            val = int(body.get("value")); cnt = int(body.get("count"))
-        except Exception:
-            return [], "bad value/count"
-        err = LV.play(g, idx, val, cnt, ev)
-        if err:
-            return [], err
-    elif action == "pass":
-        take_index = body.get("take_index")
-        if take_index is not None:
-            try:
-                take_index = int(take_index)
-            except Exception:
-                return [], "bad take_index"
-        err = LV.pass_turn(g, idx, ev, take_index=take_index)
-        if err:
-            return [], err
-    else:
-        return [], "unknown action"
+    err = LEAVES_MODULE.apply_action(g, idx, action, body, ev)
+    if err:
+        return [], err
     leaves_render(g, ev)
     return ev, None
 
@@ -5716,45 +5652,16 @@ def start_web_server(state):
 
         def do_GET(self):
             u = urllib.parse.urlparse(self.path)
+            if u.path in HEALTH_PATHS:
+                return self._send(200, {"ok": True, "version": WEB_VER,
+                                        "games": len(GR.GAME_KEYS)})
             if u.path in ("/", "/flip7.html"):
                 return self._send(200, open(HTML_PATH, "rb").read(), "text/html")
-            if u.path == "/flip7.js":
-                return self._send(200, open(JS_PATH, "rb").read(), "text/javascript")
-            if u.path == "/regicide.js":
-                p = os.path.join(os.path.dirname(JS_PATH), "regicide.js")
-                return self._send(200, open(p, "rb").read(), "text/javascript")
-            if u.path == "/odin.js":
-                p = os.path.join(os.path.dirname(JS_PATH), "odin.js")
-                return self._send(200, open(p, "rb").read(), "text/javascript")
-            if u.path == "/leaves.js":
-                p = os.path.join(os.path.dirname(JS_PATH), "leaves.js")
-                return self._send(200, open(p, "rb").read(), "text/javascript")
-            if u.path == "/lsd.js":
-                p = os.path.join(os.path.dirname(JS_PATH), "lsd.js")
-                return self._send(200, open(p, "rb").read(), "text/javascript")
-            if u.path == "/spots.js":
-                p = os.path.join(os.path.dirname(JS_PATH), "spots.js")
-                return self._send(200, open(p, "rb").read(), "text/javascript")
-            if u.path == "/yahtzee.js":
-                p = os.path.join(os.path.dirname(JS_PATH), "yahtzee.js")
-                return self._send(200, open(p, "rb").read(), "text/javascript")
-            if u.path == "/tornado.js":
-                p = os.path.join(os.path.dirname(JS_PATH), "tornado.js")
-                return self._send(200, open(p, "rb").read(), "text/javascript")
-            if u.path == "/fliptoons.js":
-                p = os.path.join(os.path.dirname(JS_PATH), "fliptoons.js")
-                return self._send(200, open(p, "rb").read(), "text/javascript")
-            if u.path == "/castlecombo.js":
-                p = os.path.join(os.path.dirname(JS_PATH), "castlecombo.js")
-                return self._send(200, open(p, "rb").read(), "text/javascript")
+            if u.path in GAME_JS_FILES:
+                return self._send(200, open(GAME_JS_FILES[u.path], "rb").read(),
+                                  "text/javascript")
             if u.path == "/castlecombo-faces.js":
                 p = os.path.join(os.path.dirname(JS_PATH), "castlecombo-faces.js")
-                return self._send(200, open(p, "rb").read(), "text/javascript")
-            if u.path == "/artichokes.js":
-                p = os.path.join(os.path.dirname(JS_PATH), "artichokes.js")
-                return self._send(200, open(p, "rb").read(), "text/javascript")
-            if u.path == "/fellowship.js":
-                p = os.path.join(os.path.dirname(JS_PATH), "fellowship.js")
                 return self._send(200, open(p, "rb").read(), "text/javascript")
             if u.path == "/castlecombo-messenger.png":
                 p = os.path.join(os.path.dirname(JS_PATH), "castlecombo-messenger.png")
@@ -6075,6 +5982,10 @@ def start_web_server(state):
                     board = board_json(g, uid) if g else None
                 return self._send(200 if board else 404,
                                   {"ok": bool(board), "game": board})
+            asset = web_assets.resolve(u.path)
+            if asset:
+                return self._send(200, open(asset, "rb").read(),
+                                  web_assets.content_type(asset))
             return self._send(404, {"ok": False, "error": "not found"})
 
         def do_POST(self):
@@ -6429,7 +6340,7 @@ def start_web_server(state):
                         g = leaves_get(state, chat_id)
                         if g and g.get("phase") != "game_end":
                             return self._send(200, {"ok": True, "game": leaves_board_json(g, uid), "created": False})
-                        g = LV.new_game(chat_id, uid, name)
+                        g = LEAVES_MODULE.new_game(chat_id, uid, name)
                         g["chat_type"] = "supergroup" if chat_id < 0 else "private"
                         state.setdefault("leaves", {})[str(chat_id)] = g
                         leaves_render(g, [f"🍃 13 Leaves created by {name} via Mini App!"])

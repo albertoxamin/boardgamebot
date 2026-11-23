@@ -1,5 +1,5 @@
 // Leaves Mini App (synced). Loaded by flip7.html router.
-const LV={user_id:0,chat_id:null,board:null,timer:null,init:'',sel:null};
+const LV={user_id:0,chat_id:null,board:null,timer:null,init:'',sel:[]};
 const LV_COLS=7, LV_ROWS=2;
 const LV_TILE_W=330, LV_TILE_H=518;
 function lvLog(s){let e=document.getElementById('lvLog');if(e)e.textContent+=s+'\n';}
@@ -48,13 +48,13 @@ async function lvMove(action,extra){
   let body=Object.assign({chat_id:LV.chat_id,action:action,init_data:LV.init},extra||{});
   let r=await lvApi('/api/leaves/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
   if(r.events)r.events.forEach(e=>lvLog(e)); if(r.error)lvLog('⛔ '+r.error);
-  if(r.game){LV.board=r.game; LV.sel=null; lvRender();}
+  if(r.game){LV.board=r.game; LV.sel=[]; lvRender();}
 }
 function lvRender(){
   let b=LV.board; if(!b)return;
   let isMyTurn = b.phase==='playing' && b.current_index>=0 && b.players[b.current_index] && (b.players[b.current_index].user_id===LV.user_id || b.players[b.current_index].npc);
   // row
-  let rowHtml = (b.row&&b.row.length) ? '<div class="lvrow">'+b.row.map((s,i)=>`<div style="display:inline-block;text-align:center;margin:2px;cursor:pointer" onclick="lvPassFrom(${i})" title="Tap to pass taking from this stack (pos ${i+1})">${lvCardEl(s.value,true)}<div class="small">×${s.count}<br>#${i+1}</div></div>`).join('')+'</div>' : '<div class="small">Row empty — lead any set</div>';
+  let rowHtml = (b.row&&b.row.length) ? '<div class="lvrow">'+b.row.map((s,i)=>`<div style="display:inline-block;text-align:center;margin:2px;cursor:pointer" onclick="lvPassFrom(${i})" title="Tap to pass taking from this stack (pos ${i+1})">${lvCardEl(s.value,false)}<div class="small">×${s.count}<br>#${i+1}</div></div>`).join('')+'</div>' : '<div class="small">Row empty — lead any set</div>';
   // players
   let seats = '<div class="seats reg-row">'+(b.players||[]).map((p,i)=>{
     let turn=(b.phase==='playing'&&i===b.current_index)?' current':'';
@@ -67,24 +67,34 @@ function lvRender(){
   let mh=document.getElementById('lvHand');
   if(!b.is_player){ mh.innerHTML='<div class="small">👁 Spectating</div>'; }
   else {
-    mh.innerHTML='<b>My hand ('+hand.length+')</b><div class="pile">'+hand.map(v=>`<div onclick="lvPick(${v})">${lvCardEl(v,false)}</div>`).join('')+'</div>';
+    mh.innerHTML='<b>My hand ('+hand.length+') — tap cards to select</b><div class="pile">'+hand.map((v,i)=>`<div onclick="lvPick(${i})">${lvCardEl(v,LV.sel.includes(i))}</div>`).join('')+'</div>';
   }
+  let selText=LV.sel.length?(LV.sel.map(i=>hand[i]).join(',')+' selected'):'none';
   let t=document.getElementById('lvTurn');
   if(b.phase==='lobby') t.textContent='🪑 Lobby — tap Start';
-  else if(b.phase==='playing') t.textContent=isMyTurn?('👉 Your turn (tap a card, set count, Play). Or tap a row stack to Pass taking it. Sel: '+(LV.sel?LV.sel:'none')):('👉 '+(b.players[b.current_index]?b.players[b.current_index].name:'?')+"'s turn");
+  else if(b.phase==='playing') t.textContent=isMyTurn?('👉 Your turn (tap the cards you want to play, then Play). Tap a row stack to Pass. Sel: '+selText):('👉 '+(b.players[b.current_index]?b.players[b.current_index].name:'?')+"'s turn");
   else if(b.phase==='game_end') t.textContent='🏆 Winner: '+(b.winner_name||'?');
   else t.textContent='';
   document.getElementById('lvStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.is_player));
   document.getElementById('lvPlay').classList.toggle('hidden',!(isMyTurn&&b.phase==='playing'));
   document.getElementById('lvPass').classList.toggle('hidden',!(isMyTurn&&b.phase==='playing'&&b.row&&b.row.length>0));
 }
-window.lvPick=function(v){ LV.sel=v; lvRender(); };
+window.lvPick=function(i){
+  let hand=(LV.board&&LV.board.my_hand)||[];
+  if(i<0||i>=hand.length)return;
+  let at=LV.sel.indexOf(i);
+  if(at>=0)LV.sel.splice(at,1); else LV.sel.push(i);
+  lvRender();
+};
 window.lvPassFrom=function(i){ lvMove('pass',{take_index:i}); };
 document.getElementById('lvPlay').addEventListener('click',()=>{
-  if(!LV.sel){lvLog('tap a card in your hand first');return;}
-  let countStr = prompt('How many of '+LV.sel+' to play? (1..n)');
-  if(!countStr)return; let count=parseInt(countStr); if(!count||count<1){lvLog('bad count');return;}
-  lvMove('play',{value:LV.sel,count:count});
+  let hand=(LV.board&&LV.board.my_hand)||[];
+  if(!LV.sel.length){lvLog('tap the cards you want to play first');return;}
+  let values=LV.sel.map(i=>hand[i]);
+  if(values.some(v=>v===undefined)){LV.sel=[];lvRender();lvLog('selection expired; tap cards again');return;}
+  let value=values[0];
+  if(values.some(v=>v!==value)){lvLog('select cards of the same value only');return;}
+  lvMove('play',{value:value,count:values.length});
 });
 document.getElementById('lvPass').addEventListener('click',()=>{ if(!confirm('Pass and take from leftmost stack (pos 1)?')) return; lvMove('pass',{take_index:0}); });
 document.getElementById('lvStart').addEventListener('click',()=>lvMove('start'));

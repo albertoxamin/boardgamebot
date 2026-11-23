@@ -23,17 +23,20 @@ function lvCardEl(val, selected, big){
   let cls='lvcard'+(selected?' sel':'')+(big?' big':'');
   return `<div class="${cls}" title="${val}" style="${b.style}"></div>`;
 }
+function lvChatId(raw){let s=String(raw||'');if(s.startsWith('leaves'))s=s.slice(6);
+ let n=parseInt(s,10);return isNaN(n)?0:n;}
 function lvApi(path,opts){return fetch(path,opts).then(r=>r.json());}
-function tgInit(){const tg=window.Telegram&&window.Telegram.WebApp; if(tg)tg.ready(); const p=new URLSearchParams(location.search); return {id:tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user?tg.initDataUnsafe.user.id:0,init:tg&&tg.initData?tg.initData:'',start:(p.get('tgWebAppStartParam')||''),chat_instance:(tg&&tg.initDataUnsafe?String(tg.initDataUnsafe.chat_instance||''):''),tg:tg};}
+function tgInit(){const tg=window.Telegram&&window.Telegram.WebApp; if(tg)tg.ready(); const p=new URLSearchParams(location.search); let init=tg&&tg.initData?tg.initData:''; let start=p.get('app')||p.get('tgWebAppStartParam')||''; try{let q=new URLSearchParams(init); start=start||q.get('start_param')||'';}catch(e){} return {id:tg&&tg.initDataUnsafe&&tg.initDataUnsafe.user?tg.initDataUnsafe.user.id:0,init:init,start:start,chat_instance:(tg&&tg.initDataUnsafe?String(tg.initDataUnsafe.chat_instance||''):''),tg:tg};}
 function escapeHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
 async function lvLoad(){
   let tg=tgInit();
   if(!tg.id){document.getElementById('lvBoard').innerHTML='<div class="table lobby-note">Open as Telegram Mini App via the bot link.</div>';return;}
   LV.user_id=tg.id; LV.init=tg.init;
+  let qp=new URLSearchParams(location.search);
+  let pref=lvChatId(tg.start)||lvChatId(qp.get('app'))||parseInt(qp.get('chat_id'),10)||0;
+  if(!pref && tg.chat_instance) pref=parseInt(tg.chat_instance,10)||0;
   let r=await lvApi('/api/leaves/mygames?init_data='+encodeURIComponent(tg.init));
   let mine=r.games||[];
-  let pref=parseInt(tg.start,10)||0;
-  if(!pref && tg.chat_instance) pref=parseInt(tg.chat_instance,10)||0;
   let pick=mine.find(g=>g.chat_id===pref)||mine.find(g=>g.phase!=='game_end')||mine[0];
   if(pick) lvSelect(pick.chat_id);
   else if(pref){let cr=await lvApi('/api/leaves/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init,chat_id:pref})}); if(cr.game) lvSelect(cr.game.chat_id); else lvLog('⛔ '+(cr.error||'create failed'));}

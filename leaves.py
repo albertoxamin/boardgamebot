@@ -54,7 +54,7 @@ def new_game(chat_id, creator_id, creator_name):
         "deck": [],
         "row": [],          # list of stacks: [{"value": v, "count": n}, ...] in order low->high
         "current_index": 0,
-        "passed": set(),    # user_ids who passed this round
+        "passed": [],    # user_ids who passed this round
         "leader_index": 0,
         "winner_id": None,
         "board_message_id": None,
@@ -81,7 +81,7 @@ def start_game(g, events):
         p["hand"].sort()
     g["phase"] = "playing"
     g["row"] = []
-    g["passed"] = set()
+    g["passed"] = []
     g["leader_index"] = 0
     g["current_index"] = 0
     g["winner_id"] = None
@@ -246,7 +246,7 @@ def pass_turn(g, idx, events, take_index=None):
         g["row"].pop(take_index)
     p["hand"].append(taken_val)
     p["hand"].sort()
-    g["passed"].add(p["user_id"])
+    g["passed"].append(p["user_id"])
     events.append(f"⏭ {p['name']} passes and takes a {taken_val} (from row pos {take_index + 1})")
     active = _active_indices(g)
     if len(active) <= 1:
@@ -260,7 +260,7 @@ def pass_turn(g, idx, events, take_index=None):
 def _end_round(g, events, last_idx):
     # last active leads next round
     g["row"] = []
-    g["passed"] = set()
+    g["passed"] = []
     g["leader_index"] = last_idx
     g["current_index"] = last_idx
     events.append(f"🔁 Round over. {g['players'][last_idx]['name']} leads a new round.")

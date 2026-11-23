@@ -30,7 +30,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 12
+WEB_VER = 14
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -47,6 +47,7 @@ HELP = """🎴 <b>Boardgame bot</b>
 /rules - how to play (reply to a board for that game's rules)   /cancel - reply to a board to cancel that game
 /regicide - co-op Regicide (also /regicide_join /regicide_start /regicide_play /regicide_yield /regicide_discard /regicide_rules /regicide_cancel)
 /odin - card-shedding Odin (also /odin_join /odin_start /odin_play /odin_pass /odin_pickup /odin_score /odin_cancel /odin_rules)
+/leaves - shed sets in 13 Leaves (also /leaves_join /leaves_start /leaves_play /leaves_pass /leaves_rules /leaves_cancel)
 /spots - push-your-luck dog dice (also /spots_join /spots_start /spots_trick /spots_place /spots_reroll /spots_score /spots_cancel /spots_rules)
 /yahtzee - dice scorecard classic (also /yahtzee_join /yahtzee_start /yahtzee_roll /yahtzee_score /yahtzee_cancel /yahtzee_rules)
 /fliptoons - grid-building card market (also /fliptoons_join /fliptoons_start /fliptoons_hire /fliptoons_dismiss /fliptoons_skip /fliptoons_choose /fliptoons_cancel /fliptoons_rules)
@@ -237,16 +238,16 @@ def web_keyboard(chat_type="private", chat_id=None, game="flip7"):
     startapp=<game><chat_id> (no second BotFather app needed)."""
     if not WEB_URL:
         return None
-    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "lsd": "🎮 Play Summon Demons (HTML)", "spots": "🎮 Play Spots (HTML)", "yahtzee": "🎮 Play Yahtzee (HTML)", "fliptoons": "🎮 Play Fliptoons (HTML)", "tornado": "🎮 Play Tornado Splash (HTML)", "castlecombo": "🎮 Play Castle Combo (HTML)", "artichokes": "🎮 Play Abandon All Artichokes (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
+    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "leaves": "🎮 Play 13 Leaves (HTML)", "lsd": "🎮 Play Summon Demons (HTML)", "spots": "🎮 Play Spots (HTML)", "yahtzee": "🎮 Play Yahtzee (HTML)", "fliptoons": "🎮 Play Fliptoons (HTML)", "tornado": "🎮 Play Tornado Splash (HTML)", "castlecombo": "🎮 Play Castle Combo (HTML)", "artichokes": "🎮 Play Abandon All Artichokes (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
     if chat_type in ("group", "supergroup", "channel"):
         if chat_id:
-            start = f"{game}{chat_id}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes") else str(chat_id)
+            start = f"{game}{chat_id}" if game in ("regicide", "odin", "leaves", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes") else str(chat_id)
             url = f"https://t.me/flip7groupbot?startapp={start}&v={WEB_VER}"
         else:
             url = f"{WEB_URL}?v={WEB_VER}"
         btn = {"text": label, "url": url}
     else:
-        url = WEB_URL + f"?v={WEB_VER}" + (f"&app={game}" if game in ("regicide", "odin", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes") else "")
+        url = WEB_URL + f"?v={WEB_VER}" + (f"&app={game}" if game in ("regicide", "odin", "leaves", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes") else "")
         if chat_id:
             url += ("&" if "?" in url else "?") + f"chat_id={chat_id}"
         btn = {"text": label, "web_app": {"url": url}}
@@ -255,7 +256,7 @@ def web_keyboard(chat_type="private", chat_id=None, game="flip7"):
 
 # ---------- State ----------
 def load_state():
-    s = {"games": {}, "regicide": {}, "odin": {}, "lsd": {}, "spots": {}, "yahtzee": {}, "fliptoons": {}, "tornado": {}, "castlecombo": {}, "artichokes": {}}
+    s = {"games": {}, "regicide": {}, "odin": {}, "leaves": {}, "lsd": {}, "spots": {}, "yahtzee": {}, "fliptoons": {}, "tornado": {}, "castlecombo": {}, "artichokes": {}}
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE) as f:
@@ -265,6 +266,7 @@ def load_state():
     s.setdefault("games", {})
     s.setdefault("regicide", {})  # migrate old state files
     s.setdefault("odin", {})
+    s.setdefault("leaves", {})
     s.setdefault("lsd", {})
     s.setdefault("spots", {})
     s.setdefault("yahtzee", {})
@@ -275,13 +277,19 @@ def load_state():
     return s
 
 
+def _state_json_default(o):
+    if isinstance(o, set):
+        return list(o)
+    raise TypeError(f"Object of type {o.__class__.__name__} is not JSON serializable")
+
+
 def save_state(state):
     import shutil
     if os.path.exists(STATE_FILE):
         shutil.copy2(STATE_FILE, STATE_FILE + ".bak")  # last-good backup
     tmp = STATE_FILE + ".tmp"
     with open(tmp, "w") as f:
-        json.dump(state, f, ensure_ascii=False, indent=1)
+        json.dump(state, f, ensure_ascii=False, indent=1, default=_state_json_default)
     os.replace(tmp, STATE_FILE)
 
 
@@ -326,6 +334,8 @@ def add_npc(key, g):
         p = {**_npc_player(), "hand": []}
     elif key == "odin":
         p = {**_npc_player(), "hand": [], "score": O.START_SCORE}
+    elif key == "leaves":
+        p = {**_npc_player(), **LV.new_player(NPC_ID, "🤖 NPC")}
     elif key == "lsd":
         p = {**_npc_player(), "souls": 5, "candle": None,
              "in_play": [], "demons": [], "demon_hand": []}
@@ -3547,14 +3557,14 @@ def artichokes_api_move(state, chat_id, user_id, body):
 
 
 REMATCH_END_PHASES = {"games": ("game_end",), "regicide": ("won", "lost"),
-                     "odin": ("game_end",), "lsd": ("game_end",), "spots": ("game_end",),
+                     "odin": ("game_end",), "leaves": ("game_end",), "lsd": ("game_end",), "spots": ("game_end",),
                      "yahtzee": ("game_end",), "fliptoons": ("game_end",),
                       "tornado": ("race_end", "game_end"),
                       "castlecombo": ("game_end",), "artichokes": ("game_end",)}
 
 
 RENDERERS = {"games": render, "regicide": rg_render, "odin": odin_render,
-             "lsd": lsd_render, "spots": spots_render, "yahtzee": yahtzee_render,
+             "leaves": leaves_render, "lsd": lsd_render, "spots": spots_render, "yahtzee": yahtzee_render,
              "fliptoons": fliptoons_render, "tornado": tornado_render,
              "castlecombo": castlecombo_render, "artichokes": artichokes_render}
 
@@ -3575,6 +3585,7 @@ def rematch_game(state, key, chat_id, uid):
         "games": lambda u, n: G.new_player(u, n),
         "regicide": lambda u, n: {"user_id": u, "name": n, "hand": []},
         "odin": lambda u, n: {"user_id": u, "name": n, "hand": [], "score": O.START_SCORE},
+        "leaves": lambda u, n: LV.new_player(u, n),
         "lsd": lambda u, n: {"user_id": u, "name": n, "souls": 5, "candle": None,
                              "in_play": [], "demons": [], "demon_hand": []},
         "spots": lambda u, n: {"user_id": u, "name": n, "dogs": [], "scored": [],
@@ -3586,7 +3597,7 @@ def rematch_game(state, key, chat_id, uid):
         "artichokes": lambda u, n: AT.new_player(u, n),
     }
     news = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
-            "lsd": D.new_game, "spots": SP.new_game, "yahtzee": Y.new_game,
+            "leaves": LV.new_game, "lsd": D.new_game, "spots": SP.new_game, "yahtzee": Y.new_game,
              "fliptoons": FT.new_game, "tornado": TS.new_game,
              "castlecombo": CC.new_game, "artichokes": AT.new_game}
     chat_type = g.get("chat_type", "private")
@@ -3642,6 +3653,7 @@ def handle_command(state, msg):
             ("games", "🎴 Flip 7", "/flip7", "/flip7_join", "press-your-luck dice, first to 200"),
             ("regicide", "⚔️ Regicide", "/regicide", "/regicide_join", "co-op vs 12 royals, private hands"),
             ("odin", "🛡️ Odin", "/odin", "/odin_join", "card shedding, fewest points wins"),
+            ("leaves", "🍃 13 Leaves", "/leaves", "/leaves_join", "shed sets, first to empty your hand"),
             ("lsd", "😈 Let's Summon Demons", "/lsd", "/lsd_join", "dice activations, 3 demons + 10 souls"),
             ("spots", "🐶 Spots", "/spots", "/spots_join", "dog dice push-your-luck, 6 scored wins"),
             ("yahtzee", "🎲 Yahtzee", "/yahtzee", "/yahtzee_join", "dice scorecard, 13 boxes"),
@@ -3720,7 +3732,7 @@ def handle_command(state, msg):
         # (Flip 7 rules as the default when there are none).
         _mid = (msg.get("reply_to_message") or {}).get("message_id") if msg.get("reply_to_message") else None
         _by_key = (("games", RULES), ("regicide", REGICIDE_RULES), ("odin", ODIN_RULES),
-                   ("lsd", LSD_RULES), ("spots", SPOTS_RULES), ("yahtzee", YAHTZEE_RULES),
+                   ("leaves", LEAVES_RULES), ("lsd", LSD_RULES), ("spots", SPOTS_RULES), ("yahtzee", YAHTZEE_RULES),
                     ("fliptoons", FLIPTOONS_RULES), ("tornado", TORNADO_RULES),
                     ("castlecombo", CASTLECOMBO_RULES), ("artichokes", ARTICHOKES_RULES))
         if _mid:
@@ -5293,6 +5305,9 @@ def start_web_server(state):
             if u.path == "/odin.js":
                 p = os.path.join(os.path.dirname(JS_PATH), "odin.js")
                 return self._send(200, open(p, "rb").read(), "text/javascript")
+            if u.path == "/leaves.js":
+                p = os.path.join(os.path.dirname(JS_PATH), "leaves.js")
+                return self._send(200, open(p, "rb").read(), "text/javascript")
             if u.path == "/lsd.js":
                 p = os.path.join(os.path.dirname(JS_PATH), "lsd.js")
                 return self._send(200, open(p, "rb").read(), "text/javascript")
@@ -5958,6 +5973,8 @@ def start_web_server(state):
                     chat_id = None
                     for cand in (chat_instance, start_param, str(body.get("chat_id") or "")):
                         cand = str(cand)
+                        if cand.startswith("leaves"):
+                            cand = cand[len("leaves"):]
                         try:
                             chat_id = int(cand)
                             break

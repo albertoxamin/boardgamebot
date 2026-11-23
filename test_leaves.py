@@ -1,4 +1,5 @@
 """Run: python3 test_leaves.py"""
+import json
 import os
 import random
 import sys
@@ -33,7 +34,7 @@ def test_lead_and_play():
     g["deck"] = []
     g["phase"] = "playing"
     g["row"] = []
-    g["passed"] = set()
+    g["passed"] = []
     g["current_index"] = 0
     ev = []
     assert L.play(g, 0, 5, 2, ev) is None
@@ -48,7 +49,7 @@ def test_play_stack_and_extend():
     g["deck"] = []
     g["phase"] = "playing"
     g["row"] = [{"value": 5, "count": 2}]
-    g["passed"] = set()
+    g["passed"] = []
     g["current_index"] = 0
     ev = []
     # stack onto end value 5: must play >= 2
@@ -64,7 +65,7 @@ def test_extend_left_right():
     g["deck"] = []
     g["phase"] = "playing"
     g["row"] = [{"value": 5, "count": 1}, {"value": 6, "count": 1}]
-    g["passed"] = set()
+    g["passed"] = []
     g["current_index"] = 0
     ev = []
     # extend left with 4 (needs >= left stack count 1)
@@ -89,12 +90,22 @@ def test_win_on_empty_hand():
     g["deck"] = []
     g["phase"] = "playing"
     g["row"] = []
-    g["passed"] = set()
+    g["passed"] = []
     g["current_index"] = 0
     ev = []
     assert L.play(g, 0, 5, 1, ev) is None
     assert g["phase"] == "game_end"
     assert g["winner_id"] == g["players"][0]["user_id"]
+
+
+def test_pass_and_serialize():
+    g = mk(3)
+    g["phase"] = "playing"
+    g["row"] = [{"value": 5, "count": 1}]
+    g["current_index"] = 0
+    ev = []
+    assert L.pass_turn(g, 0, ev) is None
+    json.dumps({"leaves": {str(g["chat_id"]): g}})
 
 
 if __name__ == "__main__":
@@ -110,4 +121,6 @@ if __name__ == "__main__":
     print("PASS test_cannot_pass_on_empty_row")
     test_win_on_empty_hand()
     print("PASS test_win_on_empty_hand")
+    test_pass_and_serialize()
+    print("PASS test_pass_and_serialize")
     print("all leaves tests passed")

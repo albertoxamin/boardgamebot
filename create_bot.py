@@ -86,6 +86,7 @@ COMMANDS = (
     "spots - Push-your-luck Spots dog dice\n"
     "tornado - Jet-ski racing Tornado Splash\n"
     "artichokes - Deck-wrecking Abandon All Artichokes\n"
+    "fotr - Co-op Lord of the Rings trick-taking\n"
     "games - List the games you can start\n"
     "join_npc - Add a mock player anyone can control\n"
     "score - Show board and scores\n"

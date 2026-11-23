@@ -251,6 +251,26 @@ Text commands: `/artichokes` (create), `/artichokes_join`,
 Mini App: board button = `?startapp=artichokes<chat>` (same Main Mini App,
 routed by `start_param`). Engine: `artichokes.py` + `test_artichokes.py`.
 
+## Fellowship of the Ring (same bot, co-op trick-taking)
+
+The Lord of the Rings: The Fellowship of the Ring Trick-Taking Game
+(Office Dog / Asmodee), 2–4 players, 18 chapters. Private hands, follow the
+lead suit, Rings sealed until broken, and the 1 of Rings may claim a trick.
+Each character has its own goal; the round is won only when all chosen
+characters succeed. Chapters 1, 2 and 13 follow the published rules closely;
+chapters 3–18 use simplified/approximated rosters and goals because the
+printed chapter cards are not all available in digital form. The 2-player
+mode also simplifies the printed "pyramid" hand into a normal two-handed game
+(the One Ring is moved into a player's hand when it would be undealt).
+
+Text commands: `/fotr` (create), `/fotr_join`, `/fotr_join_npc`,
+`/fotr_start [chapter]`, `/fotr_chapter <1-18>`, `/fotr_choose <key>`,
+`/fotr_exchange <card> [target]`, `/fotr_back <card>`, `/fotr_play <card>`,
+`/fotr_ring yes|no`, `/fotr_retry`, `/fotr_restart`, `/fotr_next`,
+`/fotr_rules`, `/fotr_cancel` (creator). Mini App: board button =
+`?startapp=fellowship<chat>` (same Main Mini App, routed by `start_param`).
+Engine: `fellowship.py` + `test_fellowship.py`.
+
 ## Files
 
 - `game.py` – pure engine: deck, scoring, bust/Flip 7, actions, rounds.
@@ -258,6 +278,7 @@ routed by `start_param`). Engine: `artichokes.py` + `test_artichokes.py`.
 - `fliptoons.py` – pure engine: deck, grid, abilities, market, final flip.
 - `tornado.py` – pure engine: boats, decks, courses, ranks, movement, Grand Prix.
 - `artichokes.py` – pure engine: garden stack/row, harvesting, all vegetable powers, win check.
+- `fellowship.py` – pure engine: 37-card deck, chapter rosters/goals, setup exchanges, trick play, One Ring.
 - `bot.py` – Telegram polling, inline keyboards, commands, JSON state.
 - `create_bot.py` – BotFather self-creation (MTProto, see above).
 - `test_game.py` – unit tests: `python3 test_game.py`
@@ -265,11 +286,13 @@ routed by `start_param`). Engine: `artichokes.py` + `test_artichokes.py`.
 - `test_fliptoons.py` – Fliptoons unit tests: `python3 test_fliptoons.py`
 - `test_tornado.py` – Tornado Splash unit tests: `python3 test_tornado.py`
 - `test_artichokes.py` – Abandon All Artichokes unit tests: `python3 test_artichokes.py`
+- `test_fellowship.py` – Fellowship engine tests: `python3 test_fellowship.py`
 - `web/flip7.html` – standalone HTML5 Flip 7 game (hot-seat, Mini App-ready)
 - `web/yahtzee.js` – Yahtzee Mini App view (synced)
 - `web/fliptoons.js` – Fliptoons Mini App view (synced)
 - `web/tornado.js` – Tornado Splash Mini App view (synced)
 - `web/artichokes.js` – Abandon All Artichokes Mini App view (synced)
+- `web/fellowship.js` – Fellowship Mini App view (synced, viewer-filtered hands)
 - `web/artichokes_cards/` – BGA card art (0–9 vegetables, 10–14 Artichokes, 15 Rhubarb, 16 back)
 - `web/covers/*.jpg` – box art shown as the lobby photo for each game
 - `web/server.py` – static server for the HTML game (needs HTTPS tunnel for in-Telegram use)
@@ -283,6 +306,7 @@ python3 test_yahtzee.py     # 6 Yahtzee tests
 python3 test_fliptoons.py   # Fliptoons engine/ability tests
 python3 test_tornado.py     # Tornado Splash engine tests
 python3 test_artichokes.py  # Abandon All Artichokes engine tests
+python3 test_fellowship.py  # Fellowship engine tests
 ```
 A full 3-player game was also simulated end-to-end (hits/stays/actions/
 round rotation → a winner at 200+ in 13 rounds) with the Telegram layer

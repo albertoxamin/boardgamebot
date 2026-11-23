@@ -396,6 +396,20 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <div class="log" id="atLog"></div>
 <div id="atPopup" class="atpopup hidden"></div>
 </div>
+<div id="fellowship" class="hidden">
+<div id="ftrTurn" style="font-size:18px;font-weight:700;background:#1e293b;border-radius:10px;padding:8px 10px;margin-bottom:8px"></div>
+<div id="ftrBoard"></div>
+<div id="ftrActions"></div>
+<div id="ftrHand"></div>
+<button class="primary hidden" id="ftrJoin">🙋 Join</button>
+<button class="primary hidden" id="ftrStart">🎮 Start</button>
+<button class="hit hidden" id="ftrRingYes">💍 Claim with R1</button>
+<button class="stay hidden" id="ftrRingNo">⏭ Let it lose</button>
+<button class="primary hidden" id="ftrRetry">🔁 Retry round</button>
+<button class="primary hidden" id="ftrRestart">↺ Restart chapter</button>
+<button class="primary hidden" id="ftrNext">📖 Next chapter</button>
+<div class="log" id="ftrLog"></div>
+</div>
 <div id="synced">
 <div id="syncBoard"></div>
 <div id="syncTurn" style="font-size:18px;font-weight:700"></div>
@@ -439,4 +453,5 @@ const FX={capture(sel,attr){let m={};document.querySelectorAll(sel).forEach(el=>
 <script data-cfasync="false" src="castlecombo.js?v=7"></script>
 <script data-cfasync="false" src="tornado.js?v=3"></script>
 <script data-cfasync="false" src="artichokes.js?v=11"></script>
+<script data-cfasync="false" src="fellowship.js?v=1"></script>
 </body></html>

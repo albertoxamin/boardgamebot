@@ -20,6 +20,7 @@ import yahtzee as Y
 import fliptoons as FT
 import castlecombo as CC
 import tornado as TS
+import fellowship as FTR
 
 TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT_TOKEN", "")
 API = f"https://api.telegram.org/bot{TOKEN}" if TOKEN else ""
@@ -30,7 +31,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 14
+WEB_VER = 15
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -54,6 +55,7 @@ HELP = """🎴 <b>Boardgame bot</b>
 /castlecombo - deck-building Castle Combo (also /castlecombo_join /castlecombo_start /castlecombo_buy /castlecombo_flip /castlecombo_key /castlecombo_choose /castlecombo_cancel /castlecombo_rules)
 /tornado - jet-ski racing Tornado Splash (also /tornado_join /tornado_start /tornado_pick /tornado_play /tornado_wait /tornado_hand /tornado_next /tornado_cancel /tornado_rules)
 /artichokes - deck-wrecking Abandon All Artichokes (also /artichokes_join /artichokes_start /artichokes_harvest /artichokes_play /artichokes_end /artichokes_choose /artichokes_cancel /artichokes_rules)
+/fotr - co-op Lord of the Rings trick-taking (also /fotr_join /fotr_start /fotr_chapter /fotr_choose /fotr_play /fotr_ring /fotr_rules /fotr_cancel)
 /games - list the games you can start (and what's running here)
 🤖 /join_npc (or /&lt;game&gt;_join_npc) - add a mock player anyone can control, in the lobby
 /lsd - dice game Let's Summon Demons (also /lsd_join /lsd_start /lsd_roll /lsd_buy /lsd_summon /lsd_end /lsd_score /lsd_cancel /lsd_rules)
@@ -120,7 +122,7 @@ COVERS = {"games": "flip7.jpg", "flip7": "flip7.jpg", "regicide": "regicide.jpg"
           "odin": "odin.jpg", "lsd": "lsd.jpg", "spots": "spots.jpg",
           "yahtzee": "yahtzee.jpg", "fliptoons": "fliptoons.jpg",
            "tornado": "tornado.jpg", "castlecombo": "castlecombo.jpg",
-           "artichokes": "artichokes.jpg"}
+           "artichokes": "artichokes.jpg", "fellowship": "fellowship.png"}
 
 
 def cover_path(game):
@@ -238,16 +240,16 @@ def web_keyboard(chat_type="private", chat_id=None, game="flip7"):
     startapp=<game><chat_id> (no second BotFather app needed)."""
     if not WEB_URL:
         return None
-    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "leaves": "🎮 Play 13 Leaves (HTML)", "lsd": "🎮 Play Summon Demons (HTML)", "spots": "🎮 Play Spots (HTML)", "yahtzee": "🎮 Play Yahtzee (HTML)", "fliptoons": "🎮 Play Fliptoons (HTML)", "tornado": "🎮 Play Tornado Splash (HTML)", "castlecombo": "🎮 Play Castle Combo (HTML)", "artichokes": "🎮 Play Abandon All Artichokes (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
+    label = {"regicide": "🎮 Play Regicide (HTML)", "odin": "🎮 Play Odin (HTML)", "leaves": "🎮 Play 13 Leaves (HTML)", "lsd": "🎮 Play Summon Demons (HTML)", "spots": "🎮 Play Spots (HTML)", "yahtzee": "🎮 Play Yahtzee (HTML)", "fliptoons": "🎮 Play Fliptoons (HTML)", "tornado": "🎮 Play Tornado Splash (HTML)", "castlecombo": "🎮 Play Castle Combo (HTML)", "artichokes": "🎮 Play Abandon All Artichokes (HTML)", "fellowship": "🎮 Play Fellowship (HTML)"}.get(game, "🎮 Play Flip 7 (HTML)")
     if chat_type in ("group", "supergroup", "channel"):
         if chat_id:
-            start = f"{game}{chat_id}" if game in ("regicide", "odin", "leaves", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes") else str(chat_id)
+            start = f"{game}{chat_id}" if game in ("regicide", "odin", "leaves", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes", "fellowship") else str(chat_id)
             url = f"https://t.me/flip7groupbot?startapp={start}&v={WEB_VER}"
         else:
             url = f"{WEB_URL}?v={WEB_VER}"
         btn = {"text": label, "url": url}
     else:
-        url = WEB_URL + f"?v={WEB_VER}" + (f"&app={game}" if game in ("regicide", "odin", "leaves", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes") else "")
+        url = WEB_URL + f"?v={WEB_VER}" + (f"&app={game}" if game in ("regicide", "odin", "leaves", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes", "fellowship") else "")
         if chat_id:
             url += ("&" if "?" in url else "?") + f"chat_id={chat_id}"
         btn = {"text": label, "web_app": {"url": url}}
@@ -256,7 +258,7 @@ def web_keyboard(chat_type="private", chat_id=None, game="flip7"):
 
 # ---------- State ----------
 def load_state():
-    s = {"games": {}, "regicide": {}, "odin": {}, "leaves": {}, "lsd": {}, "spots": {}, "yahtzee": {}, "fliptoons": {}, "tornado": {}, "castlecombo": {}, "artichokes": {}}
+    s = {"games": {}, "regicide": {}, "odin": {}, "leaves": {}, "lsd": {}, "spots": {}, "yahtzee": {}, "fliptoons": {}, "tornado": {}, "castlecombo": {}, "artichokes": {}, "fellowship": {}}
     if os.path.exists(STATE_FILE):
         try:
             with open(STATE_FILE) as f:
@@ -274,6 +276,7 @@ def load_state():
     s.setdefault("tornado", {})
     s.setdefault("castlecombo", {})
     s.setdefault("artichokes", {})
+    s.setdefault("fellowship", {})
     return s
 
 
@@ -302,7 +305,8 @@ def _npc_player():
 
 NPC_MAX = {"games": 6, "regicide": 4, "odin": 6, "leaves": 6, "lsd": 5, "spots": 4,
            "yahtzee": Y.MAX_PLAYERS, "tornado": TS.MAX_PLAYERS, "fliptoons": 4,
-           "castlecombo": CC.MAX_PLAYERS, "artichokes": AT.MAX_PLAYERS}
+           "castlecombo": CC.MAX_PLAYERS, "artichokes": AT.MAX_PLAYERS,
+           "fellowship": FTR.MAX_PLAYERS}
 NPC_FULL = {
     "games": "⛔ Game is full.",
     "regicide": "⛔ Regicide is 2-4 players (full).",
@@ -315,6 +319,7 @@ NPC_FULL = {
     "fliptoons": "⛔ Fliptoons is 2-4 players (full).",
     "castlecombo": f"⛔ Castle Combo is 2-{CC.MAX_PLAYERS} players (full).",
     "artichokes": f"⛔ Abandon All Artichokes is 2-{AT.MAX_PLAYERS} players (full).",
+    "fellowship": f"⛔ Fellowship is {FTR.MIN_PLAYERS}-{FTR.MAX_PLAYERS} players (full).",
 }
 
 
@@ -353,6 +358,9 @@ def add_npc(key, g):
         p["npc"] = True
     elif key == "artichokes":
         p = AT.new_player(NPC_ID, "🤖 NPC")
+        p["npc"] = True
+    elif key == "fellowship":
+        p = FTR.new_player(NPC_ID, "🤖 NPC")
         p["npc"] = True
     g["players"].append(p)
     return None
@@ -1258,6 +1266,385 @@ def handle_leaves(state, msg, cmd, text, uid, name):
             leaves_render(g, ev)
         return True
     return False
+
+
+# ---------- The Fellowship of the Ring (cooperative trick-taking) ----------
+FTR_RULES = """💍 <b>Fellowship of the Ring rules</b> (short):
+• 2–4 players, 18 chapters. Shuffle 37 cards (Hills/Mountains/Forests/Shadows 1–8, Rings 1–5). Turn one face-up as the <b>lost card</b> (never the 1 of Rings), deal 12 each (2–3p) or 9 each (4p). Whoever holds the <b>1 of Rings</b> is Frodo and leads; the One Ring cannot be exchanged.
+• Follow the lead suit; highest rank of that suit wins the trick. Rings cannot be led until someone plays a Ring off-suit (or Rings is your only suit). When you play the <b>1 of Rings</b> you may choose to win the trick — it must still follow suit.
+• Start to Frodo's left: characters with a 🔨 perform setup (draw the lost card, draw a threat, or exchange one card). Exchange targets choose the card passed back.
+• Each character has a goal (win N tricks, win Rings, win the last trick, avoid a threat number, etc.). Win a round only if <b>every chosen character</b> succeeds. Short chapters end when all goals are met; long chapters repeat rounds until all roster goals are met or fail and retry.
+• Commands: <code>/fotr_chapter N</code>, <code>/fotr_choose key</code>, <code>/fotr_exchange CARD TARGET</code>, <code>/fotr_back CARD</code>, <code>/fotr_play CARD</code>, <code>/fotr_ring yes|no</code>, <code>/fotr_retry</code>, <code>/fotr_next</code>.
+• Later chapter rosters/goals are simplified approximations of the printed campaign."""
+
+
+def fotr_get(state, chat_id):
+    return state.setdefault("fellowship", {}).get(str(chat_id))
+
+
+def fotr_actor(g, uid, ref):
+    """Only the referenced seat (or anyone controlling the NPC) may act."""
+    if ref is None or not (0 <= ref < len(g["players"])):
+        return None
+    p = g["players"][ref]
+    if p.get("npc"):
+        return ref
+    return ref if p["user_id"] == uid else None
+
+
+def fotr_apply(g, uid, action, params=None):
+    """Apply one Fellowship action. Returns (events, error)."""
+    params = params or {}
+    ev = []
+
+    def want_int(value):
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
+
+    if action == "join":
+        if g.get("phase") != "lobby":
+            return ev, "game already started"
+        if any(p["user_id"] == uid for p in g["players"]):
+            return ev, None
+        if len(g["players"]) >= FTR.MAX_PLAYERS:
+            return ev, f"Fellowship is {FTR.MIN_PLAYERS}-{FTR.MAX_PLAYERS} players (full)."
+        g["players"].append(FTR.new_player(uid, params.get("name") or "Player"))
+        ev.append(f"🙋 {html.escape(params.get('name') or 'Player')} joined.")
+        return ev, None
+    if action == "npc":
+        err = add_npc("fellowship", g)
+        if not err:
+            ev.append("🤖 NPC joined - anyone can play for it.")
+        return ev, err
+    if action == "start":
+        err = FTR.start_game(g, ev, params.get("chapter"))
+        return ev, err
+    if action == "chapter":
+        err = FTR.set_chapter(g, params.get("chapter"), ev)
+        return ev, err
+    if action == "choose":
+        idx = fotr_actor(g, uid, FTR.selection_actor(g))
+        if idx is None:
+            return ev, "not your turn to choose"
+        err = FTR.choose_character(g, idx, params.get("character") or params.get("key"), ev)
+        return ev, err
+    if action == "out":
+        idx = fotr_actor(g, uid, FTR.pending_actor(g))
+        if idx is None:
+            return ev, "not your exchange"
+        target = want_int(params.get("target"))
+        if target is None:
+            return ev, "bad exchange target"
+        err = FTR.exchange_cards(g, idx, params.get("card"), target, ev)
+        return ev, err
+    if action == "back":
+        idx = fotr_actor(g, uid, FTR.pending_actor(g))
+        if idx is None:
+            return ev, "not your exchange"
+        err = FTR.exchange_back(g, idx, params.get("card"), ev)
+        return ev, err
+    if action == "play":
+        idx = fotr_actor(g, uid, g.get("current"))
+        if idx is None:
+            return ev, "not your turn"
+        err = FTR.play_card(g, idx, params.get("card"), ev)
+        return ev, err
+    if action == "ring":
+        idx = fotr_actor(g, uid, FTR.pending_actor(g))
+        if idx is None:
+            return ev, "no Ring choice for you"
+        use_it = params.get("use")
+        if isinstance(use_it, str):
+            use_it = use_it.lower() in ("1", "yes", "y", "true", "on")
+        err = FTR.ring_choice(g, idx, bool(use_it), ev)
+        return ev, err
+    if action == "retry":
+        err = FTR.retry_round(g, ev)
+        return ev, err
+    if action == "restart":
+        err = FTR.restart_chapter(g, ev)
+        return ev, err
+    if action == "next":
+        err = FTR.next_chapter(g, ev)
+        return ev, err
+    return ev, "unknown action"
+
+
+def fotr_board_text(g):
+    title = FTR.chapter_name(g["chapter"])
+    ch = FTR.chapter(g["chapter"])
+    head = f"💍 <b>Fellowship</b> — {html.escape(title)} · round {g.get('round', 1)}"
+    if ch:
+        head += f" · {html.escape(ch['victory'])}"
+    lines = [head]
+    for i, p in enumerate(g["players"]):
+        mark = ""
+        if i == g.get("ring_holder"):
+            mark += " 💍"
+        if i == FTR.current_player(g) and g.get("phase") not in ("lobby", "game_end"):
+            mark += " 👈"
+        chname = FTR.CHARACTERS.get(p["character"], {}).get("name", "?")
+        lines.append(f"• {html.escape(p['name'])} — {html.escape(chname)} · {len(p['hand'])} cards{mark}")
+    phase = g.get("phase")
+    if phase == "lobby":
+        lines.append(f"🪑 Lobby ({len(g['players'])}/{FTR.MAX_PLAYERS}). /fotr_join, /fotr_join_npc, /fotr_start [chapter].")
+        lines.append(f"📖 Now: {html.escape(title)}. /fotr_chapter N to choose another chapter.")
+    elif phase == "choosing":
+        opts = FTR.available_characters(g)
+        lines.append("🎭 Choose your character: " + ", ".join(
+            f"<code>{c}</code> {html.escape(FTR.CHARACTERS[c]['name'])}" for c in opts))
+    elif phase == "setup":
+        pend = g.get("pending") or {}
+        if pend.get("kind") == "exchange_out":
+            lines.append(f"🔨 Exchange one card with {html.escape(g['players'][pend['targets'][0]]['name'])} (or choose a target), then they pass one back.")
+        elif pend.get("kind") == "exchange_in":
+            lines.append("🔨 Pass a card back to complete the exchange (the same card is allowed).")
+        else:
+            lines.append("🔨 Setup actions in progress...")
+    elif phase == "playing":
+        trick = g.get("trick")
+        lead = f"lead {html.escape(trick['suit'])}" if trick and trick["suit"] else "lead any suit"
+        plays = ", ".join(
+            f"{html.escape(g['players'][pl['player']]['name'])}:{FTR.cshort(pl['card'])}"
+            for pl in (trick["plays"] if trick else [])) or "—"
+        lines.append(f"🃏 Trick {g.get('trick_no', 1)} · {lead} · plays: {plays}")
+        lines.append(f"🃏 Lost: {FTR.cname(g['lost']) if g.get('lost') else 'taken'}"
+                     f" · Rings {'BROKEN' if g.get('ring_broken') else 'sealed'}")
+        goals = FTR.goal_status(g)
+        if goals:
+            lines.append("🎯 Goals: " + " · ".join(
+                f"{html.escape(goal['name'])} {'✅' if goal['ok'] else '❌'}"
+                for goal in goals))
+    elif phase in ("round_end", "chapter_end", "game_end"):
+        res = g.get("result") or phase
+        lines.append(f"🏁 Result: <b>{html.escape(str(res))}</b>")
+        if phase != "game_end":
+            lines.append("Buttons below: retry round / restart chapter / next chapter.")
+        else:
+            lines.append("🏆 Campaign complete! Pick any chapter with /fotr_chapter N.")
+    return "\n".join(lines)
+
+
+def fotr_keyboard(g):
+    kb = []
+    phase = g.get("phase")
+    if phase == "lobby":
+        kb.append([{"text": "🙋 Join", "callback_data": "fotr:join"}])
+        if not any(p.get("npc") for p in g["players"]):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "fr:npc"}])
+        kb.append([{"text": "🎮 Start", "callback_data": "fotr:start"}])
+    elif phase == "choosing":
+        row = []
+        for c in FTR.available_characters(g):
+            row.append({"text": FTR.CHARACTERS[c]["name"], "callback_data": f"fotr:choose:{c}"})
+            if len(row) == 2:
+                kb.append(row)
+                row = []
+        if row:
+            kb.append(row)
+    elif phase == "setup":
+        pend = g.get("pending") or {}
+        idx = pend.get("actor")
+        if pend.get("kind") == "exchange_out" and idx is not None:
+            hand = [c for c in g["players"][idx]["hand"]
+                    if not (idx == g["ring_holder"] and c == "R1")]
+            for t in pend.get("targets", []):
+                tname = g["players"][t]["name"]
+                row = [{"text": f"{FTR.cshort(c)} → {html.unescape(tname)[:8]}",
+                        "callback_data": f"fotr:out:{c}:{t}"} for c in hand[:12]]
+                for i in range(0, len(row), 4):
+                    kb.append(row[i:i + 4])
+        elif pend.get("kind") == "exchange_in" and idx is not None:
+            hand = [c for c in g["players"][idx]["hand"]
+                    if not (idx == g["ring_holder"] and c == "R1")]
+            row = [{"text": FTR.cshort(c), "callback_data": f"fotr:back:{c}"} for c in hand]
+            for i in range(0, len(row), 5):
+                kb.append(row[i:i + 5])
+    elif phase == "playing":
+        pend = g.get("pending") or {}
+        if pend.get("kind") == "ring_choice":
+            kb.append([
+                {"text": "💍 Claim with R1", "callback_data": "fotr:ring:1"},
+                {"text": "⏭ Let it lose", "callback_data": "fotr:ring:0"},
+            ])
+        else:
+            idx = g.get("current")
+            if idx is not None:
+                row = [{"text": FTR.cshort(c), "callback_data": f"fotr:play:{c}"}
+                       for c in FTR.legal_cards(g, idx)]
+                for i in range(0, len(row), 5):
+                    kb.append(row[i:i + 5])
+    if phase in ("round_end", "chapter_end"):
+        kb.append([
+            {"text": "🔁 Retry round", "callback_data": "fotr:retry"},
+            {"text": "↺ Restart chapter", "callback_data": "fotr:restart"},
+        ])
+        if phase == "chapter_end":
+            kb.append([{"text": "📖 Next chapter", "callback_data": "fotr:next"}])
+    if phase in ("chapter_end", "game_end"):
+        kb.append([{"text": "🔄 New game", "callback_data": "fotr:rematch"}])
+    ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
+    wk = web_keyboard(ct, g["chat_id"], game="fellowship")
+    if wk:
+        kb.extend(wk)
+    return kb or None
+
+
+def fotr_render(g, events=None):
+    lines = list(events or [])
+    if g.get("players") and g.get("phase") not in ("lobby", "game_end"):
+        idx = FTR.current_player(g)
+        if idx is not None:
+            who = g["players"][idx]
+            lines.append("👉 🤖 NPC to move" if who.get("npc") else f"👉 {html.escape(who['name'])}'s turn")
+    text = "\n".join(lines + [fotr_board_text(g)])
+    r = send_board(g, "fellowship", text, fotr_keyboard(g))
+    if r.get("ok"):
+        old = g.get("board_message_id")
+        g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=g["chat_id"], message_id=old)
+
+
+def handle_fellowship(state, msg, cmd, text, uid, name):
+    chat_id = msg["chat"]["id"]
+    g = fotr_get(state, chat_id)
+    if cmd in ("/fotr_rules", "/fellowship_rules"):
+        send(chat_id, FTR_RULES)
+        return True
+    if cmd in ("/fotr", "/fellowship"):
+        if not g:
+            g = FTR.new_game(chat_id, uid, name)
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state.setdefault("fellowship", {})[str(chat_id)] = g
+            fotr_render(g, ["💍 Fellowship created! Use /fotr_join, then /fotr_start."])
+        else:
+            fotr_render(g)
+        return True
+    if not g:
+        send(chat_id, "No Fellowship game here - send /fotr to create one.")
+        return True
+    g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    parts = text.split()
+    arg = parts[1] if len(parts) > 1 else None
+    rest = parts[2:] if len(parts) > 2 else []
+    if cmd in ("/fotr_join", "/fellowship_join"):
+        ev, err = fotr_apply(g, uid, "join", {"name": name})
+        if err:
+            send(chat_id, f"⛔ {err}")
+        else:
+            fotr_render(g, ev)
+        return True
+    if cmd in ("/fotr_join_npc", "/fellowship_join_npc"):
+        ev, err = fotr_apply(g, uid, "npc")
+        send(chat_id, err or "🤖 NPC joined!")
+        if not err:
+            fotr_render(g, ev)
+        return True
+    if cmd in ("/fotr_start", "/fellowship_start"):
+        ev, err = fotr_apply(g, uid, "start", {"chapter": arg})
+        if err:
+            send(chat_id, f"⛔ {err}")
+        else:
+            fotr_render(g, ev)
+        return True
+    if cmd in ("/fotr_chapter", "/fellowship_chapter"):
+        if not arg:
+            send(chat_id, "Usage: /fotr_chapter <1-18>")
+        else:
+            ev, err = fotr_apply(g, uid, "chapter", {"chapter": arg})
+            send(chat_id, f"⛔ {err}" if err else "📖 Chapter set.")
+            if not err:
+                fotr_render(g, ev)
+        return True
+    if cmd in ("/fotr_choose", "/fellowship_choose"):
+        ev, err = fotr_apply(g, uid, "choose", {"character": arg})
+        send(chat_id, f"⛔ {err}" if err else f"🎭 Chose {arg}.")
+        if not err:
+            fotr_render(g, ev)
+        return True
+    if cmd in ("/fotr_exchange", "/fellowship_exchange"):
+        if len(rest) < 1:
+            send(chat_id, "Usage: /fotr_exchange <card> [target_index]")
+        else:
+            pend = g.get("pending") or {}
+            target = rest[0] if rest else (pend.get("targets") or [0])[0]
+            ev, err = fotr_apply(g, uid, "out", {"card": arg, "target": target})
+            send(chat_id, f"⛔ {err}" if err else "🔄 Card passed.")
+            if not err:
+                fotr_render(g, ev)
+        return True
+    if cmd in ("/fotr_back", "/fellowship_back"):
+        ev, err = fotr_apply(g, uid, "back", {"card": arg})
+        send(chat_id, f"⛔ {err}" if err else "🔄 Exchange complete.")
+        if not err:
+            fotr_render(g, ev)
+        return True
+    if cmd in ("/fotr_play", "/fellowship_play"):
+        ev, err = fotr_apply(g, uid, "play", {"card": arg})
+        send(chat_id, f"⛔ {err}" if err else f"🃏 Played {arg}.")
+        if not err:
+            fotr_render(g, ev)
+        return True
+    if cmd in ("/fotr_ring", "/fellowship_ring"):
+        use = (arg or "").lower() in ("yes", "y", "1", "true", "on")
+        ev, err = fotr_apply(g, uid, "ring", {"use": use})
+        send(chat_id, f"⛔ {err}" if err else ("💍 Claimed the trick." if use else "⏭ Let it pass."))
+        if not err:
+            fotr_render(g, ev)
+        return True
+    if cmd in ("/fotr_retry", "/fellowship_retry"):
+        ev, err = fotr_apply(g, uid, "retry")
+        send(chat_id, f"⛔ {err}" if err else "🔁 Round re-dealt.")
+        if not err:
+            fotr_render(g, ev)
+        return True
+    if cmd in ("/fotr_restart", "/fellowship_restart"):
+        ev, err = fotr_apply(g, uid, "restart")
+        send(chat_id, f"⛔ {err}" if err else "↺ Chapter restarted.")
+        if not err:
+            fotr_render(g, ev)
+        return True
+    if cmd in ("/fotr_next", "/fellowship_next"):
+        ev, err = fotr_apply(g, uid, "next")
+        send(chat_id, f"⛔ {err}" if err else "📖 Next chapter.")
+        if not err:
+            fotr_render(g, ev)
+        return True
+    if cmd in ("/fotr_cancel", "/fellowship_cancel"):
+        if uid != g["created_by"]:
+            send(chat_id, "⛔ Only the creator can cancel.")
+        else:
+            del state["fellowship"][str(chat_id)]
+            send(chat_id, "🗑 Fellowship cancelled.")
+        return True
+    return False
+
+
+def fotr_board_json(g, viewer_id=None):
+    board = FTR.public_board(g, viewer_id)
+    board["chat_type"] = g.get("chat_type", "private")
+    return board
+
+
+def fotr_api_move(state, chat_id, user_id, body):
+    g = fotr_get(state, chat_id)
+    if not g:
+        return [], "no Fellowship game in that chat"
+    action = body.get("action")
+    if action == "rematch":
+        return rematch_game(state, "fellowship", chat_id, user_id)
+    params = dict(body)
+    if params.get("character") is None and params.get("key") is not None:
+        params["character"] = params["key"]
+    ev, err = fotr_apply(g, user_id, action, params)
+    if err:
+        return ev, err
+    fotr_render(g, ev)
+    return ev, None
+
 
 # ---------- Let's Summon Demons (dice activation, market, demons) ----------
 LSD_RULES = """😈 <b>Let's Summon Demons rules</b> (Cryptozoic, 2-5 players): be first to 3 summoned Demons AND 10 Souls.
@@ -3560,13 +3947,15 @@ REMATCH_END_PHASES = {"games": ("game_end",), "regicide": ("won", "lost"),
                      "odin": ("game_end",), "leaves": ("game_end",), "lsd": ("game_end",), "spots": ("game_end",),
                      "yahtzee": ("game_end",), "fliptoons": ("game_end",),
                       "tornado": ("race_end", "game_end"),
-                      "castlecombo": ("game_end",), "artichokes": ("game_end",)}
+                       "castlecombo": ("game_end",), "artichokes": ("game_end",),
+                      "fellowship": ("chapter_end", "game_end")}
 
 
 RENDERERS = {"games": render, "regicide": rg_render, "odin": odin_render,
              "leaves": leaves_render, "lsd": lsd_render, "spots": spots_render, "yahtzee": yahtzee_render,
              "fliptoons": fliptoons_render, "tornado": tornado_render,
-             "castlecombo": castlecombo_render, "artichokes": artichokes_render}
+              "castlecombo": castlecombo_render, "artichokes": artichokes_render,
+              "fellowship": fotr_render}
 
 
 def rematch_game(state, key, chat_id, uid):
@@ -3595,11 +3984,13 @@ def rematch_game(state, key, chat_id, uid):
         "castlecombo": lambda u, n: CC.new_player(u, n),
         "tornado": lambda u, n: TS.new_player(u, n),
         "artichokes": lambda u, n: AT.new_player(u, n),
+        "fellowship": lambda u, n: FTR.new_player(u, n),
     }
     news = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
             "leaves": LV.new_game, "lsd": D.new_game, "spots": SP.new_game, "yahtzee": Y.new_game,
              "fliptoons": FT.new_game, "tornado": TS.new_game,
-             "castlecombo": CC.new_game, "artichokes": AT.new_game}
+              "castlecombo": CC.new_game, "artichokes": AT.new_game,
+              "fellowship": FTR.new_game}
     chat_type = g.get("chat_type", "private")
     board_id = g.get("board_message_id")
     g.clear()
@@ -3661,6 +4052,7 @@ def handle_command(state, msg):
             ("castlecombo", "🏰 Castle Combo", "/castlecombo", "/castlecombo_join", "deck-building tableau, 3×3 shields & sets"),
             ("tornado", "🛥️ Tornado Splash", "/tornado", "/tornado_join", "jet-ski racing cards, first to the finish"),
             ("artichokes", "🥬 Abandon All Artichokes", "/artichokes", "/artichokes_join", "deck-wrecking veggies, draw a hand with no Artichokes"),
+            ("fellowship", "💍 Fellowship of the Ring", "/fotr", "/fotr_join", "co-op trick-taking through 18 chapters"),
         )
         lines = ["🎮 <b>Games you can start:</b>"]
         for _key, _name, _new, _join, _desc in _catalog:
@@ -3682,7 +4074,7 @@ def handle_command(state, msg):
         # Reply-targeted cancel: cancels the one game whose board message
         # was replied to (searches every game type in this chat).
         _mid = msg["reply_to_message"].get("message_id")
-        for _key in ("games", "regicide", "odin", "leaves", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes"):
+        for _key in ("games", "regicide", "odin", "leaves", "lsd", "spots", "yahtzee", "fliptoons", "tornado", "castlecombo", "artichokes", "fellowship"):
             _gg = state.get(_key, {}).get(str(chat_id))
             if _gg is not None and _gg.get("board_message_id") == _mid:
                 del state[_key][str(chat_id)]
@@ -3720,6 +4112,9 @@ def handle_command(state, msg):
     if cmd.startswith("/artichokes"):
         handle_artichokes(state, msg, cmd, text, uid, name)
         return
+    if cmd.startswith("/fotr") or cmd.startswith("/fellowship"):
+        handle_fellowship(state, msg, cmd, text, uid, name)
+        return
     if cmd in ("/start", "/help", "/commands"):
         send(chat_id, HELP)
         return
@@ -3734,7 +4129,8 @@ def handle_command(state, msg):
         _by_key = (("games", RULES), ("regicide", REGICIDE_RULES), ("odin", ODIN_RULES),
                    ("leaves", LEAVES_RULES), ("lsd", LSD_RULES), ("spots", SPOTS_RULES), ("yahtzee", YAHTZEE_RULES),
                     ("fliptoons", FLIPTOONS_RULES), ("tornado", TORNADO_RULES),
-                    ("castlecombo", CASTLECOMBO_RULES), ("artichokes", ARTICHOKES_RULES))
+                     ("castlecombo", CASTLECOMBO_RULES), ("artichokes", ARTICHOKES_RULES),
+                     ("fellowship", FTR_RULES))
         if _mid:
             for _key, _rules in _by_key:
                 _gg = state.get(_key, {}).get(str(chat_id))
@@ -3812,7 +4208,8 @@ def handle_callback(state, cb):
     if data.endswith(":npc"):
         key = {"f7": "games", "rg": "regicide", "od": "odin", "lv": "leaves", "lsd": "lsd",
                "spots": "spots", "yz": "yahtzee", "ts": "tornado",
-                "ft": "fliptoons", "cc": "castlecombo", "at": "artichokes"}.get(data.split(":")[0])
+                 "ft": "fliptoons", "cc": "castlecombo", "at": "artichokes",
+                 "fr": "fellowship"}.get(data.split(":")[0])
         g = state.get(key, {}).get(str(chat_id)) if key else None
         if not g:
             return answer_cb(cb["id"], "No game here.")
@@ -3821,6 +4218,30 @@ def handle_callback(state, cb):
             return answer_cb(cb["id"], err)
         answer_cb(cb["id"], "🤖 NPC joined")
         RENDERERS[key](g, ["🤖 NPC joined - anyone can play for it!"])
+        return
+    if data.startswith("fotr:"):
+        g = fotr_get(state, chat_id)
+        if not g:
+            return answer_cb(cb["id"], "No Fellowship game here.")
+        parts = data.split(":")
+        action = parts[1] if len(parts) > 1 else ""
+        params = {}
+        if action == "choose" and len(parts) > 2:
+            params = {"character": parts[2]}
+        elif action == "out" and len(parts) > 3:
+            params = {"card": parts[2], "target": parts[3]}
+        elif action == "back" and len(parts) > 2:
+            params = {"card": parts[2]}
+        elif action == "play" and len(parts) > 2:
+            params = {"card": parts[2]}
+        elif action == "ring" and len(parts) > 2:
+            params = {"use": parts[2] == "1"}
+        elif action == "start" and len(parts) > 2:
+            params = {"chapter": parts[2]}
+        ev, err = fotr_api_move(state, chat_id, uid, {"action": action, **params})
+        answer_cb(cb["id"], err or "OK")
+        if not err:
+            save_state(state)
         return
     if data.startswith("spots:"):
         sp = spots_get(state, chat_id)
@@ -5332,6 +5753,9 @@ def start_web_server(state):
             if u.path == "/artichokes.js":
                 p = os.path.join(os.path.dirname(JS_PATH), "artichokes.js")
                 return self._send(200, open(p, "rb").read(), "text/javascript")
+            if u.path == "/fellowship.js":
+                p = os.path.join(os.path.dirname(JS_PATH), "fellowship.js")
+                return self._send(200, open(p, "rb").read(), "text/javascript")
             if u.path == "/castlecombo-messenger.png":
                 p = os.path.join(os.path.dirname(JS_PATH), "castlecombo-messenger.png")
                 return self._send(200, open(p, "rb").read(), "image/png", cache="public, max-age=86400")
@@ -5599,6 +6023,25 @@ def start_web_server(state):
                 with STATE_LOCK:
                     g = leaves_get(state, chat_id)
                     board = leaves_board_json(g, uid) if g else None
+                return self._send(200 if board else 404, {"ok": bool(board), "game": board})
+            if u.path == "/api/fellowship/mygames":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                with STATE_LOCK:
+                    games = [fotr_board_json(g, uid) for g in state.get("fellowship", {}).values()
+                             if any(p["user_id"] == uid for p in g["players"])]
+                return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/fellowship/game":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                chat_id = q.get("chat_id", [""])[0]
+                with STATE_LOCK:
+                    g = fotr_get(state, chat_id)
+                    board = fotr_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/regicide/mygames":
                 q = urllib.parse.parse_qs(u.query)
@@ -5998,6 +6441,52 @@ def start_web_server(state):
                     events, err = leaves_api_move(state, chat_id, uid, body)
                     g = leaves_get(state, chat_id)
                     board = leaves_board_json(g, uid) if g else None
+                    save_state(state)
+                return self._send(200 if not err else 400,
+                                  {"ok": not err, "error": err, "events": events, "game": board})
+            if path in ("/api/fellowship/create", "/api/fellowship/move"):
+                try:
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                except Exception:
+                    return self._send(400, {"ok": False, "error": "bad json"})
+                iu = init_user(body.get("init_data", ""))
+                if iu is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                uid, name, start_param, chat_instance = iu
+                if path == "/api/fellowship/create":
+                    chat_id = None
+                    for cand in (chat_instance, start_param, str(body.get("chat_id") or "")):
+                        cand = str(cand)
+                        if cand.startswith("fellowship"):
+                            cand = cand[len("fellowship"):]
+                        try:
+                            chat_id = int(cand)
+                            break
+                        except (TypeError, ValueError):
+                            continue
+                    if not chat_id:
+                        return self._send(400, {"ok": False, "error": "open the Mini App from a chat (startapp link)"})
+                    with STATE_LOCK:
+                        g = fotr_get(state, chat_id)
+                        if g and g.get("phase") != "game_end":
+                            return self._send(200, {"ok": True, "game": fotr_board_json(g, uid), "created": False})
+                        g = FTR.new_game(chat_id, uid, name)
+                        g["chat_type"] = "supergroup" if chat_id < 0 else "private"
+                        state.setdefault("fellowship", {})[str(chat_id)] = g
+                        fotr_render(g, [f"💍 Fellowship created by {name} via Mini App!"])
+                        save_state(state)
+                        board = fotr_board_json(g, uid)
+                    return self._send(200, {"ok": True, "game": board, "created": True})
+                chat_id = body.get("chat_id")
+                if not chat_id and str(start_param).startswith("fellowship"):
+                    try:
+                        chat_id = int(str(start_param)[len("fellowship"):])
+                    except ValueError:
+                        pass
+                with STATE_LOCK:
+                    events, err = fotr_api_move(state, chat_id, uid, body)
+                    g = fotr_get(state, chat_id)
+                    board = fotr_board_json(g, uid) if g else None
                     save_state(state)
                 return self._send(200 if not err else 400,
                                   {"ok": not err, "error": err, "events": events, "game": board})

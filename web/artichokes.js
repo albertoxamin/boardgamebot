@@ -1,4 +1,4 @@
-const ATAPP={user_id:0,chat_id:null,board:null,timer:null,init:'',err:'',sel:[],pass:new Set(),popupTimer:null};
+const ATAPP={user_id:0,chat_id:null,board:null,timer:null,init:'',err:'',sel:[],pass:new Set(),popupTimer:null,sig:''};
 const AT_VER=4;
 const AT_SPRITE={beet:0,broccoli:1,carrot:2,corn:3,eggplant:4,leek:5,onion:6,peas:7,
  pepper:8,potato:9,artichoke:10,rhubarb:15,back:16};
@@ -59,21 +59,25 @@ async function atLoad(){
  if(cands.length){atSelect(cands[0].chat_id);return;}
  board.innerHTML='<div class="table lobby-note">No Abandon All Artichokes game for you yet — send /artichokes in a chat, then open its Mini App link.</div>';
 }
-async function atSelect(chat_id){ATAPP.chat_id=chat_id;ATAPP.err='';ATAPP.sel=[];ATAPP.pass.clear();await atRefresh();
+async function atSelect(chat_id){ATAPP.chat_id=chat_id;ATAPP.err='';ATAPP.sel=[];ATAPP.pass.clear();ATAPP.sig='';await atRefresh();
  if(ATAPP.timer)clearInterval(ATAPP.timer);ATAPP.timer=setInterval(atRefresh,3000);}
 async function atRefresh(){if(!ATAPP.chat_id)return;
  let r=await atApi('/api/artichokes/game?chat_id='+encodeURIComponent(ATAPP.chat_id)+'&init_data='+encodeURIComponent(ATAPP.init));
- if(r.ok){ATAPP.board=r.game;ATAPP.err='';atRender();atAutoLog();}
+ if(r.ok){ATAPP.board=r.game;ATAPP.err='';atAutoLog();
+  let sig=JSON.stringify(ATAPP.board);
+  if(sig===ATAPP.sig)return;
+  ATAPP.sig=sig;atRender();}
  else if(ATAPP.board){ATAPP.err=r.error||'game not found';atRender();}}
 function atAutoLog(){let b=ATAPP.board;if(!b||!b.events)return;b.events.forEach(e=>atLog(e));delete b.events;}
 async function atMove(action,extra){
  let body=Object.assign({chat_id:ATAPP.chat_id,action:action,init_data:ATAPP.init},extra||{});
  let r=await atApi('/api/artichokes/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
  if(r.events)r.events.forEach(e=>atLog(e));
- ATAPP.err=r.error||'';if(r.error)atLog('⛔ '+r.error);
- if(!r.error){ATAPP.sel=[];ATAPP.pass.clear();}
- if(r.game)ATAPP.board=r.game;
- if(ATAPP.board)atRender();}
+  ATAPP.err=r.error||'';if(r.error)atLog('⛔ '+r.error);
+  if(!r.error){ATAPP.sel=[];ATAPP.pass.clear();}
+  if(r.game){ATAPP.board=r.game;delete ATAPP.board.events;ATAPP.sig=JSON.stringify(ATAPP.board);}
+  if(ATAPP.board)atRender();}
+
 function atCard(c,cls,extra){
  let num=AT_SPRITE[c.v];if(num===undefined)num=AT_SPRITE.back;
  let name=atCardName(c.v||'').toUpperCase(),desc=atCardDesc(c);
@@ -136,6 +140,7 @@ function atFlyHarvest(card,from,to){
 function atRender(){
  let b=ATAPP.board;if(!b)return;
  let old=ATAPP.prevBoard,rects=atOldRects(),oldCounts=old&&old.counts||{};
+ let scroll=window.PXSCROLL?window.PXSCROLL.save(['#atBoard .atrowcards','#atHand .athand']):null;
  let turn=document.getElementById('atTurn'),board=document.getElementById('atBoard'),
   actions=document.getElementById('atActions'),hand=document.getElementById('atHand'),
   choice=document.getElementById('atChoice');
@@ -144,7 +149,7 @@ function atRender(){
  else if(b.phase==='game_end')turn.textContent='🏆 '+(winner?escapeHtml(winner.name):'Someone')+' abandoned all artichokes!';
  else if(b.phase==='harvest')turn.textContent='🌱 '+(b.can_act?'Your turn':'Waiting for '+escapeHtml((b.players[b.actor]||{}).name||'player'))+' — harvest one card';
  else if(b.pending)turn.textContent='⚡ '+(b.can_act?'Choose':'Waiting for '+escapeHtml((b.players[b.pending.by]||{}).name||'player'))+' — '+b.pending.prompt;
- else turn.textContent='🎴 '+(b.can_act?'Your turn':'Waiting for '+escapeHtml((b.players[b.actor]||{}).name||'player'))+' — play vegetables, then end turn';
+  else turn.textContent='🎴 '+(b.can_act?'Your turn':'Waiting for '+escapeHtml((b.players[b.actor]||{}).name||'player'))+' — play vegetables (auto-skips when none remain)';
  let h='<div class="table"><div class="small">Round '+b.round+' · 🌳 Stack '+b.garden_stack+' · ♻️ Compost '+b.compost+'</div>'+
   '<div class="atrow"><b>Garden Row</b><div class="atrowcards">';
  b.garden_row.forEach(c=>{
@@ -203,6 +208,7 @@ function atRender(){
    }
   }
   ATAPP.prevBoard=fresh;
+  if(window.PXSCROLL)window.PXSCROLL.restore(scroll);
 }
 (function atEvents(){
  document.addEventListener('click',e=>{

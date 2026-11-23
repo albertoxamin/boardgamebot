@@ -130,7 +130,7 @@ def test_broccoli_and_carrot():
     g, ev = mk()
     idx = g["current_index"]
     g["phase"] = "play"
-    set_hand(g, idx, ["broccoli"] + ["artichoke"] * 3)
+    set_hand(g, idx, ["broccoli", "pepper"] + ["artichoke"] * 3)
     b = g["players"][idx]["hand"][0]["id"]
     assert A.playable(g, idx) == [b]
     assert A.do_play(g, idx, b, ev) is None
@@ -138,7 +138,7 @@ def test_broccoli_and_carrot():
     assert any(c["v"] == "broccoli" for c in g["players"][idx]["discard"])
 
     g["players"][idx]["discard"] = []
-    set_hand(g, idx, ["carrot"] + ["artichoke"] * 2)
+    set_hand(g, idx, ["carrot", "pepper"] + ["artichoke"] * 2)
     carrot = g["players"][idx]["hand"][0]["id"]
     assert A.do_play(g, idx, carrot, ev) is None
     assert g["play_done"] is True
@@ -183,7 +183,8 @@ def test_beet_swap_and_double_compost():
     assert A.apply_choice(g, idx, target, ev) is None
     assert g["pending"] is None
     assert len(g["compost"]) == 2
-    assert g["players"][idx]["hand"] == []
+    assert g["phase"] == "harvest"
+    assert any("auto-skipped" in e for e in ev)
     assert g["players"][target]["hand"] == []
 
 
@@ -299,7 +300,7 @@ def test_potato():
     g, ev = mk()
     idx = g["current_index"]
     g["phase"] = "play"
-    set_hand(g, idx, ["potato"])
+    set_hand(g, idx, ["potato", "pepper"])
     potato = g["players"][idx]["hand"][0]["id"]
     g["players"][idx]["deck"] = [card("artichoke", 701)]
     assert A.do_play(g, idx, potato, ev) is None
@@ -308,7 +309,7 @@ def test_potato():
 
     g["players"][idx]["deck"] = []
     g["players"][idx]["discard"] = [card("beet", 702)]
-    set_hand(g, idx, ["potato"])
+    set_hand(g, idx, ["potato", "pepper"])
     potato2 = g["players"][idx]["hand"][0]["id"]
     assert A.do_play(g, idx, potato2, ev) is None
     assert any(c["id"] == 702 for c in g["players"][idx]["discard"])
@@ -329,6 +330,52 @@ def test_requirements_and_playable():
     g["garden_row"] = [card("peas")]
     g["players"][idx]["discard"] = [card("beet")]
     assert set(A.playable(g, idx)) == {c["id"] for c in g["players"][idx]["hand"] if c["v"] in ("corn", "pepper", "potato", "peas")}
+
+
+def test_auto_skip_after_last_vegetable():
+    g, ev = mk()
+    idx = g["current_index"]
+    nxt = (idx + 1) % len(g["players"])
+    g["phase"] = "play"
+    set_hand(g, idx, ["broccoli"] + ["artichoke"] * 3)
+    broccoli = g["players"][idx]["hand"][0]["id"]
+    assert A.has_vegetables(g, idx) is True
+    assert A.do_play(g, idx, broccoli, ev) is None
+    assert g["phase"] == "harvest"
+    assert g["current_index"] == nxt
+    assert any("auto-skipped" in e for e in ev)
+
+
+def test_auto_skip_waits_for_pending():
+    g, ev = mk()
+    idx = g["current_index"]
+    nxt = (idx + 1) % len(g["players"])
+    g["phase"] = "play"
+    set_hand(g, idx, ["corn", "artichoke"])
+    corn = g["players"][idx]["hand"][0]["id"]
+    assert A.do_play(g, idx, corn, ev) is None
+    assert g["phase"] == "play"
+    assert g["pending"] is not None
+    assert not any("auto-skipped" in e for e in ev)
+    choice = g["pending"]["options"][0]["v"]
+    assert A.apply_choice(g, idx, choice, ev) is None
+    assert g["pending"] is None
+    assert g["phase"] == "harvest"
+    assert g["current_index"] == nxt
+    assert any("auto-skipped" in e for e in ev)
+
+
+def test_no_auto_skip_while_vegetable_remains():
+    g, ev = mk()
+    idx = g["current_index"]
+    g["phase"] = "play"
+    set_hand(g, idx, ["broccoli", "pepper"] + ["artichoke"] * 3)
+    broccoli = g["players"][idx]["hand"][0]["id"]
+    assert A.do_play(g, idx, broccoli, ev) is None
+    assert A.has_vegetables(g, idx) is True
+    assert g["phase"] == "play"
+    assert g["current_index"] == idx
+    assert not any("auto-skipped" in e for e in ev)
 
 
 def test_win_only_at_refill():
@@ -393,7 +440,8 @@ def test_full_random_games():
                             resolve_pending(g, ev)
                         if g["play_done"]:
                             break
-                    assert A.end_turn(g, idx, ev) is None
+                    if g["phase"] == "play" and g["current_index"] == idx:
+                        assert A.end_turn(g, idx, ev) is None
             assert g["phase"] == "game_end", (n, seed, turns)
             assert g["winner_id"] is not None
             json.dumps(g)

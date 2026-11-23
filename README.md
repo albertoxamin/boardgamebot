@@ -238,6 +238,7 @@ routed by `start_param`). Engine: `tornado.py` + `test_tornado.py`.
 Abandon All Artichokes (Gamewright), 2–4 players. Everyone starts with 10
 Artichokes in hand; a turn refills the 5-card Garden Row, harvests one row
 card, plays any number of vegetable powers, then discards and redraws 5.
+The turn auto-skips once the last vegetable is played (pending choices resolve first).
 The Garden Stack holds 6 copies of each of the 10 vegetables; when 4+ of the
 same vegetable appear in the row, that kind is reshuffled into the stack and
 the row is refilled. Vegetables let you swap, draw, force discards, reveal

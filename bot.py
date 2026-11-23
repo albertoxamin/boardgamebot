@@ -33,7 +33,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 23
+WEB_VER = 25
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -3699,7 +3699,7 @@ def castlecombo_api_move(state, chat_id, user_id, body):
 # ============================================================ Abandon All Artichokes
 ARTICHOKES_RULES = """🥬 <b>Abandon All Artichokes rules</b> (2-4 players): a deck-wrecking game. First to draw a hand with <b>no Artichokes</b> at the end of their turn wins.
 • Setup: everyone starts with a 10-Artichoke personal deck and draws 5. The shared Garden Stack has 6 of each of the 10 vegetables; 5 are face-up in the Garden Row.
-• Your turn: <b>1</b> refill the row to 5 (4+ matching cards are reshuffled); <b>2</b> harvest 1 row card into your hand; <b>3</b> play any number of vegetables; <b>4</b> discard your hand; <b>5</b> draw 5. If that new hand has no Artichokes, shout it and win!
+• Your turn: <b>1</b> refill the row to 5 (4+ matching cards are reshuffled); <b>2</b> harvest 1 row card into your hand; <b>3</b> play any number of vegetables (the turn auto-skips when none remain, after any pending choice); <b>4</b> discard your hand; <b>5</b> draw 5. If that new hand has no Artichokes, shout it and win!
 • You can never play an Artichoke unless a card says so. Composted cards are out for good.
 • <b>Beet</b> swap a random card with an opponent (two Artichokes = both composted). <b>Broccoli</b> compost 1 if you have 3+ Artichokes. <b>Carrot</b> compost 2 (your only play that turn). <b>Corn</b> discard an Artichoke, put a row card on your deck. <b>Eggplant</b> compost 1, everyone passes 2 cards left. <b>Leek</b> reveal an opponent's top deck card and take it or discard it. <b>Onion</b> compost 1, send the Onion to someone's discard. <b>Pepper</b> move a card from your discard to your deck. <b>Peas</b> send one of the top 2 stack cards to your discard and one to an opponent. <b>Potato</b> reveal your top card: compost it if it's an Artichoke.
 • <i>Bot adaptation:</i> in private chats the active player's hand is shown on the board so they can act from Telegram; in groups and in the Mini App only your own hand is shown (counts only for others). The Mini App shows each viewer only their own hand."""
@@ -3787,7 +3787,7 @@ def artichokes_board_text(g):
             lines.append("📖 " + " · ".join(
                 f"<b>{html.escape(AT.card_name({'v': v}))}</b>: {html.escape(AT.card_desc({'v': v}))}"
                 for v in seen))
-        lines.append(f"Play: /artichokes_play &lt;card id or name&gt; (playable: {', '.join(map(str, play)) or 'none'}) · /artichokes_end")
+        lines.append(f"Play: /artichokes_play &lt;card id or name&gt; (playable: {', '.join(map(str, play)) or 'none'}) · /artichokes_end (auto-skips when no vegetables remain)")
     return "\n".join(lines)
 
 

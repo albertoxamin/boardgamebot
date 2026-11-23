@@ -269,14 +269,33 @@ def playable(g, idx):
     return [c["id"] for c in g["players"][idx]["hand"] if not _play_error(g, idx, c)]
 
 
+def has_vegetables(g, idx):
+    return any(c["v"] in VEGGIES for c in g["players"][idx]["hand"])
+
+
+def _auto_end_if_no_vegetables(g, idx, events):
+    if (g["phase"] != "play" or idx is None or idx != g["current_index"]
+            or g["pending"] is not None or has_vegetables(g, idx)):
+        return None
+    events.append(f"⏭️ {g['players'][idx]['name']} has no vegetables left - turn auto-skipped.")
+    return end_turn(g, idx, events)
+
+
 def _pending(g, kind, idx, card, options, prompt, **data):
-    pend = {"kind": kind, "by": idx, "card": card,
+    pend = {"kind": kind, "by": idx, "actor": idx, "card": card,
             "options": options, "prompt": prompt}
     pend.update(data)
     g["pending"] = pend
 
 
 def do_play(g, idx, card_id, events):
+    err = _do_play(g, idx, card_id, events)
+    if err:
+        return err
+    return _auto_end_if_no_vegetables(g, idx, events)
+
+
+def _do_play(g, idx, card_id, events):
     err = None
     pos = None
     if g["phase"] != "play" or idx != g["current_index"]:
@@ -317,7 +336,7 @@ def do_play(g, idx, card_id, events):
         _compost(g, _take_artichoke(p))
         _compost(g, card)
         order = list(range(len(g["players"])))
-        g["pending"] = {"kind": "eggplant", "order": order, "pos": 0,
+        g["pending"] = {"kind": "eggplant", "order": order, "pos": 0, "actor": idx,
                         "answers": {}, "prompt": "Eggplant: everyone passes up to two cards to the left."}
         events.append(f"🍆 {p['name']} composted an Artichoke with Eggplant - everyone passes two cards left!")
         _eggplant_next(g, events)
@@ -377,6 +396,15 @@ def _eggplant_next(g, events):
 
 
 def apply_choice(g, idx, choice, events):
+    pend = g["pending"]
+    actor = pend.get("actor", pend.get("by")) if pend else None
+    err = _apply_choice(g, idx, choice, events)
+    if err:
+        return err
+    return _auto_end_if_no_vegetables(g, actor, events)
+
+
+def _apply_choice(g, idx, choice, events):
     pend = g["pending"]
     if pend is None:
         return "nothing to choose"

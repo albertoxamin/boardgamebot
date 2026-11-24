@@ -175,6 +175,16 @@ function tdRender() {
     const zp = (g.zone_pos || [])[p.artist_zone];
     if (zp) html += tdMeeple(zp[0], zp[1] + 3, col, 'artist', p.name + ' Artist @ ' + ((g.zones[p.artist_zone] || {}).name || ''));
   });
+  // FB-0028: the Hot Spring token itself, on the board. It only shows
+  // while a player holds it — if you see it on the board, the other
+  // player does not have it. It sits in the middle of the board with
+  // the holder's colour ring, like the character tokens.
+  if (g.hot_spring !== null && g.hot_spring !== undefined) {
+    const hp = g.players[g.hot_spring];
+    if (hp) html += '<span class="tdhotspring td' + (hp.color === 'purple' ? 'purple' : 'green') +
+      '" style="top:50%;left:50%;" title="♨️ Hot Spring token — held by ' + escapeHtml(hp.name) +
+      ' (the other player does not have it)"></span>';
+  }
   // FB-0010/FB-0011: boutiques and waves ON the board itself, not just
   // in the card underneath it. The face-up Wave tiles sit in a strip
   // across the top of the board (icon + side, full ability in the title).

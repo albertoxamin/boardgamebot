@@ -355,7 +355,7 @@ def test_miniapp_notices_a_new_version():
     assert "New version — reopen the Mini App" in js
     html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
                 encoding="utf-8").read()
-    assert 'src="tokaidoduo.js?v=4"' in html
+    assert 'src="tokaidoduo.js?v=5"' in html
 
 
 def test_character_markers_use_bga_icons_on_boutique_symbols():
@@ -403,6 +403,38 @@ def test_character_markers_use_bga_icons_on_boutique_symbols():
     assert ".tdmeeple.tdpurple{background-color:#7c3aed;box-shadow:0 0 0 2px #7c3aedcc" in html
     assert ".tdmeeple.tdgreen{background-color:#059669;box-shadow:0 0 0 2px #059669cc" in html
     assert "border:4px solid #fff" in html
+
+
+def test_hot_spring_token_shows_on_board():
+    # FB-0028: the Hot Spring token (BGA art from
+    # sources/tokaidoduo/bga/hotspring.jpg) must be visible ON the board
+    # while a player holds it — if it is on the board, the other player
+    # does not have it. It sits in the middle of the board with the
+    # holder's colour ring, like the character tokens, and is hidden
+    # while nobody holds it.
+    from PIL import Image
+    tok = Image.open(os.path.join(os.path.dirname(__file__), "web",
+                                  "tokaidoduo-hotspring.webp"))
+    assert tok.size == (288, 288), tok.size  # tight crop of the round token
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    start = js.index("let html = '<div class=\"tdboard\">'")
+    end = js.index("html += '</div>';", start)
+    board_html = js[start:end]
+    assert "tdhotspring" in board_html and "hot_spring" in board_html, board_html
+    assert "top:50%;left:50%" in board_html
+    assert "g.players[g.hot_spring]" in board_html
+    assert "tdhotspring td'" in board_html  # class built as 'td' + colour
+    assert "'purple' ? 'purple' : 'green'" in board_html
+    # No token while nobody holds it: the span is only added inside
+    # the hot_spring check, and the board JSON already carries the holder.
+    assert "g.hot_spring !== null" in board_html
+    html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
+                encoding="utf-8").read()
+    assert ".tdhotspring{position:absolute;width:40px;height:40px;" in html
+    assert "background:url(tokaidoduo-hotspring.webp) center/cover;" in html
+    assert ".tdhotspring.tdpurple{border-color:#7c3aed" in html
+    assert ".tdhotspring.tdgreen{border-color:#059669" in html
 
 
 def test_pending_move_options_carry_board_positions():

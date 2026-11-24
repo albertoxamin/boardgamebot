@@ -45,6 +45,15 @@ class RegistryTests(unittest.TestCase):
             self.assertTrue(os.path.isfile(os.path.join(web_dir, asset)), asset)
             self.assertEqual(web_assets.resolve("/" + asset), os.path.join(web_dir, asset))
 
+    def test_no_duplicate_element_ids_in_html(self):
+        # FB-0007: Altay reused Artichokes' atBoard/atHand/... ids, so
+        # getElementById wrote the board and hand into the hidden
+        # Artichokes section and the Altay player saw neither.
+        with open(os.path.join(web_assets.WEB_DIR, "flip7.html"), encoding="utf-8") as handle:
+            ids = re.findall(r'id="([^"]+)"', handle.read())
+        dupes = sorted({i for i in ids if ids.count(i) > 1})
+        self.assertEqual(dupes, [])
+
     def test_fellowship_art_map_covers_every_character(self):
         with open(os.path.join(web_assets.WEB_DIR, "fellowship.js"), encoding="utf-8") as handle:
             text = handle.read()

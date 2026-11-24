@@ -1,7 +1,7 @@
 const ATG = {user_id: 0, chat_id: null, board: null, timer: null, init: '', mode: null};
 
 function atLog(s) {
-  const e = document.getElementById('atLog');
+  const e = document.getElementById('ayLog');
   if (e) e.textContent += s + '\n';
 }
 function atApi(path, opts) { return fetch(path, opts).then(r => r.json()); }
@@ -14,7 +14,7 @@ function atChatId(raw) {
 async function atLoad() {
   const tg = tgInit();
   if (!tg.id) {
-    document.getElementById('atTurn').textContent = 'Open as Telegram Mini App via the bot link.';
+    document.getElementById('ayTurn').textContent = 'Open as Telegram Mini App via the bot link.';
     return;
   }
   ATG.user_id = tg.id;
@@ -34,7 +34,7 @@ async function atLoad() {
     if (cr.game) atSelect(cr.game.chat_id);
     else atLog('⛔ ' + (cr.error || 'create failed'));
   } else {
-    document.getElementById('atTurn').textContent = 'No Altay game yet — send /altay in a chat.';
+    document.getElementById('ayTurn').textContent = 'No Altay game yet — send /altay in a chat.';
   }
 }
 async function atSelect(chat_id) {
@@ -111,20 +111,20 @@ function atRegion(region, g) {
 function atRender() {
   const g = ATG.board;
   if (!g) return;
-  const turn = document.getElementById('atTurn');
-  const players = document.getElementById('atPlayers');
-  const board = document.getElementById('atBoard');
-  const hand = document.getElementById('atHand');
-  const actions = document.getElementById('atActions');
-  const market = document.getElementById('atMarket');
-  const achievements = document.getElementById('atAch');
-  const join = document.getElementById('atJoin');
-  const npc = document.getElementById('atNpc');
-  const start = document.getElementById('atStart');
-  const rematch = document.getElementById('atRematch');
+  const turn = document.getElementById('ayTurn');
+  const players = document.getElementById('ayPlayers');
+  const board = document.getElementById('ayBoard');
+  const hand = document.getElementById('ayHand');
+  const actions = document.getElementById('ayActions');
+  const market = document.getElementById('ayMarket');
+  const achievements = document.getElementById('ayAch');
+  const join = document.getElementById('ayJoin');
+  const npc = document.getElementById('ayNpc');
+  const start = document.getElementById('ayStart');
+  const rematch = document.getElementById('ayRematch');
   [join, npc, start, rematch].forEach(el => el.classList.add('hidden'));
   [board, hand, actions, market, achievements].forEach(el => { el.innerHTML = ''; });
-  document.getElementById('atLog').textContent = (g.log || []).join('\n');
+  document.getElementById('ayLog').textContent = (g.log || []).join('\n');
   const names = g.players.map(p => escapeHtml(p.name) + (p.npc ? ' 🤖' : '') +
     ' <b style="color:' + p.color + '">' + p.score + ' VP</b>').join(' · ');
   turn.innerHTML = g.phase === 'lobby' ? '🏜️ Altay lobby — ' + g.players.length + '/2 · ' + names :
@@ -198,8 +198,8 @@ function atRender() {
     atMove('develop', {achievement: el.dataset.ach});
   }));
 }
-document.getElementById('atJoin').addEventListener('click', () => atMove('join'));
-document.getElementById('atNpc').addEventListener('click', () => atMove('npc'));
-document.getElementById('atStart').addEventListener('click', () => atMove('start'));
-document.getElementById('atRematch').addEventListener('click', () => atMove('rematch'));
+document.getElementById('ayJoin').addEventListener('click', () => atMove('join'));
+document.getElementById('ayNpc').addEventListener('click', () => atMove('npc'));
+document.getElementById('ayStart').addEventListener('click', () => atMove('start'));
+document.getElementById('ayRematch').addEventListener('click', () => atMove('rematch'));
 atLoad();

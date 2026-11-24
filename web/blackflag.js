@@ -62,15 +62,19 @@ async function bfMove(action, extra) {
 function bfCard(card, clickable, attrs) {
   const sprite = card.sprite || [9, 9];
   const cls = 'bfcard' + (clickable ? ' bfclick' : '');
-  return '<div class="' + cls + '" style="background-position:' + (sprite[0] * 100 / 5) + '% ' +
-    (sprite[1] * 100 / 8) + '%" title="' + escapeHtml(card.name + ' — ' + (card.text || '')) + '" ' +
+  // Card sheet is a 10x16 grid (background-size 1000% 1600%); cards use
+  // the top-left 5x8 block. A % position aligns that point of the sheet
+  // with the div, so steps are /(cols-1) and /(rows-1).
+  return '<div class="' + cls + '" style="background-position:' + (sprite[0] * 100 / 9) + '% ' +
+    (sprite[1] * 100 / 15) + '%" title="' + escapeHtml(card.name + ' — ' + (card.text || '')) + '" ' +
     (attrs || '') + '></div>';
 }
 function bfShip(ship, clickable, attrs) {
   const sprite = ship.sprite || [9, 9];
   const cls = 'bfship' + (clickable ? ' bfclick' : '');
-  return '<div class="' + cls + '" style="background-position:' + (sprite[0] * 100 / 4) + '% ' +
-    (sprite[1] * 100 / 4) + '%" title="' + escapeHtml(ship.name + ' Range ' + ship.range +
+  // Ship sheet is 4 cols x 4 rows (background-size 400% 400%).
+  return '<div class="' + cls + '" style="background-position:' + (sprite[0] * 100 / 3) + '% ' +
+    (sprite[1] * 100 / 3) + '%" title="' + escapeHtml(ship.name + ' Range ' + ship.range +
       ' · Cannons ' + ship.ammo + ' · Barrels ' + ship.barrels) + '" ' + (attrs || '') + '></div>';
 }
 function bfRender() {

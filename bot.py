@@ -38,7 +38,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 48
+WEB_VER = 49
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -4778,6 +4778,11 @@ def tokaidoduo_keyboard(g):
             for opt in TD.pending_options(g, pend["by"]):
                 kb.append([{"text": opt["label"][:60],
                             "callback_data": f"td:c:{opt['value']}"}])
+            # FB-0030: while the meeple has not moved yet, the player
+            # can cancel the die pick and choose another die instead.
+            if pend["kind"] in TD.CANCELLABLE_PENDING:
+                kb.append([{"text": "↩️ Cancel move",
+                            "callback_data": "td:cancel"}])
         elif g["phase"] == "play":
             for ch in TD.available_dice(g):
                 kb.append([{"text": f"{TD.CHAR_EMOJI[ch]} {ch.title()} ({g['dice'][ch]})",
@@ -4945,6 +4950,7 @@ def tokaidoduo_board_json(g, viewer_id=None):
         "zone_pos": TD.ZONE_POS,
         "town_pos": TD.TOWN_POS,
         "package_pos": TD.PACKAGE_POS,
+        "wave_pos": TD.WAVE_POS,
         "town_adj": {k: v for k, v in TD.TOWN_ADJ.items()},
         "mountain_draw": TD.MOUNTAIN_DRAW,
         "gold_points": TD.GOLD_POINTS, "culture_points": TD.CULTURE_POINTS,
@@ -4991,6 +4997,8 @@ def tokaidoduo_api_move(state, chat_id, user_id, body):
             return [], "not in this game"
         if action == "pick":
             err = TD.pick_die(g, actor, str(body.get("char", "")), ev)
+        elif action == "cancel":
+            err = TD.cancel_pick(g, actor, ev)
         elif action == "choose":
             err = TD.choose(g, actor, str(body.get("value", "skip")), ev)
         else:
@@ -6269,6 +6277,8 @@ def handle_callback(state, cb):
             return answer_cb(cb["id"], "Not your turn.")
         if action == "pick":
             err = TD.pick_die(g, idx, parts[2] if len(parts) > 2 else "", ev)
+        elif action == "cancel":
+            err = TD.cancel_pick(g, idx, ev)
         elif action == "c":
             err = TD.choose(g, idx, ":".join(parts[2:]), ev)
         else:

@@ -130,6 +130,22 @@ TOWN_POS = {"m_w": (50, 68), "m_cl": (50, 53), "m_c": (55, 40), "m_e": (48, 27),
 # not offset towards the board centre.
 PACKAGE_POS = {"c_0": (88, 15), "c_4": (91, 33), "c_9": (90, 63), "c_13": (81, 95),
                "c_18": (19, 91), "c_23": (9, 60), "c_27": (9, 47), "c_31": (9, 11)}
+# Centres of the three dashed Wave-tile slots at the top of the board
+# (measured off tokaidoduo-board.webp, % of the portrait board):
+# left to right = pilgrim, merchant, artist. FB-0029: the face-up
+# Wave tile for each character sits in its slot as the real token
+# art from sources/tokaidoduo/bga/spriteVagues.jpg.
+WAVE_POS = {"pilgrim": (40.4, 8.0), "merchant": (49.9, 8.0), "artist": (59.4, 8.0)}
+# Index of each Wave side in the tokaidoduo-waves.webp sprite strip
+# (spriteVagues.jpg, left to right): pilgrim hasty/tranquil,
+# merchant crafty/robust, artist proficient/inspired.
+WAVE_SPRITE = {"pilgrim": {"hasty": 0, "tranquil": 1},
+               "merchant": {"crafty": 2, "robust": 3},
+               "artist": {"proficient": 4, "inspired": 5}}
+# Pending kinds where the meeple has NOT moved yet, so the die pick
+# can still be cancelled (FB-0030). Later pendings (wave_take, sell,
+# keep_wares, artist_action, hotspring) come after the move: committed.
+CANCELLABLE_PENDING = ("pilgrim_wave", "merchant_dest", "artist_dest")
 
 # Starting positions: opposite sides. Pilgrim starts are the two
 # Temple stations marked with a parasol, Merchant starts the two
@@ -334,6 +350,7 @@ def _advance_pick(g, events, rng=None):
     g["pick_value"] = 0
     g["pick_path"] = []
     g["pending"] = None
+    g["pick_repeat"] = False
     g["pick_index"] += 1
     if g["pick_index"] < 3:
         nxt = pick_order(g)[g["pick_index"]]
@@ -484,6 +501,35 @@ def pick_die(g, pid, char, events, rng=None):
     events.append(f"🎲 {name_of(g, pid)} takes the {CHAR_EMOJI[char]} die "
                   f"({g['dice'][char]}) - move the {char}.")
     return _begin_move(g, pid, events, rng)
+
+
+def cancel_pick(g, pid, events):
+    """Undo a die pick while the move is still uncommitted (FB-0030):
+    a destination choice is pending, so the meeple has not moved yet.
+    The die goes back in the pool and the same player picks again.
+    After the move the pick is committed and cannot be cancelled.
+    A Hot Spring repeat cancelled this way gives the token back."""
+    if g["phase"] != "play":
+        return "Game is not in progress."
+    pend = g.get("pending")
+    if not pend or pend["by"] != pid:
+        return "Nothing to cancel."
+    if pend["kind"] not in CANCELLABLE_PENDING:
+        return "The move is already done - it cannot be cancelled."
+    char = g.get("pick_char")
+    if char in g["dice_taken"]:
+        g["dice_taken"].remove(char)
+    if g.get("pick_repeat") and g.get("hot_spring") is None:
+        g["hot_spring"] = pid
+        g["hot_spring_gained"] = (g["round"], g["pick_index"])
+    g["pick_repeat"] = False
+    g["pick_char"] = None
+    g["pick_value"] = 0
+    g["pick_path"] = []
+    g["pending"] = None
+    events.append(f"↩️ {name_of(g, pid)} cancels the {CHAR_EMOJI.get(char, '')}{char} "
+                  f"pick - the die is back in the pool.")
+    return None
 
 
 def _begin_move(g, pid, events, rng=None):
@@ -847,6 +893,7 @@ def choose(g, pid, value, events, rng=None):
         # repeat the same character move with the same die value
         g["hot_spring"] = None
         g["repeating"] = True
+        g["pick_repeat"] = True
         events.append(f"♨️ {name_of(g, pid)} uses the Hot Spring token to repeat "
                       f"the {g['pick_char']} move ({g['pick_value']})!")
         err = _begin_move(g, pid, events, rng)

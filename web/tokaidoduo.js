@@ -102,6 +102,14 @@ function tdPaintTile(t, idx) {
   const em = (TDG.board.zone_icon_emoji || {})[t.icon] || t.icon;
   return '<span class="tdpaint" title="' + escapeHtml(t.icon) + '">' + em + '</span>';
 }
+// Index of each Wave side in the tokaidoduo-waves.webp sprite strip
+// (spriteVagues.jpg, left to right): pilgrim hasty/tranquil, merchant
+// crafty/robust, artist proficient/inspired.
+const TD_WAVE_IDX = {pilgrim: {hasty: 0, tranquil: 1}, merchant: {crafty: 2, robust: 3},
+  artist: {proficient: 4, inspired: 5}};
+// Pending kinds where the meeple has not moved yet, so the die pick
+// can still be cancelled (FB-0030).
+const TD_CANCELLABLE = ['pilgrim_wave', 'merchant_dest', 'artist_dest'];
 // Coastal town locations on the portrait board, so the boutique list
 // is readable without memorising town codes.
 const TD_TOWN_WHERE = {c_0: 'top right', c_4: 'right', c_9: 'lower right',
@@ -185,15 +193,21 @@ function tdRender() {
       '" style="top:50%;left:50%;" title="♨️ Hot Spring token — held by ' + escapeHtml(hp.name) +
       ' (the other player does not have it)"></span>';
   }
-  // FB-0010/FB-0011: boutiques and waves ON the board itself, not just
-  // in the card underneath it. The face-up Wave tiles sit in a strip
-  // across the top of the board (icon + side, full ability in the title).
+  // FB-0029: the face-up Wave tiles as real tokens on the board, in
+  // the three dashed slots at the top (one per character, wave_pos),
+  // using the BGA art from spriteVagues.jpg (tokaidoduo-waves.webp).
+  // A tile leaves its slot when a player takes it. The full ability
+  // text stays in the card under the board (and in the title tooltip).
+  (g.waves_board || []).forEach(w => {
+    const pos = (g.wave_pos || {})[w.char];
+    const idx = (TD_WAVE_IDX[w.char] || {})[w.side];
+    if (!pos || idx === undefined) return;
+    html += '<span class="tdwavetok tdwave' + idx + '" style="top:' + pos[1].toFixed(1) +
+      '%;left:' + pos[0].toFixed(1) + '%;" title="' +
+      escapeHtml(w.char + ': ' + tdWaveText(g, w.char, w.side)) + '"></span>';
+  });
   // FB-0014: each boutique pill sits exactly over its town's wrapped
   // package symbol at the board edge (package_pos), not offset inwards.
-  html += '<div class="tdwaves">' + (g.waves_board || []).map(w =>
-    '<span class="tdwave" title="' + escapeHtml(tdWaveText(g, w.char, w.side)) + '">' +
-    (g.char_emoji[w.char] || '') + ' ' + w.side.charAt(0).toUpperCase() + w.side.slice(1) +
-    '</span>').join('') + '</div>';
   Object.entries(g.boutiques || {}).forEach(([t, b]) => {
     const pp = (g.package_pos || {})[t] || (g.town_pos || {})[t];
     if (!pp) return;
@@ -276,6 +290,16 @@ function tdRender() {
       b.addEventListener('click', () => tdMove('choose', {value: o.value}));
       actions.appendChild(b);
     });
+    // FB-0030: while the meeple has not moved yet, offer to cancel the
+    // die pick — the die goes back in the pool and the player picks again.
+    if (g.can_act && TD_CANCELLABLE.includes(g.pending.kind)) {
+      const c = document.createElement('button');
+      c.type = 'button';
+      c.className = 'stay';
+      c.textContent = '↩️ Cancel move';
+      c.addEventListener('click', () => tdMove('cancel', {}));
+      actions.appendChild(c);
+    }
   } else if (g.can_act) {
     (g.legal.dice || []).forEach(ch => {
       const b = document.createElement('button');

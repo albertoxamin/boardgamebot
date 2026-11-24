@@ -462,6 +462,121 @@ def test_pending_move_options_carry_board_positions():
     assert "tdtap" in js[start:end] and "data-tap" in js[start:end]
 
 
+def test_wave_tokens_show_on_board_slots():
+    # FB-0029: the face-up Wave tiles must sit ON the board as real
+    # tokens (BGA art from sources/tokaidoduo/bga/spriteVagues.jpg),
+    # one per character in the three dashed slots at the top of the
+    # board — not as a text strip. A tile leaves its slot once taken.
+    from PIL import Image
+    waves = Image.open(os.path.join(os.path.dirname(__file__), "web",
+                                    "tokaidoduo-waves.webp"))
+    assert waves.size == (1464, 328), waves.size  # 6 tiles of 244x328
+    assert set(TD.WAVE_POS) == {"pilgrim", "merchant", "artist"}
+    xs = [TD.WAVE_POS[ch][0] for ch in ("pilgrim", "merchant", "artist")]
+    assert xs == sorted(xs)  # slots left to right, one per character
+    for ch, (x, y) in TD.WAVE_POS.items():
+        assert 0 <= x <= 100 and 0 <= y <= 100, (ch, x, y)
+    # every Wave side maps to exactly one sprite tile, 0..5
+    assert set(TD.WAVE_SPRITE) == {"pilgrim", "merchant", "artist"}
+    idxs = [i for sides in TD.WAVE_SPRITE.values() for i in sides.values()]
+    assert sorted(idxs) == list(range(6))
+    for ch, sides in TD.WAVES.items():
+        assert {name for name, _ in sides} == set(TD.WAVE_SPRITE[ch])
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    start = js.index("let html = '<div class=\"tdboard\">'")
+    end = js.index("html += '</div>';", start)
+    board_html = js[start:end]
+    assert "tdwavetok" in board_html and "waves_board" in board_html
+    assert "wave_pos" in board_html and "TD_WAVE_IDX" in board_html
+    assert '<div class="tdwaves">' not in js  # text strip replaced
+    html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
+                encoding="utf-8").read()
+    assert ".tdwavetok{position:absolute;width:36px;height:48px;" in html
+    assert "background-image:url(tokaidoduo-waves.webp);background-size:600% 100%;" in html
+    assert ".tdwave0{background-position:0% 0}" in html
+    assert ".tdwave5{background-position:100% 0}" in html
+    # a taken Wave leaves the board: no tile of that character remains
+    g = mk()
+    assert len(g["waves_board"]) == 3
+    g["waves_board"] = [w for w in g["waves_board"] if w["char"] != "pilgrim"]
+    assert all(w["char"] != "pilgrim" for w in g["waves_board"])
+
+
+def test_cancel_pick_returns_die_to_pool():
+    # FB-0030: after choosing a die, while the move is still a pending
+    # destination choice (meeple not moved yet), the player can cancel
+    # the pick — the die goes back in the pool and they pick again.
+    g = mk()
+    _set_dice(g, {"pilgrim": 1, "merchant": 2, "artist": 2})
+    _pick(g, 0, "merchant")
+    assert g["pending"] and g["pending"]["kind"] == "merchant_dest"
+    assert g["dice_taken"] == ["merchant"]
+    ev = []
+    assert TD.cancel_pick(g, 0, ev) is None
+    assert g["pending"] is None
+    assert g["dice_taken"] == []
+    assert g["pick_char"] is None and g["pick_value"] == 0
+    assert g["pick_index"] == 0
+    assert "merchant" in TD.available_dice(g)
+    assert "back in the pool" in ev[-1]
+    # re-picking the same die works and reaches the same choice
+    _pick(g, 0, "merchant")
+    assert g["pending"] and g["pending"]["kind"] == "merchant_dest"
+
+
+def test_cancel_pick_rejected_once_move_is_done():
+    # FB-0030: once the move has executed (single-option pick moves at
+    # once, no pending choice), the pick is committed — no cancelling.
+    g = mk()
+    _set_dice(g, {"pilgrim": 1, "merchant": 2, "artist": 2})
+    _pick(g, 0, "pilgrim")
+    assert not g["pending"]
+    assert g["pick_index"] == 1
+    ev = []
+    err = TD.cancel_pick(g, 0, ev)
+    assert err and "Nothing to cancel" in err
+    assert g["dice_taken"] == ["pilgrim"]
+    assert g["pick_index"] == 1
+    # a pending choice that comes AFTER the move (here: taking a Wave
+    # on the seashore) is committed too — cancelling must not undo it.
+    g2 = mk()
+    g2["players"][0]["pilgrim_pos"] = 5  # move 1 -> station 6 seashore
+    _set_dice(g2, {"pilgrim": 1, "merchant": 2, "artist": 2})
+    _pick(g2, 0, "pilgrim")
+    assert g2["pending"] and g2["pending"]["kind"] == "wave_take"
+    err = TD.cancel_pick(g2, 0, [])
+    assert err and "already done" in err
+    assert g2["pending"] and g2["pending"]["kind"] == "wave_take"
+    assert g2["dice_taken"] == ["pilgrim"]
+
+
+def test_cancel_pick_restores_hot_spring_token():
+    # FB-0030: cancelling a Hot Spring repeat gives the token back —
+    # the player must not lose it for changing their mind mid-repeat.
+    g = mk()
+    p = g["players"][0]
+    g["hot_spring"] = 0
+    g["hot_spring_gained"] = (1, 99)  # gained on an earlier pick
+    _set_dice(g, {"pilgrim": 1, "merchant": 2, "artist": 2})
+    _pick(g, 0, "merchant")  # c_0 -> m_c (mountain draw), then offer
+    assert g["pending"] and g["pending"]["kind"] == "merchant_dest"
+    ev = []
+    assert TD.choose(g, 0, "dest:m_c", ev) is None
+    assert g["pending"] and g["pending"]["kind"] == "hotspring"
+    assert TD.choose(g, 0, "use", ev) is None
+    assert g["hot_spring"] is None
+    assert g["pending"] and g["pending"]["kind"] == "merchant_dest"
+    assert TD.cancel_pick(g, 0, ev) is None
+    assert g["hot_spring"] == 0  # token back
+    assert g["dice_taken"] == []
+    assert g["pending"] is None
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    assert "↩️ Cancel move" in js and "tdMove('cancel'" in js
+    assert "TD_CANCELLABLE" in js
+
+
 def test_board_lines_show_boutiques_and_wave_abilities():
     g = mk()
     lines = TD.board_lines(g)

@@ -1,8 +1,20 @@
-const ATG = {user_id: 0, chat_id: null, board: null, timer: null, init: '', mode: null};
+const ATG = {user_id: 0, chat_id: null, board: null, timer: null, init: '', mode: null, msgs: []};
 
-function atLog(s) {
+function atRenderLog() {
   const e = document.getElementById('ayLog');
-  if (e) e.textContent += s + '\n';
+  if (!e) return;
+  const server = ((ATG.board && ATG.board.log) || []).join('\n');
+  const mine = ATG.msgs.join('\n');
+  e.textContent = server + (server && mine ? '\n' : '') + mine;
+}
+function atLog(s) {
+  // FB-0022: client-side messages must survive the 3s refresh — atRender
+  // used to overwrite ayLog with the server log, wiping every error
+  // (e.g. "You cannot afford that card.") within seconds, so the four
+  // action buttons looked dead. Keep them in ATG.msgs and re-render.
+  ATG.msgs.push(s);
+  if (ATG.msgs.length > 8) ATG.msgs.shift();
+  atRenderLog();
 }
 function atApi(path, opts) { return fetch(path, opts).then(r => r.json()); }
 function atChatId(raw) {
@@ -82,7 +94,10 @@ function atCard(card, clickable, attrs) {
 function atCardCell(card, clickable, attrs, who) {
   const cap = (who ? escapeHtml(who) + ' · ' : '') + '<b>' + escapeHtml(card.name) +
     '</b><br>' + escapeHtml(card.text || '');
-  return '<div class="atcardwrap">' + atCard(card, clickable, attrs) +
+  // FB-0022: the tap target is the whole card incl. its caption — the
+  // data-* attribute used to sit on the card image only, so tapping the
+  // name/effect text under it did nothing.
+  return '<div class="atcardwrap" ' + (attrs || '') + '>' + atCard(card, clickable) +
     '<div class="atcap">' + cap + '</div></div>';
 }
 function atAch(ach, index) {
@@ -98,9 +113,11 @@ function atAch(ach, index) {
   // on the card itself (same pattern as atCardCell, FB-0013/FB-0016).
   const cap = '<b>' + escapeHtml(ach.name) + '</b><br>' +
     escapeHtml(cost + ' · ' + ach.vp + ' VP') + '<br>' + escapeHtml(ach.text);
-  return '<div class="atachwrap"><div class="' + cls + '" style="background-position:' + x + '% ' + y +
+  // FB-0022: data-ach on the whole tile incl. its caption, like the
+  // market/hand cards — tapping the description text must work too.
+  return '<div class="atachwrap" data-ach="' + escapeHtml(ach.id) + '"><div class="' + cls + '" style="background-position:' + x + '% ' + y +
     '%" title="' + escapeHtml(ach.name + ' (' + cost + ', ' + ach.vp + ' VP) — ' + ach.text) +
-    '" data-ach="' + escapeHtml(ach.id) + '"></div>' +
+    '"></div>' +
     '<div class="atcap">' + cap + '</div></div>';
 }
 function atRegion(region, g) {
@@ -123,6 +140,26 @@ function atRegion(region, g) {
   }
   return html + '</div>';
 }
+// FB-0022: why Build/Attack cannot be used right now — the player
+// starts every turn with 0 resources, 0 builds and 0 swords (end_turn
+// discards them), so these actions only become possible after playing
+// hand cards. The Mini App used to stay silent, which read as "the
+// buttons do not work".
+function atWhy(mode) {
+  const g = ATG.board;
+  const me = (g && g.players[g.me]) || {};
+  const res = me.resources || {};
+  if (mode === 'build') {
+    if (!(me.builds > 0)) return '🏠 Build needs a build first — play a card like Village from your hand.';
+    if ((res.food || 0) < 2) return '🏠 Build costs 2 food — play a card that produces food first.';
+    return '🏠 Build: no territory you can build on right now.';
+  }
+  if (mode === 'attack') {
+    if (!(me.swords > 0)) return '⚔️ Attack needs a sword first — play a card like Warrior from your hand.';
+    return '⚔️ Attack: no territory in reach right now.';
+  }
+  return '';
+}
 function atRender() {
   const g = ATG.board;
   if (!g) return;
@@ -140,7 +177,7 @@ function atRender() {
   const rematch = document.getElementById('ayRematch');
   [join, npc, start, rematch].forEach(el => el.classList.add('hidden'));
   [board, inv, hand, actions, market, achievements].forEach(el => { el.innerHTML = ''; });
-  document.getElementById('ayLog').textContent = (g.log || []).join('\n');
+  atRenderLog();
   const names = g.players.map(p => escapeHtml(p.name) + (p.npc ? ' 🤖' : '') +
     ' <b style="color:' + p.color + '">' + p.score + ' VP</b>').join(' · ');
   turn.innerHTML = g.phase === 'lobby' ? '🏜️ Altay lobby — ' + g.players.length + '/2 · ' + names :
@@ -170,6 +207,10 @@ function atRender() {
       atMove('build', {region: region});
     } else if (ATG.mode === 'attack' && (g.legal.attack || []).some(o => o.region === region)) {
       atMove('attack', {region: region});
+    } else if (ATG.mode === 'build' || ATG.mode === 'attack') {
+      // FB-0022: tapping a territory that is not a legal target used to
+      // do nothing at all — say why instead of looking broken.
+      atLog(atWhy(ATG.mode));
     }
   }));
   const me = g.players[g.me] || {hand: []};
@@ -203,7 +244,15 @@ function atRender() {
     b.className = 'atbtn';
     b.textContent = label;
     b.disabled = !g.can_act;
-    b.addEventListener('click', () => { ATG.mode = ATG.mode === mode ? null : mode; atRender(); });
+    b.addEventListener('click', () => {
+      // FB-0022: tapping Build/Attack with nothing available used to do
+      // nothing at all — explain what is missing instead.
+      if (ATG.mode !== mode) {
+        const legal = mode === 'build' ? (g.legal.build || []) : (g.legal.attack || []);
+        if (!legal.length) { atLog(atWhy(mode)); return; }
+      }
+      ATG.mode = ATG.mode === mode ? null : mode; atRender();
+    });
     return b;
   };
   actions.appendChild(mkBtn('🏠 Build', 'build'));
@@ -215,6 +264,19 @@ function atRender() {
   end.disabled = !g.can_act;
   end.addEventListener('click', () => atMove('end'));
   actions.appendChild(end);
+  // FB-0022: Buy, Build, Attack and Develop all need what hand cards
+  // give you — resources, builds, swords — and end_turn discards all
+  // of them, so at the start of every turn the four buttons look dead
+  // unless you play cards first. Say so right next to the buttons.
+  if (g.can_act) {
+    const res = Object.values(me.resources || {}).reduce((a, n) => a + n, 0);
+    const hint = document.createElement('div');
+    hint.className = 'athint';
+    hint.textContent = (me.builds > 0 || me.swords > 0 || res > 0)
+      ? '💡 Builds ' + (me.builds || 0) + ' · Swords ' + (me.swords || 0) + ' · Resources ' + res + ' — tap Buy, Build, Attack or Develop to use them.'
+      : '💡 No resources, builds or swords yet — play cards from your hand first, then Buy, Build, Attack and Develop work.';
+    actions.appendChild(hint);
+  }
   market.innerHTML = '<div class="atlabel">Market — buy once per turn</div>' + (g.market || []).map(c => {
     const affordable = Object.entries(c.cost || {}).every(([k, n]) => (me.resources[k] || 0) >= n);
     const bought = (me.bought || []).includes(c.id);

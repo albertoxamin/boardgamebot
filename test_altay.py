@@ -221,5 +221,37 @@ class AltayEngineTests(unittest.TestCase):
         self.assertIn(".atmarkerchip{position:absolute;transform:translate(-50%,-50%);width:42px;height:28px;", html)
 
 
+    def test_action_buttons_explain_why_they_cannot_be_used(self):
+        """FB-0022: 'on altay, the buttons buy, build, attack and develop
+        do not work' — the engine was fine: every turn starts with 0
+        resources, 0 builds and 0 swords (end_turn discards them), so
+        all four actions are correctly impossible until hand cards are
+        played. The Mini App gave no feedback: Build/Attack taps were
+        silently ignored, and server errors were written to the log only
+        to be wiped by the 3s refresh. The Mini App must now explain
+        what is missing, keep its messages across refreshes, show a
+        hint next to the buttons, and let the whole card (incl. its
+        caption) be tapped."""
+        base = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(base, "web", "altay.js"), encoding="utf-8") as f:
+            js = f.read()
+        # Client messages survive the 3s refresh instead of being wiped.
+        self.assertIn("ATG.msgs", js)
+        self.assertIn("atRenderLog()", js)
+        # Tapping Build/Attack (or a territory) with nothing available
+        # explains what is missing instead of doing nothing.
+        self.assertIn("atWhy(mode)", js)
+        self.assertIn("play a card like Village", js)
+        self.assertIn("play a card like Warrior", js)
+        # Hint next to the buttons about playing hand cards first.
+        self.assertIn("play cards from your hand first", js)
+        # Tap target is the whole card incl. its caption.
+        self.assertIn('<div class="atcardwrap" \' + (attrs || \'\') + \'>', js)
+        self.assertIn('<div class="atachwrap" data-ach="', js)
+        with open(os.path.join(base, "web", "flip7.html"), encoding="utf-8") as f:
+            html = f.read()
+        self.assertIn(".athint{width:100%;font-size:12px;color:#94a3b8}", html)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

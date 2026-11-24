@@ -155,6 +155,20 @@ function tdRender() {
       '%;" title="Boutique ' + t + ': ' + b.ware + ' · ' + b.price + ' coins">' +
       (g.ware_emoji[b.ware] || '') + ' ' + b.price + '🪙</span>';
   });
+  // FB-0015: tap the board to move — when a move choice is pending,
+  // highlight every legal destination on the board (station, town or
+  // zone) so the player can tap it instead of hunting for the button.
+  if (g.pending && g.can_act) {
+    (g.options || []).forEach(o => {
+      let pos = null;
+      if (g.pending.kind === 'pilgrim_wave' && o.station !== undefined && o.station !== null) pos = tdStationPos(o.station);
+      else if (g.pending.kind === 'merchant_dest' && String(o.value).indexOf('dest:') === 0) pos = (g.town_pos || {})[String(o.value).slice(5)];
+      else if (g.pending.kind === 'artist_dest' && String(o.value).indexOf('dest:') === 0) pos = (g.zone_pos || [])[Number(String(o.value).slice(5))];
+      if (!pos) return;
+      html += '<span class="tdtap" style="top:' + pos[1].toFixed(1) + '%;left:' + pos[0].toFixed(1) +
+        '%;" data-tap="' + escapeHtml(o.value) + '" title="' + escapeHtml(o.label) + '"></span>';
+    });
+  }
   html += '</div>';
   // boutiques + waves on board, right under the board (not buried below
   // the seats): what each town buys, where it is, whose Merchant is there,
@@ -196,9 +210,18 @@ function tdRender() {
   });
   html += '</div>';
   board.innerHTML = html;
+  board.querySelectorAll('[data-tap]').forEach(el => el.addEventListener('click', () => {
+    tdMove('choose', {value: el.dataset.tap});
+  }));
   // actions
   if (g.phase === 'game_end') return;
   if (g.pending) {
+    if (g.can_act && board.querySelector('[data-tap]')) {
+      const hint = document.createElement('div');
+      hint.className = 'small';
+      hint.textContent = '👆 Tap a glowing spot on the board — or use a button below.';
+      actions.appendChild(hint);
+    }
     (g.options || []).forEach(o => {
       const b = document.createElement('button');
       b.type = 'button';

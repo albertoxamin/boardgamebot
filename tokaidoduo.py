@@ -721,7 +721,10 @@ def pending_options(g, pid):
     kind = pend["kind"]
     if kind == "pilgrim_wave":
         v = g["pick_value"]
-        opts = [{"value": f"dist:{d}", "label": f"Move {d} station(s)"}
+        # FB-0015: each distance also carries its landing station, so the
+        # Mini App can highlight it on the board and let the player tap it.
+        opts = [{"value": f"dist:{d}", "label": f"Move {d} station(s)",
+                 "station": pilgrim_destinations(g, pid, d)}
                 for d in pend["options"]]
         return opts
     if kind == "merchant_dest":

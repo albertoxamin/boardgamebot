@@ -358,6 +358,8 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .tdmeeple{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:#fff;border:2px solid #fff;box-shadow:0 1px 4px #000a;z-index:3}
 .tdmeeple.tdpurple{background:#7c3aed}.tdmeeple.tdgreen{background:#059669}
 .tdbout{position:absolute;transform:translate(-50%,-50%);background:#fefce8;color:#1c1917;border:1px solid #a16207;border-radius:999px;font-size:11px;font-weight:900;padding:1px 5px;white-space:nowrap;z-index:2;box-shadow:0 1px 3px #000a}
+.tdtap{position:absolute;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;border:3px solid #22c55e;background:#22c55e2e;z-index:4;cursor:pointer;animation:tdpulse 1.2s ease-in-out infinite}
+@keyframes tdpulse{0%,100%{box-shadow:0 0 0 0 #22c55e88}50%{box-shadow:0 0 0 7px #22c55e00}}
 .tdwaves{position:absolute;top:6px;left:50%;transform:translateX(-50%);display:flex;gap:4px;z-index:2}
 .tdwave{background:#0f172ad9;color:#fff;border:1px solid #38bdf8;border-radius:999px;font-size:11px;font-weight:800;padding:1px 6px;white-space:nowrap}
 .tdlobby{min-height:120px;background:linear-gradient(#0f172ae8,#0f172ae8),url(tokaidoduo-board.webp?v=1) center/cover;border:1px solid #475569;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;text-align:center;padding:12px}
@@ -679,7 +681,7 @@ window.PXSCROLL={
 <script data-cfasync="false" src="fellowship.js?v=6"></script>
 <script data-cfasync="false" src="azul.js?v=3"></script>
 <script data-cfasync="false" src="toybattle.js?v=1"></script>
-<script data-cfasync="false" src="tokaidoduo.js?v=2"></script>
+<script data-cfasync="false" src="tokaidoduo.js?v=3"></script>
 <script data-cfasync="false" src="altay.js?v=3"></script>
 <script data-cfasync="false" src="blackflag.js?v=2"></script>
 </body></html>

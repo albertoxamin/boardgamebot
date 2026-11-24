@@ -339,6 +339,31 @@ def test_boutique_pills_sit_over_package_symbols():
         assert math.hypot(px - 50, py - 50) > math.hypot(tx - 50, ty - 50), town
 
 
+def test_pending_move_options_carry_board_positions():
+    # FB-0015: tap the board to move — every move option must map to a
+    # spot on the board: pilgrim options carry their landing station,
+    # merchant/artist options name a town/zone with a known position.
+    g = mk()
+    g["pending"] = {"kind": "pilgrim_wave", "by": 0, "options": [2, 3]}
+    opts = TD.pending_options(g, 0)
+    assert len(opts) == 2
+    for o in opts:
+        d = int(o["value"][5:])
+        assert o["station"] == TD.pilgrim_destinations(g, 0, d)
+        assert 0 <= o["station"] < len(TD.STATIONS)
+    g["pending"] = {"kind": "merchant_dest", "by": 0, "options": ["c_0", "c_4"]}
+    for o in TD.pending_options(g, 0):
+        assert o["value"][5:] in TD.TOWN_POS
+    g["pending"] = {"kind": "artist_dest", "by": 0, "options": [1, 3]}
+    for o in TD.pending_options(g, 0):
+        assert 0 <= int(o["value"][5:]) < len(TD.ZONE_POS)
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    start = js.index("let html = '<div class=\"tdboard\">'")
+    end = js.index("html += '</div>';", start)
+    assert "tdtap" in js[start:end] and "data-tap" in js[start:end]
+
+
 def test_board_lines_show_boutiques_and_wave_abilities():
     g = mk()
     lines = TD.board_lines(g)

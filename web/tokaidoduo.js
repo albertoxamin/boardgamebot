@@ -157,6 +157,21 @@ function tdSeatBoard(g, p, col) {
 // Index of each Wave side in the tokaidoduo-waves.webp sprite strip
 // (spriteVagues.jpg, left to right): pilgrim hasty/tranquil, merchant
 // crafty/robust, artist proficient/inspired.
+// FB-0044: the commerce tokens are the real BGA art from
+// spriteJetonCommerce.jpg (tokaidoduo-commerce.webp): 6 panels, one
+// per boutique offer, left to right — pottery 4, pottery 3, fan 3,
+// fan 2, doll 3, kimono 4 — replacing the ware emoji wherever a Ware
+// appears. A held Ware has no price, so it uses its ware's first
+// panel (the coins on it are decorative there).
+const TD_WARE_TOKEN = {pottery: {4: 0, 3: 1}, fan: {3: 2, 2: 3}, doll: {3: 4}, kimono: {4: 5}};
+const TD_WARE_FIRST = {pottery: 0, fan: 2, doll: 4, kimono: 5};
+function tdWare(ware, price) {
+  const idx = price === undefined ? TD_WARE_FIRST[ware]
+    : ((TD_WARE_TOKEN[ware] || {})[price]);
+  if (idx === undefined) return escapeHtml(ware || '');
+  return '<span class="tdware" style="background-position-x:' + (idx * 20) +
+    '%;" title="' + escapeHtml(ware) + '"></span>';
+}
 const TD_WAVE_IDX = {pilgrim: {hasty: 0, tranquil: 1}, merchant: {crafty: 2, robust: 3},
   artist: {proficient: 4, inspired: 5}};
 // Pending kinds where the meeple has not moved yet, so the die pick
@@ -180,7 +195,7 @@ function tdSellLines(g, p) {
         let per = b.price + (p.waves.merchant === 'crafty' ? 1 : 0);
         return t + ' ' + per + '🪙' + (p.merchant_pos === t ? ' ★ here' : '');
       });
-    return (g.ware_emoji[w] || '') + w + (n > 1 ? ' ×' + n : '') + ' → ' + offers.join(' / ');
+    return tdWare(w) + w + (n > 1 ? ' ×' + n : '') + ' → ' + offers.join(' / ');
   });
 }
 function tdRender() {
@@ -268,7 +283,7 @@ function tdRender() {
     if (!pp) return;
     html += '<span class="tdbout" style="top:' + pp[1].toFixed(1) + '%;left:' + pp[0].toFixed(1) +
       '%;" title="Boutique ' + t + ': ' + b.ware + ' · ' + b.price + ' coins">' +
-      (g.ware_emoji[b.ware] || '') + ' ' + b.price + '🪙</span>';
+      tdWare(b.ware, b.price) + b.price + '🪙</span>';
   });
   // FB-0015: tap the board to move — when a move choice is pending,
   // highlight every legal destination on the board (station, town or
@@ -291,7 +306,7 @@ function tdRender() {
   const bouts = Object.entries(g.boutiques || {}).map(([t, b]) => {
     const here = g.players.filter(pp => pp.merchant_pos === t).map(pp => pp.name);
     return '<b>' + t + '</b> (' + (TD_TOWN_WHERE[t] || t) + ') ' +
-      (g.ware_emoji[b.ware] || '') + b.ware + ' · ' + b.price + '🪙' +
+      tdWare(b.ware, b.price) + b.ware + ' · ' + b.price + '🪙' +
       (here.length ? ' — ' + here.map(escapeHtml).join(', ') + ' here' : '');
   }).join('<br>');
   const wavesOnBoard = (g.waves_board || []).map(w =>
@@ -314,7 +329,7 @@ function tdRender() {
     const counts = {};
     p.wares.forEach(w => { counts[w] = (counts[w] || 0) + 1; });
     const waresTxt = Object.entries(counts).map(([w, n]) =>
-      (g.ware_emoji[w] || '') + w + (n > 1 ? ' ×' + n : '')).join(', ') || 'no Wares';
+      tdWare(w) + w + (n > 1 ? ' ×' + n : '')).join(', ') || 'no Wares';
     const sellTxt = tdSellLines(g, p).join('<br>') || '—';
     html += '<div class="seat' + (p.is_current ? ' current' : '') + '"><div class="seat-head"><span>' +
       (p.color === 'purple' ? '🟣 ' : '🟢 ') + escapeHtml(p.name) + (p.npc ? ' 🤖' : '') +

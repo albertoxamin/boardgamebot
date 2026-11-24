@@ -366,6 +366,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
    board strip (tokaidoduo-pboards.webp, spritePlateauxJoueurs.png:
    two 862x213 boards) with the player's markers on its printed tracks. */
 .tddie{display:inline-block;width:22px;height:22px;background-image:url(tokaidoduo-dice.webp);background-size:600% 300%;background-repeat:no-repeat;vertical-align:-6px;margin-right:5px;border-radius:4px;box-shadow:0 1px 3px #000a}
+/* FB-0044: the commerce tokens (tokaidoduo-commerce.webp,
+   spriteJetonCommerce.jpg: 6 panels, one per boutique offer —
+   pottery 4/3, fan 3/2, doll 3, kimono 4), shown wherever a Ware
+   appears instead of the emoji. The panel index is set inline by
+   tdWare() in tokaidoduo.js as background-position-x (idx * 20%). */
+.tdware{display:inline-block;width:24px;height:24px;background-image:url(tokaidoduo-commerce.webp);background-size:600% 100%;background-repeat:no-repeat;vertical-align:-6px;margin-right:3px;border-radius:4px;box-shadow:0 1px 3px #000a}
 .tdpboard{position:relative;aspect-ratio:862/213;background-image:url(tokaidoduo-pboards.webp);background-size:100% 200%;background-repeat:no-repeat;border-radius:8px;margin:6px 0;border:1px solid #475569}
 .tdpboard.pb1{background-position-y:100%}
 .tdmark{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px #000a;z-index:2}

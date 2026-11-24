@@ -108,6 +108,44 @@ def test_merchant_mountain_towns_are_measured_off_the_board():
     assert '"town_pos": TD.TOWN_POS' in bot
 
 
+def test_commerce_tokens_use_bga_art():
+    # FB-0044: the commerce tokens (dolls, vases, ...) were emoji —
+    # Annalisa asked for the real BGA art from spriteJetonCommerce.jpg.
+    # The webp is the 6-panel strip (one panel per boutique offer) and
+    # the JS picks the panel by (ware, price) wherever a Ware appears,
+    # so the emoji are gone from the Mini App (Telegram text keeps them).
+    import os
+    webp = os.path.join(os.path.dirname(__file__), "web",
+                        "tokaidoduo-commerce.webp")
+    assert os.path.isfile(webp) and os.path.getsize(webp) > 10000
+    src = os.path.join(os.path.dirname(__file__), "sources", "tokaidoduo",
+                       "bga", "spriteJetonCommerce.jpg")
+    assert os.path.isfile(src)
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    assert "ware_emoji" not in js
+    assert "TD_WARE_TOKEN = {pottery: {4: 0, 3: 1}, fan: {3: 2, 2: 3}, doll: {3: 4}, kimono: {4: 5}}" in js
+    assert "function tdWare(ware, price)" in js
+    assert "tdWare(b.ware, b.price)" in js
+    assert "tdWare(w)" in js
+    # every distinct boutique offer has a panel, and no panel is unused
+    panels = set()
+    for ware, price in set(TD.BOUTIQUE_TOKENS):
+        assert ware in ("pottery", "fan", "doll", "kimono")
+        panels.add((ware, price))
+    assert len(panels) == 6
+    html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
+                encoding="utf-8").read()
+    assert "tokaidoduo-commerce.webp" in html
+    assert "background-size:600% 100%" in html
+    assert ".tdware{" in html
+    # FB-0039: a referenced webp that is not in bot.py's static
+    # allowlist answers 404 and renders invisible.
+    bot = open(os.path.join(os.path.dirname(__file__), "bot.py"),
+               encoding="utf-8").read()
+    assert '"/tokaidoduo-commerce.webp"' in bot
+
+
 def test_zone_graph_and_spaces():
     assert len(TD.ZONES) == 8
     # adjacency is symmetric, 11 trade routes

@@ -547,12 +547,12 @@ def test_player_seats_use_bga_player_boards():
 
 
 def test_hot_spring_token_shows_on_board():
-    # FB-0028: the Hot Spring token (BGA art from
+    # FB-0028 / FB-0040: the Hot Spring token (BGA art from
     # sources/tokaidoduo/bga/hotspring.jpg) must be visible ON the board
-    # while a player holds it — if it is on the board, the other player
-    # does not have it. It sits in the middle of the board with the
-    # holder's colour ring, like the character tokens, and is hidden
-    # while nobody holds it.
+    # always — not only while a player holds it. It sits in the middle
+    # of the board with the holder's colour ring, like the character
+    # tokens; while nobody holds it (every fresh game) it shows with
+    # a grey ring, so it never looks missing.
     from PIL import Image
     tok = Image.open(os.path.join(os.path.dirname(__file__), "web",
                                   "tokaidoduo-hotspring.webp"))
@@ -565,17 +565,27 @@ def test_hot_spring_token_shows_on_board():
     assert "tdhotspring" in board_html and "hot_spring" in board_html, board_html
     assert "top:50%;left:50%" in board_html
     assert "g.players[g.hot_spring]" in board_html
-    assert "tdhotspring td'" in board_html  # class built as 'td' + colour
+    assert "' td' + (hp.color" in board_html  # held: 'td' + colour class
     assert "'purple' ? 'purple' : 'green'" in board_html
-    # No token while nobody holds it: the span is only added inside
-    # the hot_spring check, and the board JSON already carries the holder.
-    assert "g.hot_spring !== null" in board_html
+    # The token is rendered unconditionally now: the span is added
+    # outside any hot_spring if-gate, with an unclaimed branch.
+    assert "if (g.hot_spring" not in board_html
+    assert "nobody holds it yet" in board_html
+    # Unclaimed it gets a grey ring (tdnone) so it reads on the light
+    # board instead of relying on the plain white border.
+    assert "' tdnone'" in board_html
+    # The card under the board also always names the token's state.
+    assert "Hot Spring: ' + (g.hot_spring !== null" in js
+    assert "nobody holds it yet" in js
     html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
                 encoding="utf-8").read()
     assert ".tdhotspring{position:absolute;width:40px;height:40px;" in html
     assert "background:url(tokaidoduo-hotspring.webp) center/cover;" in html
     assert ".tdhotspring.tdpurple{border-color:#7c3aed" in html
     assert ".tdhotspring.tdgreen{border-color:#059669" in html
+    # Unclaimed it gets a grey ring (tdnone) so it reads on the light
+    # board instead of relying on the plain white border.
+    assert ".tdhotspring.tdnone{border-color:#64748b" in html
 
 
 def test_pending_move_options_carry_board_positions():

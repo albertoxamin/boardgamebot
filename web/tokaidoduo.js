@@ -229,16 +229,17 @@ function tdRender() {
     const zp = (g.zone_pos || [])[p.artist_zone];
     if (zp) html += tdMeeple(zp[0], zp[1] + 3, col, 'artist', p.name + ' Artist @ ' + ((g.zones[p.artist_zone] || {}).name || ''));
   });
-  // FB-0028: the Hot Spring token itself, on the board. It only shows
-  // while a player holds it — if you see it on the board, the other
-  // player does not have it. It sits in the middle of the board with
-  // the holder's colour ring, like the character tokens.
-  if (g.hot_spring !== null && g.hot_spring !== undefined) {
-    const hp = g.players[g.hot_spring];
-    if (hp) html += '<span class="tdhotspring td' + (hp.color === 'purple' ? 'purple' : 'green') +
-      '" style="top:50%;left:50%;" title="♨️ Hot Spring token — held by ' + escapeHtml(hp.name) +
-      ' (the other player does not have it)"></span>';
-  }
+  // FB-0028 / FB-0040: the Hot Spring token itself, on the board — always.
+  // It starts unclaimed in the middle of the board (white ring: nobody
+  // holds it yet) and, once a Pilgrim visits a Hot Spring, it shows
+  // there with the holder's colour ring. Hiding it while unclaimed
+  // (the old behaviour) made it look missing in every fresh game.
+  const hp = (g.hot_spring !== null && g.hot_spring !== undefined)
+    ? g.players[g.hot_spring] : null;
+  html += '<span class="tdhotspring' + (hp ? ' td' + (hp.color === 'purple' ? 'purple' : 'green') : ' tdnone') +
+    '" style="top:50%;left:50%;" title="♨️ Hot Spring token — ' + (hp
+      ? 'held by ' + escapeHtml(hp.name) + ' (the other player does not have it)'
+      : 'nobody holds it yet — visit a Hot Spring to take it') + '"></span>';
   // FB-0029: the face-up Wave tiles as real tokens on the board, in
   // the three dashed slots at the top (one per character, wave_pos),
   // using the BGA art from spriteVagues.jpg (tokaidoduo-waves.webp).
@@ -289,7 +290,7 @@ function tdRender() {
     w.char + ': ' + tdWaveText(g, w.char, w.side)).join('<br>');
   html += '<div class="card small">🏘️ <b>Boutiques</b> — sell a Ware at its town:<br>' + bouts +
     '<br>🌊 <b>Waves on board</b>:<br>' + (wavesOnBoard || 'none') +
-    (g.hot_spring !== null && g.hot_spring !== undefined ? '<br>♨️ Hot Spring held by ' + escapeHtml((g.players[g.hot_spring] || {}).name || '') : '') +
+    '<br>♨️ Hot Spring: ' + (g.hot_spring !== null && g.hot_spring !== undefined ? 'held by ' + escapeHtml((g.players[g.hot_spring] || {}).name || '') : 'nobody holds it yet') +
     (g.end_triggered ? '<br>🏁 End triggered: ' + escapeHtml(g.end_reason || '') + ' — finish this round.' : '') + '</div>';
   // player seats
   // player seats: each seat IS the BGA player board (FB-0034) — the

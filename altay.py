@@ -57,49 +57,64 @@ FACTIONS = {
 
 CARDS = {
     "colonist": {"name": "Colonist", "kind": "produce", "resources": {"food": 1, "wood": 1},
-                 "starter_col": 0, "text": "Produce 1 food and 1 wood."},
+                 "text": "Produce 1 food and 1 wood."},
     "digger": {"name": "Digger", "kind": "produce", "resources": {"stone": 1},
-               "starter_col": 1, "text": "Produce 1 stone."},
+               "text": "Produce 1 stone."},
     "hunter": {"name": "Hunter", "kind": "produce", "resources": {"food": 1},
-               "starter_col": 2, "text": "Produce 1 food."},
-    "village": {"name": "Village", "kind": "build", "starter_col": 4,
+               "text": "Produce 1 food."},
+    "village": {"name": "Village", "kind": "build",
                 "text": "Gain one settlement build (costs 2 food)."},
-    "warrior": {"name": "Warrior", "kind": "attack", "swords": 1, "starter_col": 6,
+    "warrior": {"name": "Warrior", "kind": "attack", "swords": 1,
                 "text": "Add 1 sword this turn."},
     "loremaster": {"name": "Loremaster", "kind": "produce", "resources": {"culture": 1},
-                   "starter_col": 3, "text": "Produce 1 culture."},
+                   "text": "Produce 1 culture."},
     "shaman": {"name": "Shaman", "kind": "produce", "resources": {"food": 1, "culture": 1},
-               "starter_col": 3, "text": "Produce 1 food and 1 culture."},
+               "text": "Produce 1 food and 1 culture."},
     "spellweaver": {"name": "Spellweaver", "kind": "produce", "resources": {"culture": 2},
-                    "starter_col": 3, "text": "Produce 2 culture."},
+                    "text": "Produce 2 culture."},
     "craftsman_wood": {"name": "Craftsman (Wood)", "kind": "produce", "resources": {"wood": 1},
-                       "starter_col": 0, "text": "Produce 1 wood."},
+                       "text": "Produce 1 wood."},
     "craftsman_stone": {"name": "Craftsman (Stone)", "kind": "produce", "resources": {"stone": 1},
-                        "starter_col": 1, "text": "Produce 1 stone."},
+                        "text": "Produce 1 stone."},
+    # Market cards: "sprite" is [col, row] into web/altay-actions.webp
+    # (10 cols x 15 rows). Rows 4-14 hold the BGA action cards, one type
+    # per row, cols 1-8 (cols 0 and 9 are card backs); col 4 is used.
+    # Every sprite below was checked against the sheet (FB-0018): the old
+    # coords showed the wrong card — e.g. Scholar showed the card back,
+    # Chariot showed a Worker, City showed a Chariot. Two cards are named
+    # after their real BGA art: "miner" became Stonecutter (its effect is
+    # "produce 2 stone", exactly the Stonecutter's) and "herbalist" became
+    # Farmer (produce 2 food). Architect and Champion have no real BGA
+    # counterpart, so they use the closest art: Town (build) and Cavalry
+    # (2 shields). Legacy ids stay as aliases so games saved before the
+    # rename still load and play.
     "worker": {"name": "Worker", "kind": "produce", "resources": {"food": 1},
-               "cost": {"wood": 1}, "sprite": [6, 6], "text": "Cost 1 wood. Produce 1 food."},
-    "miner": {"name": "Miner", "kind": "produce", "resources": {"stone": 2},
-              "cost": {"wood": 1}, "sprite": [7, 7], "text": "Cost 1 wood. Produce 2 stone."},
-    "herbalist": {"name": "Herbalist", "kind": "produce", "resources": {"food": 2},
-                  "cost": {"food": 1}, "sprite": [8, 8], "text": "Cost 1 food. Produce 2 food."},
+               "cost": {"wood": 1}, "sprite": [4, 12], "text": "Cost 1 wood. Produce 1 food."},
+    "stonecutter": {"name": "Stonecutter", "kind": "produce", "resources": {"stone": 2},
+                    "cost": {"wood": 1}, "sprite": [4, 7], "text": "Cost 1 wood. Produce 2 stone."},
+    "farmer": {"name": "Farmer", "kind": "produce", "resources": {"food": 2},
+               "cost": {"food": 1}, "sprite": [4, 4], "text": "Cost 1 food. Produce 2 food."},
     "scholar": {"name": "Scholar", "kind": "produce", "resources": {"culture": 2},
-                "cost": {"culture": 1}, "sprite": [9, 8], "text": "Cost 1 culture. Produce 2 culture."},
+                "cost": {"culture": 1}, "sprite": [4, 8], "text": "Cost 1 culture. Produce 2 culture."},
     "chariot": {"name": "Chariot", "kind": "attack", "swords": 2, "cost": {"metal": 2},
-                "vp": 1, "sprite": [4, 12], "text": "Cost 2 metal. 2 swords. Worth 1 VP."},
+                "vp": 1, "sprite": [4, 13], "text": "Cost 2 metal. 2 swords. Worth 1 VP."},
     "cavalry": {"name": "Cavalry", "kind": "attack", "swords": 2,
-                "cost": {"food": 1, "metal": 1}, "vp": 1, "sprite": [4, 9],
+                "cost": {"food": 1, "metal": 1}, "vp": 1, "sprite": [4, 10],
                 "text": "Cost 1 food, 1 metal. 2 swords. Worth 1 VP."},
     "architect": {"name": "Architect", "kind": "build2", "cost": {"stone": 2, "wood": 1},
-                  "vp": 1, "sprite": [5, 13], "text": "Cost 2 stone, 1 wood. Two builds. Worth 1 VP."},
+                  "vp": 1, "sprite": [4, 11], "text": "Cost 2 stone, 1 wood. Two builds. Worth 1 VP."},
     "champion": {"name": "Champion", "kind": "attack_defense", "swords": 1, "shields": 2,
-                 "cost": {"culture": 2}, "vp": 1, "sprite": [6, 13],
+                 "cost": {"culture": 2}, "vp": 1, "sprite": [4, 10],
                  "text": "Cost 2 culture. 1 sword, 2 shields. Worth 1 VP."},
     "merchant": {"name": "Merchant", "kind": "produce", "resources": {"wood": 1, "culture": 1},
-                 "cost": {"food": 1}, "sprite": [7, 9], "text": "Cost 1 food. Produce 1 wood and 1 culture."},
+                 "cost": {"food": 1}, "sprite": [4, 9], "text": "Cost 1 food. Produce 1 wood and 1 culture."},
     "city": {"name": "City", "kind": "build2", "cost": {"stone": 2, "culture": 1},
-             "vp": 2, "sprite": [8, 13], "text": "Cost 2 stone, 1 culture. Two builds. Worth 2 VP."},
+             "vp": 2, "sprite": [4, 14], "text": "Cost 2 stone, 1 culture. Two builds. Worth 2 VP."},
 }
-MARKET = ["worker", "miner", "herbalist", "scholar", "chariot", "cavalry",
+# Legacy ids (pre-FB-0018 names) for games saved before the rename.
+CARDS["miner"] = CARDS["stonecutter"]
+CARDS["herbalist"] = CARDS["farmer"]
+MARKET = ["worker", "stonecutter", "farmer", "scholar", "chariot", "cavalry",
           "architect", "champion", "merchant", "city"]
 
 ACHIEVEMENTS = {
@@ -386,9 +401,20 @@ def _card_sprite(game, player_index, card_id):
     card = CARDS[card_id]
     if "sprite" in card:
         return list(card["sprite"])
+    # Starter cards have no fixed sprite: each faction row of
+    # altay-actions.webp lists that faction's starter deck in order
+    # (verified against the BGA sheet), so the picture column is the
+    # card's position in its faction's deck. The old fixed
+    # "starter_col" per card type was wrong for most factions (FB-0018):
+    # e.g. Village showed a Hunter and Warrior showed a Village, while
+    # the caption named the right card — so picture and description
+    # did not match.
     faction = game["players"][player_index].get("faction")
+    deck = FACTIONS.get(faction, {}).get("deck", [])
     row = FACTIONS.get(faction, {}).get("row", 0)
-    return [card.get("starter_col", 0), row]
+    if card_id in deck:
+        return [deck.index(card_id), row]
+    return [0, row]
 
 
 def card_info(game, player_index, card_id):

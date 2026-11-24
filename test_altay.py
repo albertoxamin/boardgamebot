@@ -150,6 +150,41 @@ class AltayEngineTests(unittest.TestCase):
         self.assertIn("Produce 1 food", played[0]["text"])
         self.assertEqual(board["players"][1]["played"], [])
 
+    def test_card_sprites_match_faction_decks_and_market_art(self):
+        # FB-0018: the picture of a card must match its description. The
+        # BGA sprite sheet lists each faction's starter deck in order
+        # along its row, so a starter card's sprite column is its
+        # position in its faction's deck; market cards use fixed coords
+        # into the action-card rows (cols 1-8; cols 0 and 9 are backs).
+        game, _ = self.new_game()
+        for faction, info in altay.FACTIONS.items():
+            game["players"][0]["faction"] = faction
+            for index, card_id in enumerate(info["deck"]):
+                sprite = altay._card_sprite(game, 0, card_id)
+                # Duplicates share identical art, so the sprite column is
+                # the card's first deck position; the cell there must be
+                # this card.
+                self.assertEqual(sprite, [info["deck"].index(card_id), info["row"]],
+                                 f"{faction} {card_id} should be at deck position {index}")
+                self.assertEqual(info["deck"][sprite[0]], card_id)
+        expected_market = {
+            "worker": [4, 12], "stonecutter": [4, 7], "farmer": [4, 4],
+            "scholar": [4, 8], "chariot": [4, 13], "cavalry": [4, 10],
+            "architect": [4, 11], "champion": [4, 10], "merchant": [4, 9],
+            "city": [4, 14],
+        }
+        self.assertEqual(list(altay.MARKET), list(expected_market))
+        board = altay.board_json(game, 42)
+        for card in board["market"]:
+            self.assertEqual(card["sprite"], expected_market[card["id"]],
+                             f"market {card['id']} shows the wrong picture")
+            col, row = card["sprite"]
+            self.assertTrue(1 <= col <= 8 and 4 <= row <= 14,
+                            f"market {card['id']} sprite {card['sprite']} is a card back or out of range")
+        # Legacy ids from games saved before the rename still resolve.
+        self.assertEqual(altay.CARDS["miner"]["name"], "Stonecutter")
+        self.assertEqual(altay.CARDS["herbalist"]["name"], "Farmer")
+
     def test_turn_order_and_wrong_player_guard(self):
         game, events = self.new_game()
         self.assertIsNotNone(altay.play_card(game, 1, 0, events))

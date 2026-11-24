@@ -378,6 +378,10 @@ def _npc_player():
     return {"user_id": NPC_ID, "name": "🤖 NPC", "npc": True}
 
 
+def _is_npc(player):
+    return bool(player.get("npc") or player.get("user_id") == NPC_ID)
+
+
 NPC_MAX = dict(GR.NPC_MAX)
 NPC_FULL = dict(GR.NPC_FULL)
 
@@ -426,7 +430,7 @@ NPC_PLAYERS = {
     "castlecombo": _castlecombo_npc,
     "artichokes": _artichokes_npc,
     "fellowship": _fellowship_npc,
-    "azul": lambda: {**_npc_player(), **AZ.new_player(NPC_ID, "🤖 NPC")},
+    "azul": lambda: {**AZ.new_player(NPC_ID, "🤖 NPC"), **_npc_player()},
 }
 
 
@@ -435,7 +439,7 @@ def add_npc(key, g):
     Returns an error string, or None on success."""
     if g["phase"] != "lobby":
         return "⛔ Game already started."
-    if any(p.get("npc") for p in g["players"]):
+    if any(_is_npc(p) for p in g["players"]):
         return "🤖 NPC is already in this game."
     if len(g["players"]) >= NPC_MAX[key]:
         return NPC_FULL[key]
@@ -446,7 +450,7 @@ def add_npc(key, g):
 def _actor_idx(g, user_id, ref):
     """Index to act as: your own, or the reference player's if it is the
     NPC (anyone may control the NPC)."""
-    if g["players"][ref].get("npc"):
+    if _is_npc(g["players"][ref]):
         return ref
     return next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
 
@@ -4124,7 +4128,7 @@ def azul_keyboard(g):
     wk = web_keyboard(ct, g["chat_id"], game="azul")
     if g["phase"] == "lobby":
         kb = [[{"text": "🙋 Join Azul", "callback_data": "az:join"}]]
-        if not any(p.get("npc") for p in g["players"]):
+        if not any(_is_npc(p) for p in g["players"]):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "az:npc"}])
         kb.append([{"text": "▶️ Start game", "callback_data": "az:start"}])
         return kb + (wk or [])
@@ -4165,7 +4169,7 @@ def azul_render(g, events=None):
     if g["phase"] == "draft":
         p = g["players"][g["current"]]
         pend = g.get("pending")
-        if p.get("npc"):
+        if _is_npc(p):
             ping = "👉 🤖 NPC's turn - anyone can play for it!"
         else:
             ping = f"👉 {azul_mention(g, p['user_id'])} - " + (
@@ -4285,11 +4289,11 @@ def azul_board_json(g, viewer_id=None):
     me = next((p for p in g["players"] if p["user_id"] == viewer_id), None)
     actor = g["current"] if g["phase"] == "draft" else None
     can_act = bool(actor is not None and me is not None and
-                   (g["players"][actor]["user_id"] == viewer_id or g["players"][actor].get("npc")))
+                   (g["players"][actor]["user_id"] == viewer_id or _is_npc(g["players"][actor])))
     players = []
     for i, p in enumerate(g["players"]):
         players.append({
-            "user_id": p["user_id"], "name": p["name"], "npc": bool(p.get("npc")),
+            "user_id": p["user_id"], "name": p["name"], "npc": _is_npc(p),
             "score": p["score"], "wall": p["wall"], "pattern": p["pattern"],
             "floor": p["floor"], "last_round": p["last_round"], "winner": p["winner"],
             "rows": AZ.complete_rows(p), "cols": AZ.complete_columns(p),
@@ -4441,7 +4445,7 @@ def rematch_game(state, key, chat_id, uid):
         return [], "game is not over yet"
     if not any(p["user_id"] == uid for p in g["players"]):
         return [], "only players of this game can rematch"
-    keep = [(p["user_id"], p["name"], bool(p.get("npc"))) for p in g["players"]]
+    keep = [(p["user_id"], p["name"], _is_npc(p)) for p in g["players"]]
     creator = next((k for k in keep if k[0] != NPC_ID), keep[0])
     makers = PLAYER_MAKERS
     news = GAME_MAKERS

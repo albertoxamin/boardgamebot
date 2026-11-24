@@ -165,6 +165,33 @@ class RegistryTests(unittest.TestCase):
         self.assertEqual(game["passed"], [1])
         json.dumps(game)
 
+    def test_azul_npc_can_be_controlled_by_any_player(self):
+        game = bot.AZ.new_game(7, 42, "Ada")
+        self.assertIsNone(bot.add_npc("azul", game))
+        self.assertTrue(game["players"][1]["npc"])
+        events = []
+        self.assertIsNone(bot.AZ.start_game(game, events))
+        game["current"] = 1
+        self.assertEqual(bot.azul_actor_idx(game, 42), 1)
+        board = bot.azul_board_json(game, 42)
+        self.assertTrue(board["can_act"])
+        self.assertTrue(board["players"][1]["npc"])
+        self.assertTrue(board["options"])
+        game["players"][1]["npc"] = False
+        self.assertEqual(bot.azul_actor_idx(game, 42), 1)
+        self.assertTrue(bot.azul_board_json(game, 42)["can_act"])
+        state = {"azul": {"7": game}}
+        opt = bot.AZ.take_options(game)[0]
+        with patch.object(bot, "send_board", return_value={"ok": False}):
+            _, err = bot.azul_api_move(state, 7, 42, {
+                "action": "take", "source": opt["source"],
+                "index": opt["index"], "color": opt["color"],
+            })
+            self.assertIsNone(err)
+            self.assertEqual(game["pending"]["by"], 1)
+            _, err = bot.azul_api_move(state, 7, 42, {"action": "place", "row": -1})
+            self.assertIsNone(err)
+
     def test_player_mention_uses_player_name(self):
         game = {"players": [{"user_id": 42, "name": "A<b>"}]}
         self.assertEqual(

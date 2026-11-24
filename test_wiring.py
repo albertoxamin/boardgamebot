@@ -266,6 +266,15 @@ class RegistryTests(unittest.TestCase):
             self.assertIsNone(err)
         self.assertEqual(game["current"], 0)
 
+    def test_altay_api_can_add_npc_from_lobby(self):
+        game = bot.AL.new_game(7, 42, "Ada")
+        state = {"altay": {"7": game}}
+        with patch.object(bot, "send_board", return_value={"ok": False}):
+            events, err = bot.altay_api_move(state, 7, 42, {"action": "npc"})
+        self.assertIsNone(err)
+        self.assertTrue(game["players"][1]["npc"])
+        self.assertTrue(events)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

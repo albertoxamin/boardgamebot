@@ -5262,6 +5262,13 @@ def altay_api_move(state, chat_id, user_id, body):
         err = AL.set_faction(g, mine, str(body.get("faction", "")))
         if err:
             return [], err
+    elif action == "npc":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        err = add_npc("altay", g)
+        if not err:
+            ev.append("🤖 NPC joined - anyone can play for it.")
+        return ev, err
     elif action == "start":
         if g["phase"] != "lobby":
             return [], "already started"
@@ -5648,6 +5655,14 @@ def handle_callback(state, cb):
             answer_cb(cb["id"], err or "Joined!")
             if not err:
                 altay_render(g, [f"🙋 {cb['from'].get('first_name')} joined Altay."])
+            return
+        if action == "npc":
+            if g["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            err = add_npc("altay", g)
+            answer_cb(cb["id"], err or "🤖 NPC joined")
+            if not err:
+                altay_render(g)
             return
         if action == "f":
             if g["phase"] != "lobby" or mine is None:

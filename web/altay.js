@@ -119,9 +119,10 @@ function atRender() {
   const market = document.getElementById('atMarket');
   const achievements = document.getElementById('atAch');
   const join = document.getElementById('atJoin');
+  const npc = document.getElementById('atNpc');
   const start = document.getElementById('atStart');
   const rematch = document.getElementById('atRematch');
-  [join, start, rematch].forEach(el => el.classList.add('hidden'));
+  [join, npc, start, rematch].forEach(el => el.classList.add('hidden'));
   [board, hand, actions, market, achievements].forEach(el => { el.innerHTML = ''; });
   document.getElementById('atLog').textContent = (g.log || []).join('\n');
   const names = g.players.map(p => escapeHtml(p.name) + (p.npc ? ' 🤖' : '') +
@@ -138,8 +139,10 @@ function atRender() {
     ' · 🏠 ' + p.reserve + ' · ⚔️ ' + p.captured + ' · 🎯 ' + p.markers + '<br>' +
     '📜 ' + escapeHtml(p.achievement || 'no active achievement') + '</div>').join('');
   if (g.phase === 'lobby') {
-    board.innerHTML = '<div class="atlobby">Join, choose a faction, then start.<br>' + names + '</div>';
+    board.innerHTML = '<div class="atlobby">Join or add an NPC, then start.<br>' +
+      'The board and your cards appear once the game starts.<br>' + names + '</div>';
     if (!g.is_player) join.classList.remove('hidden');
+    if (!g.players.some(p => p.npc)) npc.classList.remove('hidden');
     start.classList.remove('hidden');
     return;
   }
@@ -196,6 +199,7 @@ function atRender() {
   }));
 }
 document.getElementById('atJoin').addEventListener('click', () => atMove('join'));
+document.getElementById('atNpc').addEventListener('click', () => atMove('npc'));
 document.getElementById('atStart').addEventListener('click', () => atMove('start'));
 document.getElementById('atRematch').addEventListener('click', () => atMove('rematch'));
 atLoad();

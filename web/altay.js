@@ -93,9 +93,15 @@ function atAch(ach, index) {
   const clickable = ATG.board.can_act && !done && (!ach.active[0] || active);
   const cls = 'atach' + (done ? ' atdone' : '') + (active ? ' atactive' : '') + (clickable ? ' atclick' : '');
   const cost = Object.entries(ach.cost).map(([k, n]) => (ATG.board.resource_icons[k] || k) + n).join(' ');
-  return '<div class="' + cls + '" style="background-position:' + x + '% ' + y +
+  // FB-0020: description under each achievement card — title tooltips
+  // never show on touch, so name, cost, VP and effect must be readable
+  // on the card itself (same pattern as atCardCell, FB-0013/FB-0016).
+  const cap = '<b>' + escapeHtml(ach.name) + '</b><br>' +
+    escapeHtml(cost + ' · ' + ach.vp + ' VP') + '<br>' + escapeHtml(ach.text);
+  return '<div class="atachwrap"><div class="' + cls + '" style="background-position:' + x + '% ' + y +
     '%" title="' + escapeHtml(ach.name + ' (' + cost + ', ' + ach.vp + ' VP) — ' + ach.text) +
-    '" data-ach="' + escapeHtml(ach.id) + '"></div>';
+    '" data-ach="' + escapeHtml(ach.id) + '"></div>' +
+    '<div class="atcap">' + cap + '</div></div>';
 }
 function atRegion(region, g) {
   const builds = (g.legal.build || []).map(String).includes(String(region.id));

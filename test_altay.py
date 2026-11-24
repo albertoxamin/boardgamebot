@@ -1,4 +1,5 @@
 import json
+import os
 import random
 import unittest
 
@@ -190,6 +191,21 @@ class AltayEngineTests(unittest.TestCase):
         self.assertIsNotNone(altay.play_card(game, 1, 0, events))
         self.assertIsNone(altay.end_turn(game, 0, events, random.Random(6)))
         self.assertIsNone(altay.play_card(game, 1, 0, events))
+
+    def test_achievements_show_description_under_each_card(self):
+        """FB-0020: 'on altay, add the description under the achievements
+        cards' — each achievement tile must be wrapped with a caption
+        showing its name, cost, VP and effect text, not just a hover
+        tooltip."""
+        base = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(base, "web", "altay.js"), encoding="utf-8") as f:
+            js = f.read()
+        self.assertIn("atachwrap", js)
+        self.assertIn("ach.text", js)
+        self.assertIn("ach.vp + ' VP'", js)
+        with open(os.path.join(base, "web", "flip7.html"), encoding="utf-8") as f:
+            html = f.read()
+        self.assertIn(".atachwrap{flex:none;width:88px", html)
 
 
 if __name__ == "__main__":

@@ -194,9 +194,11 @@ GAME_SPECS = (
                        "/tokaidoduo_choose", "/tokaidoduo_rules", "/tokaidoduo_cancel"),
         web_label="🎮 Play Tokaido Duo (HTML)", callback_prefix="td",
         min_players=2, max_players=2, npc_full="⛔ Tokaido Duo is 2 players (full).",
-        rematch_phases=("game_end",), cover="",
+        rematch_phases=("game_end",), cover="tokaidoduo.jpg",
         module="tokaidoduo", web_module="tokaidoduo",
-        static_assets=("tokaidoduo.js", "tokaidoduo-board.webp", "tokaidoduo-icons.webp"),
+        static_assets=("tokaidoduo.js", "tokaidoduo-board.webp", "tokaidoduo-icons.webp",
+                       "tokaidoduo-meeples.webp", "tokaidoduo-dice.webp",
+                       "tokaidoduo-pboards.webp", "tokaidoduo-bg.webp"),
     ),
     GameSpec(
         key="altay", name="🏜️ Altay", command="/altay", join_command="/altay_join",

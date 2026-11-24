@@ -38,7 +38,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 49
+WEB_VER = 50
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -7779,6 +7779,8 @@ def start_web_server(state):
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
             if u.path in ("/toybattle-board.webp", "/toybattle-tiles.webp", "/toybattle-medals.webp",
                   "/tokaidoduo-board.webp", "/tokaidoduo-icons.webp",
+                  "/tokaidoduo-meeples.webp", "/tokaidoduo-dice.webp",
+                  "/tokaidoduo-pboards.webp", "/tokaidoduo-bg.webp",
                   "/altay-board.webp", "/altay-actions.webp",
                   "/altay-achievements.webp", "/altay-markers.webp",
                    "/altay-tokens.webp", "/altay-seafarers-actions.webp",

@@ -87,20 +87,66 @@ function tdStationPos(i) {
   return [52 + 40 * Math.sin(a), 50 - 36 * Math.cos(a)];
 }
 function tdMeeple(x, y, color, char, title) {
-  // FB-0025: the marker is the BGA character icon from
-  // tokaidoduo-icons.webp (parasol / merchant grid / paintbrush),
-  // picked by the td{char} class — no more emoji letters. The player
-  // colour is unmissable (FB-0027): the whole disc is filled with it
-  // (it shows through the icon's transparent parts), plus a 4px ring
-  // and a coloured halo (see .tdmeeple in flip7.html).
+  // FB-0031: the marker is the BGA character meeple from
+  // tokaidoduo-meeples.webp (spriteMeeples.png: pilgrim / merchant /
+  // artist down the columns, purple row on top, green row below), so
+  // the marker already is the player's colour (FB-0027) — the ring
+  // and halo just make it unmissable (see .tdmeeple in flip7.html).
   return '<span class="tdmeeple td' + color + ' td' + char + '" style="top:' + y.toFixed(1) +
          '%;left:' + x.toFixed(1) + '%;" title="' + escapeHtml(title) + '"></span>';
 }
-function tdPaintTile(t, idx) {
-  if (t.gifted) return '<span class="tdpaint gifted" title="Gifted">✓</span>';
-  if (!t.revealed) return '<span class="tdpaint back" title="Face-down Painting">?</span>';
-  const em = (TDG.board.zone_icon_emoji || {})[t.icon] || t.icon;
-  return '<span class="tdpaint" title="' + escapeHtml(t.icon) + '">' + em + '</span>';
+// FB-0033: spriteDes.jpg is 6 die faces x 3 dice (40px each): the
+// Merchant die (1/2/3/1/2/3) on the orange row, the Artist die
+// (1/2/3/1/1/2) on the gold row, the Pilgrim die (1/2/3/4/2/3) on the
+// pink row. Show the rolled face on the pick-die button, next to
+// e.g. "merchant (2)".
+const TD_DIE_ROW = {merchant: 0, artist: 1, pilgrim: 2};
+const TD_DIE_COL = {1: 0, 2: 1, 3: 2, 4: 3};
+function tdDieFace(ch, value) {
+  const col = TD_DIE_COL[value] || 0;
+  const row = TD_DIE_ROW[ch] || 0;
+  return '<span class="tddie" style="background-position:' + (col * 20) + '% ' + (row * 50) +
+    '%;" title="' + escapeHtml(ch + ' ' + value) + '"></span>';
+}
+// FB-0034: the player boards (spritePlateauxJoueurs.png, 862x213 each:
+// top half = first seat, bottom half = second). Marker positions are
+// image pixels on the half-board, measured off the BGA art:
+// culture dots on the Artist track, commerce on the gold row, temple
+// lanterns (3x3), garden circles (x1-x6), painting slots (5x2).
+const TD_CULTURE_POS = {0: [35, 58], 2: [62, 58], 4: [112, 58], 7: [165, 58],
+  10: [30, 118], 14: [80, 118], 18: [135, 118], 23: [185, 118],
+  28: [55, 180], 34: [110, 180], 40: [160, 180]};
+const TD_GOLD_POS = {0: [223, 168], 5: [278, 168], 11: [333, 168], 18: [388, 168],
+  26: [443, 168], 35: [498, 168], 45: [553, 168]};
+const TD_LANTERN_X = [602, 645, 687], TD_LANTERN_Y = [58, 118, 178];
+const TD_GARDEN_X = 735, TD_GARDEN_Y = [28, 60, 92, 123, 155, 185];
+const TD_PAINT_X = [278, 333, 388, 443, 498], TD_PAINT_Y = [32, 88];
+function tdMark(x, y, col, title) {
+  return '<span class="tdmark td' + col + '" style="left:' + (x / 862 * 100).toFixed(1) +
+    '%;top:' + (y / 213 * 100).toFixed(1) + '%;" title="' + escapeHtml(title) + '"></span>';
+}
+function tdSeatBoard(g, p, col) {
+  let s = '';
+  const cu = TD_CULTURE_POS[p.culture];
+  if (cu) s += tdMark(cu[0], cu[1], col, 'Culture ' + p.culture);
+  const go = TD_GOLD_POS[p.commerce];
+  if (go) s += tdMark(go[0], go[1], col, 'Commerce ' + p.commerce);
+  for (let t = 1; t <= Math.min(p.temple, 9); t++) {
+    s += tdMark(TD_LANTERN_X[(t - 1) % 3], TD_LANTERN_Y[Math.floor((t - 1) / 3)],
+      col, 'Temple ' + t + '/9');
+  }
+  for (let gd = 1; gd <= Math.min(p.garden, 6); gd++) {
+    s += tdMark(TD_GARDEN_X, TD_GARDEN_Y[gd - 1], col, 'Garden x' + gd);
+  }
+  p.paintings.forEach((t, idx) => {
+    if (idx >= 10) return;
+    const sx = TD_PAINT_X[idx % 5], sy = TD_PAINT_Y[Math.floor(idx / 5)];
+    const em = (g.zone_icon_emoji || {})[t.icon] || t.icon;
+    s += '<span class="tdpaintslot' + (t.gifted ? ' gifted' : (!t.revealed ? ' back' : '')) +
+      '" style="left:' + (sx / 862 * 100).toFixed(1) + '%;top:' + (sy / 213 * 100).toFixed(1) +
+      '%;" title="' + escapeHtml(t.icon) + '">' + (t.gifted ? '✓' : (!t.revealed ? '?' : em)) + '</span>';
+  });
+  return s;
 }
 // Index of each Wave side in the tokaidoduo-waves.webp sprite strip
 // (spriteVagues.jpg, left to right): pilgrim hasty/tranquil, merchant
@@ -246,9 +292,16 @@ function tdRender() {
     (g.hot_spring !== null && g.hot_spring !== undefined ? '<br>♨️ Hot Spring held by ' + escapeHtml((g.players[g.hot_spring] || {}).name || '') : '') +
     (g.end_triggered ? '<br>🏁 End triggered: ' + escapeHtml(g.end_reason || '') + ' — finish this round.' : '') + '</div>';
   // player seats
+  // player seats: each seat IS the BGA player board (FB-0034) — the
+  // top half of spritePlateauxJoueurs.png for the first seat, the
+  // bottom half for the second — with the player's markers on its
+  // printed tracks (culture, commerce, temple lanterns, garden
+  // circles, painting slots). Wares, sell lines and Waves stay as
+  // text under the board, with the exact numbers in the summary line.
   html += '<div class="seats">';
   g.players.forEach((p, i) => {
     const me = p.user_id === TDG.user_id;
+    const col = p.color === 'purple' ? 'purple' : 'green';
     const counts = {};
     p.wares.forEach(w => { counts[w] = (counts[w] || 0) + 1; });
     const waresTxt = Object.entries(counts).map(([w, n]) =>
@@ -258,6 +311,7 @@ function tdRender() {
       (p.color === 'purple' ? '🟣 ' : '🟢 ') + escapeHtml(p.name) + (p.npc ? ' 🤖' : '') +
       (me ? ' (you)' : '') + '</span><span class="score">' +
       (p.faith + p.commerce + p.culture) + ' pts</span></div>' +
+      '<div class="tdpboard' + (i === 1 ? ' pb1' : '') + '">' + tdSeatBoard(g, p, col) + '</div>' +
       '<div class="small">⛩️ ' + p.temple + '×🌳 ' + p.garden + ' = ' + p.faith +
       ' · 💰 ' + p.gold + ' slabs = ' + p.commerce +
       ' · 🎨 ' + p.gifted + '/10 = ' + p.culture +
@@ -265,8 +319,7 @@ function tdRender() {
       '<div class="small">🎒 ' + waresTxt + '</div>' +
       '<div class="small">🛍️ Sell:<br>' + sellTxt + '</div>' +
       '<div class="small">🌊 Waves: ' + ['pilgrim', 'merchant', 'artist'].map(ch =>
-        ch + ': ' + tdWaveText(g, ch, p.waves[ch])).join(' · ') + '</div>' +
-      '<div class="tdpaints">' + p.paintings.map(tdPaintTile).join('') + '</div></div>';
+        ch + ': ' + tdWaveText(g, ch, p.waves[ch])).join(' · ') + '</div></div>';
   });
   html += '</div>';
   board.innerHTML = html;
@@ -305,7 +358,8 @@ function tdRender() {
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'hit';
-      b.textContent = (g.char_emoji[ch] || '') + ' ' + ch + ' (' + g.dice[ch] + ')';
+      b.innerHTML = tdDieFace(ch, g.dice[ch]) +
+        escapeHtml((g.char_emoji[ch] || '') + ' ' + ch + ' (' + g.dice[ch] + ')');
       b.addEventListener('click', () => tdMove('pick', {char: ch}));
       actions.appendChild(b);
     });

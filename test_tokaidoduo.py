@@ -355,27 +355,29 @@ def test_miniapp_notices_a_new_version():
     assert "New version — reopen the Mini App" in js
     html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
                 encoding="utf-8").read()
-    assert 'src="tokaidoduo.js?v=5"' in html
+    assert 'src="tokaidoduo.js?v=6"' in html
 
 
-def test_character_markers_use_bga_icons_on_boutique_symbols():
+def test_character_markers_use_bga_meeples_on_boutique_symbols():
     # FB-0024: when a Merchant or a Pilgrim is at a boutique, its marker
     # must sit on the boutique symbol (TOWN_POS), not drift towards the
     # wrapped-package symbol at the board edge (PACKAGE_POS, where the
-    # boutique pill already sits). FB-0025: the markers are the BGA
-    # character tokens from sources/tokaidoduo/bga/spriteIcons.png
-    # (parasol / merchant grid / paintbrush), served as
-    # web/tokaidoduo-icons.webp, with the player colour as the ring.
+    # boutique pill already sits). FB-0031: the markers are the BGA
+    # character meeples from sources/tokaidoduo/bga/spriteMeeples.png
+    # (pilgrim / merchant / artist down the columns, purple row on top,
+    # green row below), served as web/tokaidoduo-meeples.webp — they
+    # replace the FB-0025 character icons. The meeple already is the
+    # player's colour (FB-0027); the ring and halo make it unmissable.
     from PIL import Image
-    icons = Image.open(os.path.join(os.path.dirname(__file__), "web",
-                                    "tokaidoduo-icons.webp"))
-    assert icons.size == (141, 47), icons.size  # 3 icons of 47px
+    meeples = Image.open(os.path.join(os.path.dirname(__file__), "web",
+                                      "tokaidoduo-meeples.webp"))
+    assert meeples.size == (147, 119), meeples.size  # 3 meeples x 2 colours
     js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
               encoding="utf-8").read()
     start = js.index("let html = '<div class=\"tdboard\">'")
     end = js.index("html += '</div>';", start)
     board_html = js[start:end]
-    # Markers are the character icons, not emoji letters.
+    # Markers are the character meeples, not emoji letters.
     assert "tdMeeple(sx" in board_html and "'pilgrim'" in board_html
     assert "tdMeeple(mTown[0]" in board_html and "'merchant'" in board_html
     assert "tdMeeple(zp[0]" in board_html and "'artist'" in board_html
@@ -385,24 +387,138 @@ def test_character_markers_use_bga_icons_on_boutique_symbols():
     # meeple block must use town_pos, never package_pos.
     assert "const mTown = (g.town_pos || {})[p.merchant_pos]" in board_html
     assert "const pTownName = 'c_' + p.pilgrim_pos" in board_html
-    meeples = board_html[board_html.index("g.players.forEach((p, i) => {"):
-                         board_html.index("const zp = (g.zone_pos || [])[p.artist_zone];")]
-    assert "town_pos" in meeples and "package_pos" not in meeples, meeples
+    meeples_js = board_html[board_html.index("g.players.forEach((p, i) => {"):
+                            board_html.index("const zp = (g.zone_pos || [])[p.artist_zone];")]
+    assert "town_pos" in meeples_js and "package_pos" not in meeples_js, meeples_js
     html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
                 encoding="utf-8").read()
-    assert ".tdmeeple{position:absolute;width:26px;height:26px;" in html
-    assert "background-image:url(tokaidoduo-icons.webp);background-size:300% 100%;" in html
-    assert ".tdmeeple.tdpilgrim{background-position:0% 0}" in html
-    assert ".tdmeeple.tdmerchant{background-position:50% 0}" in html
-    assert ".tdmeeple.tdartist{background-position:100% 0}" in html
-    assert ".tdmeeple.tdpurple{border-color:#7c3aed}" in html
-    assert ".tdmeeple.tdgreen{border-color:#059669}" in html
+    assert ".tdmeeple{position:absolute;width:24px;height:30px;" in html
+    assert "background-image:url(tokaidoduo-meeples.webp);background-size:300% 200%;" in html
+    assert ".tdmeeple.tdpilgrim{background-position-x:0%}" in html
+    assert ".tdmeeple.tdmerchant{background-position-x:50%}" in html
+    assert ".tdmeeple.tdartist{background-position-x:100%}" in html
+    assert ".tdmeeple.tdpurple{background-position-y:0%}" in html
+    assert ".tdmeeple.tdgreen{background-position-y:100%}" in html
     # FB-0027: the player colour must be unmissable on the token — the
-    # whole disc is filled with it (the icon has transparent parts) and
-    # it gets a coloured halo, not just a thin ring.
-    assert ".tdmeeple.tdpurple{background-color:#7c3aed;box-shadow:0 0 0 2px #7c3aedcc" in html
-    assert ".tdmeeple.tdgreen{background-color:#059669;box-shadow:0 0 0 2px #059669cc" in html
-    assert "border:4px solid #fff" in html
+    # meeple itself is that colour, plus a coloured ring and halo.
+    assert ".tdmeeple.tdpurple{border-color:#7c3aed;box-shadow:0 0 0 2px #7c3aedcc" in html
+    assert ".tdmeeple.tdgreen{border-color:#059669;box-shadow:0 0 0 2px #059669cc" in html
+    assert "border:3px solid #fff" in html
+    # The old icon sprite is no longer the marker art.
+    assert "tokaidoduo-icons.webp" not in html.split(".tdmeeple")[1].split("}")[0]
+    assert "background-color:#7c3aed" not in html.split(".tdmeeple.tdpurple")[1].split("\n")[0]
+
+
+def test_lobby_shows_bga_cover_art():
+    # FB-0032: when the lobby is opened (/tokaidoduo), show the BGA
+    # cover art from sources/tokaidoduo/bga/bg.jpg — as the Telegram
+    # lobby photo (the bot's established cover mechanism: lobbies show
+    # the game's box art as a photo with the board text as caption)
+    # and as the Mini App lobby background.
+    import bot as BOT
+    import game_registry as GR
+    from PIL import Image
+    cover = Image.open(os.path.join(os.path.dirname(__file__), "web",
+                                    "covers", "tokaidoduo.jpg"))
+    src = Image.open(os.path.join(os.path.dirname(__file__), "sources",
+                                  "tokaidoduo", "bga", "bg.jpg"))
+    assert cover.size == src.size == (559, 488), (cover.size, src.size)
+    assert GR.GAMES_BY_KEY["tokaidoduo"].cover == "tokaidoduo.jpg"
+    path = BOT.cover_path("tokaidoduo")
+    assert path and os.path.isfile(path), path
+    bg = Image.open(os.path.join(os.path.dirname(__file__), "web",
+                                 "tokaidoduo-bg.webp"))
+    assert bg.size == (559, 488), bg.size
+    html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
+                encoding="utf-8").read()
+    assert "url(tokaidoduo-bg.webp?v=1)" in html
+    assert ".tdlobby{" in html and "tokaidoduo-bg.webp" in html.split(".tdlobby{")[1].split("}")[0]
+
+
+def test_die_choice_buttons_show_die_faces():
+    # FB-0033: when the player must choose the movement die, the button
+    # shows the die face from sources/tokaidoduo/bga/spriteDes.jpg
+    # next to e.g. "merchant (2)" — not just the text. The sprite is
+    # 6 faces x 3 dice: Merchant (1/2/3/1/2/3) orange row, Artist
+    # (1/2/3/1/1/2) gold row, Pilgrim (1/2/3/4/2/3) pink row.
+    import ast
+    import re
+    from PIL import Image
+    dice = Image.open(os.path.join(os.path.dirname(__file__), "web",
+                                   "tokaidoduo-dice.webp"))
+    assert dice.size == (240, 120), dice.size  # 6 faces of 40px x 3 dice
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    row = dict(re.findall(r"(\w+): (\d+)", js[js.index("const TD_DIE_ROW = "):
+                                              js.index(";", js.index("const TD_DIE_ROW = "))]))
+    row = {k: int(v) for k, v in row.items()}
+    assert row == {"merchant": 0, "artist": 1, "pilgrim": 2}, row
+    col = ast.literal_eval(js[js.index("const TD_DIE_COL = ") + len("const TD_DIE_COL = "):
+                             js.index(";", js.index("const TD_DIE_COL = "))])
+    assert col == {1: 0, 2: 1, 3: 2, 4: 3}, col
+    # every face value of every die maps to a face in its row
+    assert set(TD.DICE_FACES["pilgrim"]) == {1, 2, 3, 4}
+    assert set(TD.DICE_FACES["merchant"]) == {1, 2, 3}
+    assert set(TD.DICE_FACES["artist"]) == {1, 2, 3}
+    for ch, faces in TD.DICE_FACES.items():
+        for v in set(faces):
+            assert v in col, (ch, v)
+    # the pick-die buttons carry the face span before the text
+    assert "tdDieFace(ch, g.dice[ch])" in js
+    assert "b.innerHTML = tdDieFace(ch, g.dice[ch])" in js
+    html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
+                encoding="utf-8").read()
+    assert ".tddie{display:inline-block;width:22px;height:22px;" in html
+    assert "background-image:url(tokaidoduo-dice.webp);background-size:600% 300%;" in html
+
+
+def test_player_seats_use_bga_player_boards():
+    # FB-0034: the player boards are the BGA boards from
+    # sources/tokaidoduo/bga/spritePlateauxJoueurs.png (two 862x213
+    # boards: top half = first seat, bottom half = second), served as
+    # web/tokaidoduo-pboards.webp, with the player's markers on the
+    # printed tracks — culture dots, commerce on the gold row, temple
+    # lanterns, garden circles, paintings in the printed slots.
+    import ast
+    import re
+    from PIL import Image
+    boards = Image.open(os.path.join(os.path.dirname(__file__), "web",
+                                     "tokaidoduo-pboards.webp"))
+    assert boards.size == (862, 426), boards.size
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+
+    def _map(name):
+        m = re.search(r"(?:const |, )" + name + r" = (\{[^}]*\}|\[[^\]]*\])", js)
+        assert m, name
+        return ast.literal_eval(m.group(1))
+    assert sorted(_map("TD_CULTURE_POS")) == [0, 2, 4, 7, 10, 14, 18, 23, 28, 34, 40]
+    assert sorted(_map("TD_GOLD_POS")) == [0, 5, 11, 18, 26, 35, 45]
+    for name in ("TD_CULTURE_POS", "TD_GOLD_POS"):
+        for x, y in _map(name).values():
+            assert 0 <= x <= 862 and 0 <= y <= 213, (name, x, y)
+    assert _map("TD_LANTERN_X") == [602, 645, 687]
+    assert _map("TD_LANTERN_Y") == [58, 118, 178]
+    assert _map("TD_GARDEN_Y") == [28, 60, 92, 123, 155, 185]
+    assert _map("TD_PAINT_X") == [278, 333, 388, 443, 498]
+    assert _map("TD_PAINT_Y") == [32, 88]
+    assert "TD_GARDEN_X = 735" in js
+    # 10 painting slots, one per painting tile in the deck
+    assert len(TD.PAINTING_TILES["purple"]) == 10
+    assert len(TD.PAINTING_TILES["green"]) == 10
+    # seats render the board strip (pb1 = bottom half for the 2nd seat)
+    # with the markers on it, and the paintings live in the slots —
+    # the old tdpaints strip under the seat is gone.
+    assert "'<div class=\"tdpboard' + (i === 1 ? ' pb1' : '') + '\">' + tdSeatBoard(g, p, col)" in js
+    assert "tdSeatBoard(g, p, col)" in js
+    assert "'<div class=\"tdpaints\">' + p.paintings.map(tdPaintTile)" not in js
+    html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
+                encoding="utf-8").read()
+    assert ".tdpboard{position:relative;aspect-ratio:862/213;" in html
+    assert "background-image:url(tokaidoduo-pboards.webp);background-size:100% 200%;" in html
+    assert ".tdpboard.pb1{background-position-y:100%}" in html
+    assert ".tdmark{position:absolute;width:14px;height:14px;" in html
+    assert ".tdpaintslot{position:absolute;width:6.4%;height:19%;" in html
 
 
 def test_hot_spring_token_shows_on_board():

@@ -784,7 +784,12 @@ def board_json(game, viewer_id=None):
             "vp": VICTORY_MARKERS.get(region_id, 0),
             "marker": dict(marker) if marker else None,
             "settlements": [
-                {"owner": owner, "color": FACTIONS.get(game["players"][owner].get("faction"), {}).get("color", "#888")}
+                {"owner": owner,
+                 "color": FACTIONS.get(game["players"][owner].get("faction"), {}).get("color", "#888"),
+                 # FB-0023: the faction, so the Mini App can draw the
+                 # settlement with that faction's token icon from
+                 # altay-tokens.webp instead of a plain coloured square.
+                 "faction": game["players"][owner].get("faction")}
                 for owner in region.get("settlements", [])
             ],
         })

@@ -212,13 +212,39 @@ class AltayEngineTests(unittest.TestCase):
         they are easier to see' — the settlement tokens on the board
         were 10px squares inside a 34px region circle; both the region
         circle and the tokens (plus the conquest marker chips) must be
-        substantially larger."""
+        substantially larger. FB-0023 replaced the plain squares with
+        the faction token icons from altay-tokens.webp (20x26px)."""
         base = os.path.dirname(os.path.abspath(__file__))
         with open(os.path.join(base, "web", "flip7.html"), encoding="utf-8") as f:
             html = f.read()
         self.assertIn(".atregion{position:absolute;transform:translate(-50%,-50%);width:44px;height:44px;", html)
-        self.assertIn(".atsettle{width:16px;height:16px;", html)
+        self.assertIn(".atsettle{width:20px;height:26px;background-image:url(altay-tokens.webp);background-size:400% 100%;", html)
         self.assertIn(".atmarkerchip{position:absolute;transform:translate(-50%,-50%);width:42px;height:28px;", html)
+
+    def test_settlements_use_faction_token_icons(self):
+        """FB-0023: 'su altay, cambia i simboli delle icone che
+        indicano gli insediamenti sulla plancia della mappa e usa come
+        icone quelle disponibili su web/altay-tokens.webp' — settlements
+        on the map must be drawn with the faction's token icon from
+        altay-tokens.webp, not a plain coloured square. The sheet holds
+        the 4 faction icons in FACTION_ORDER (4 columns), so the sprite
+        grid is 400% with 0/33.3/66.7/100% positions — the old 600% /
+        20% steps sliced icons in half. board_json must expose each
+        settlement's faction for the Mini App to pick the icon."""
+        game, _ = self.new_game()
+        board = altay.board_json(game, 42)
+        start = next(r for r in board["regions"]
+                     if r["settlements"])
+        self.assertEqual(start["settlements"][0]["faction"], "EARTHFOLK")
+        base = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(base, "web", "altay.js"), encoding="utf-8") as f:
+            js = f.read()
+        self.assertIn("(idx * 100 / 3)", js)
+        self.assertIn("atFactionStyle(s.faction)", js)
+        self.assertNotIn("background:' + s.color", js)
+        with open(os.path.join(base, "web", "flip7.html"), encoding="utf-8") as f:
+            html = f.read()
+        self.assertIn(".atfaction{display:inline-block;width:26px;height:26px;background-image:url(altay-tokens.webp);background-size:400% 100%;", html)
 
 
     def test_action_buttons_explain_why_they_cannot_be_used(self):

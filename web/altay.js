@@ -71,9 +71,15 @@ async function atMove(action, extra) {
   if (r.game) { ATG.board = r.game; ATG.mode = null; atRender(); }
 }
 function atFactionStyle(faction) {
+  // FB-0023: altay-tokens.webp holds the 4 faction settlement icons in
+  // FACTION_ORDER (295px each, 1180px wide) — a 4-column sheet, so
+  // background-size is 400% and the positions are 0/33.3/66.7/100%.
+  // The old 600% / 20% steps sliced icons in half (Elvenfolk showed
+  // half a yellow city + half a green tree; Smallfolk showed the red
+  // towers instead of the blue stones).
   const order = ['EARTHFOLK', 'ELVENFOLK', 'FIREFOLK', 'SMALLFOLK'];
   const idx = Math.max(0, order.indexOf(faction));
-  return 'background-position:' + (idx * 20) + '% 0';
+  return 'background-position:' + (idx * 100 / 3) + '% 0';
 }
 function atResources(p) {
   const icons = ATG.board.resource_icons || {};
@@ -135,8 +141,11 @@ function atRegion(region, g) {
   }
   if (region.vp) html += '<span class="atvp" style="top:-9px;left:70%">★' + region.vp + '</span>';
   if (region.settlements.length) {
+    // FB-0023: settlements are the faction's token icon from
+    // altay-tokens.webp (via atFactionStyle), not a plain coloured
+    // square — the icon is what identifies the settlement on the map.
     html += '<span class="atsettles">' + region.settlements.map(s =>
-      '<span class="atsettle" style="background:' + s.color + '"></span>').join('') + '</span>';
+      '<span class="atsettle" style="' + atFactionStyle(s.faction) + '"></span>').join('') + '</span>';
   }
   return html + '</div>';
 }

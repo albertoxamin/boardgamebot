@@ -196,7 +196,7 @@ GAME_SPECS = (
         min_players=2, max_players=2, npc_full="⛔ Tokaido Duo is 2 players (full).",
         rematch_phases=("game_end",), cover="",
         module="tokaidoduo", web_module="tokaidoduo",
-        static_assets=("tokaidoduo.js", "tokaidoduo-board.webp"),
+        static_assets=("tokaidoduo.js", "tokaidoduo-board.webp", "tokaidoduo-icons.webp"),
     ),
     GameSpec(
         key="altay", name="🏜️ Altay", command="/altay", join_command="/altay_join",

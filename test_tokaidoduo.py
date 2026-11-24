@@ -339,6 +339,47 @@ def test_boutique_pills_sit_over_package_symbols():
         assert math.hypot(px - 50, py - 50) > math.hypot(tx - 50, ty - 50), town
 
 
+def test_character_markers_use_bga_icons_on_boutique_symbols():
+    # FB-0024: when a Merchant or a Pilgrim is at a boutique, its marker
+    # must sit on the boutique symbol (TOWN_POS), not drift towards the
+    # wrapped-package symbol at the board edge (PACKAGE_POS, where the
+    # boutique pill already sits). FB-0025: the markers are the BGA
+    # character tokens from sources/tokaidoduo/bga/spriteIcons.png
+    # (parasol / merchant grid / paintbrush), served as
+    # web/tokaidoduo-icons.webp, with the player colour as the ring.
+    from PIL import Image
+    icons = Image.open(os.path.join(os.path.dirname(__file__), "web",
+                                    "tokaidoduo-icons.webp"))
+    assert icons.size == (141, 47), icons.size  # 3 icons of 47px
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    start = js.index("let html = '<div class=\"tdboard\">'")
+    end = js.index("html += '</div>';", start)
+    board_html = js[start:end]
+    # Markers are the character icons, not emoji letters.
+    assert "tdMeeple(sx" in board_html and "'pilgrim'" in board_html
+    assert "tdMeeple(mTown[0]" in board_html and "'merchant'" in board_html
+    assert "tdMeeple(zp[0]" in board_html and "'artist'" in board_html
+    assert "'⛩'" not in board_html and "'$'" not in board_html
+    # Merchant sits exactly on the town (boutique) symbol; pilgrim on a
+    # coastal station sits on that town's boutique symbol too — the
+    # meeple block must use town_pos, never package_pos.
+    assert "const mTown = (g.town_pos || {})[p.merchant_pos]" in board_html
+    assert "const pTownName = 'c_' + p.pilgrim_pos" in board_html
+    meeples = board_html[board_html.index("g.players.forEach((p, i) => {"):
+                         board_html.index("const zp = (g.zone_pos || [])[p.artist_zone];")]
+    assert "town_pos" in meeples and "package_pos" not in meeples, meeples
+    html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
+                encoding="utf-8").read()
+    assert ".tdmeeple{position:absolute;width:26px;height:26px;" in html
+    assert "background-image:url(tokaidoduo-icons.webp);background-size:300% 100%;" in html
+    assert ".tdmeeple.tdpilgrim{background-position:0% 0}" in html
+    assert ".tdmeeple.tdmerchant{background-position:50% 0}" in html
+    assert ".tdmeeple.tdartist{background-position:100% 0}" in html
+    assert ".tdmeeple.tdpurple{border-color:#7c3aed}" in html
+    assert ".tdmeeple.tdgreen{border-color:#059669}" in html
+
+
 def test_pending_move_options_carry_board_positions():
     # FB-0015: tap the board to move — every move option must map to a
     # spot on the board: pilgrim options carry their landing station,

@@ -66,10 +66,13 @@ function tdStationPos(i) {
   const a = (45 + i * (360 / 37)) * Math.PI / 180;
   return [52 + 40 * Math.sin(a), 50 - 36 * Math.cos(a)];
 }
-function tdMeeple(x, y, color, label, title) {
-  return '<span class="tdmeeple td' + color + '" style="top:' + y.toFixed(1) +
-         '%;left:' + x.toFixed(1) + '%;" title="' + escapeHtml(title) + '">' +
-         escapeHtml(label) + '</span>';
+function tdMeeple(x, y, color, char, title) {
+  // FB-0025: the marker is the BGA character icon from
+  // tokaidoduo-icons.webp (parasol / merchant grid / paintbrush),
+  // picked by the td{char} class — no more emoji letters. The player
+  // colour is the ring around the icon (see .tdmeeple in flip7.html).
+  return '<span class="tdmeeple td' + color + ' td' + char + '" style="top:' + y.toFixed(1) +
+         '%;left:' + x.toFixed(1) + '%;" title="' + escapeHtml(title) + '"></span>';
 }
 function tdPaintTile(t, idx) {
   if (t.gifted) return '<span class="tdpaint gifted" title="Gifted">✓</span>';
@@ -129,15 +132,25 @@ function tdRender() {
       (g.can_act ? ' · <b>your move</b>' : '');
   if (g.phase === 'game_end') rematch.classList.remove('hidden');
   let html = '<div class="tdboard">';
-  // meeples: pilgrim on the ring, merchant on towns, artist in zones
+  // meeples: pilgrim on the ring, merchant on towns, artist in zones.
+  // FB-0024: when a Merchant or a Pilgrim is at a boutique, its marker
+  // sits exactly on the boutique symbol (TOWN_POS) — not offset towards
+  // the wrapped-package symbol at the board edge (PACKAGE_POS, where
+  // the boutique pill already sits). A Pilgrim on a coastal station is
+  // at that town's boutique, so it uses the same symbol. If one
+  // player's Merchant and Pilgrim share a boutique, split them sideways
+  // so both markers stay visible on the boutique symbol.
   g.players.forEach((p, i) => {
     const col = p.color === 'purple' ? 'purple' : 'green';
-    const [sx, sy] = tdStationPos(p.pilgrim_pos);
-    html += tdMeeple(sx - 2.5, sy - 3, col, '⛩', p.name + ' Pilgrim @ station ' + p.pilgrim_pos + ' (' + (g.stations[p.pilgrim_pos] || '') + ')');
-    const tp = (g.town_pos || {})[p.merchant_pos];
-    if (tp) html += tdMeeple(tp[0] + 2.5, tp[1] - 3, col, '$', p.name + ' Merchant @ ' + p.merchant_pos);
+    const mTown = (g.town_pos || {})[p.merchant_pos];
+    const pTownName = 'c_' + p.pilgrim_pos;
+    const pTown = (g.town_pos || {})[pTownName];
+    const together = !!(mTown && pTown && p.merchant_pos === pTownName);
+    const [sx, sy] = pTown || tdStationPos(p.pilgrim_pos);
+    html += tdMeeple(sx + (together ? 3 : 0), sy, col, 'pilgrim', p.name + ' Pilgrim @ station ' + p.pilgrim_pos + ' (' + (g.stations[p.pilgrim_pos] || '') + ')');
+    if (mTown) html += tdMeeple(mTown[0] - (together ? 3 : 0), mTown[1], col, 'merchant', p.name + ' Merchant @ ' + p.merchant_pos);
     const zp = (g.zone_pos || [])[p.artist_zone];
-    if (zp) html += tdMeeple(zp[0], zp[1] + 3, col, '🎨', p.name + ' Artist @ ' + ((g.zones[p.artist_zone] || {}).name || ''));
+    if (zp) html += tdMeeple(zp[0], zp[1] + 3, col, 'artist', p.name + ' Artist @ ' + ((g.zones[p.artist_zone] || {}).name || ''));
   });
   // FB-0010/FB-0011: boutiques and waves ON the board itself, not just
   // in the card underneath it. The face-up Wave tiles sit in a strip

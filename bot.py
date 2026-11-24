@@ -24,6 +24,7 @@ import azul as AZ
 import toybattle as TB
 import tokaidoduo as TD
 import altay as AL
+import blackflag as BF
 import game_registry as GR
 import web_assets
 from game_modules.leaves import LEAVES_MODULE
@@ -37,7 +38,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 32
+WEB_VER = 33
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -419,6 +420,12 @@ def _fellowship_npc():
     return p
 
 
+def _blackflag_npc():
+    p = BF.new_player(NPC_ID, "🤖 NPC")
+    p["npc"] = True
+    return p
+
+
 NPC_PLAYERS = {
     "games": _games_npc,
     "regicide": lambda: {**_npc_player(), "hand": []},
@@ -437,6 +444,7 @@ NPC_PLAYERS = {
     "toybattle": lambda: {**TB.new_player(NPC_ID, "🤖 NPC"), **_npc_player()},
     "tokaidoduo": lambda: {**TD.new_player(NPC_ID, "🤖 NPC"), **_npc_player()},
     "altay": lambda: {**AL.new_player(NPC_ID, "🤖 NPC"), **_npc_player()},
+    "blackflag": _blackflag_npc,
 }
 
 
@@ -4401,6 +4409,8 @@ ALTAY_RULES = """🏜️ <b>Altay: Dawn of Civilization</b> (2 players, simplifi
 • Final score: achievements + VP action cards + 1 per settlement + VP markers held + 1 per captured settlement + 1 per 3 Conquest Markers. Ties break by achievements, cards, then settlements.
 • Commands: /altay_play &lt;card number&gt;, /altay_buy &lt;card&gt;, /altay_build &lt;territory&gt;, /altay_attack &lt;territory&gt;, /altay_develop &lt;id&gt;, /altay_end (or use buttons/Mini App)."""
 
+BLACKFLAG_RULES = BF.RULES
+
 TOYBATTLE_RULES = """🎯 <b>Toy Battle rules</b> (2 players, Castle Field): win by placing a troop on the enemy HQ, or by being first to 7 medals.
 • On your turn choose ONE action: <b>draw 2 troops</b> (rack holds at most 8) or <b>place 1 troop</b>.
 • A troop must be placed on a base connected to your HQ by a continuous line of bases topped by YOUR troops. Empty bases, enemy bases and the enemy HQ do not conduct connection. <b>Hook</b> may ignore this for bases, but not for the HQ.
@@ -5306,6 +5316,258 @@ def altay_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
+BLACKFLAG_LEN = GR.GAMES_BY_KEY["blackflag"].max_players
+BLACKFLAG_TARGET_CARDS = set(BF.ATTACK_CARDS) | {932, 934, 935, 936, 937}
+
+
+def blackflag_get(state, chat_id):
+    return state.setdefault("blackflag", {}).get(str(chat_id))
+
+
+def blackflag_actor_idx(g, uid):
+    if g["phase"] != "playing":
+        return None
+    return _actor_idx(g, uid, BF.actor(g))
+
+
+def blackflag_mention(g, user_id):
+    return f'<a href="tg://user?id={user_id}">{html.escape(BF.name_of(g, user_id))}</a>'
+
+
+def blackflag_board_text(g):
+    lines = list(BF.board_lines(g))
+    if g["phase"] == "playing":
+        ref = BF.actor(g)
+        player = g["players"][ref]
+        if _is_npc(player):
+            lines.append("👉 🤖 NPC's turn - anyone can play for it!")
+        else:
+            lines.append(f"👉 {blackflag_mention(g, player['user_id'])} - your move.")
+    return "\n".join(lines)
+
+
+def blackflag_keyboard(g):
+    if g["phase"] == "game_end":
+        return [[{"text": "🔄 Rematch!", "callback_data": "bf:rematch"}]]
+    ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
+    wk = web_keyboard(ct, g["chat_id"], game="blackflag")
+    if g["phase"] == "lobby":
+        kb = [[{"text": "🙋 Join Black Flag", "callback_data": "bf:join"}]]
+        if not any(_is_npc(p) for p in g["players"]):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "bf:npc"}])
+        kb.append([{"text": "▶️ Start game", "callback_data": "bf:start"}])
+        return kb + (wk or [])
+    kb = []
+    pending = g.get("pending")
+    if pending:
+        legal = BF.legal_actions(g)
+        for index in legal["defend"]:
+            card = g["players"][legal["actor"]]["hand"][index]
+            kb.append([{"text": f"🛡 {index + 1} {BF.CARD_INFO[card][0]}",
+                        "callback_data": f"bf:d:{index}"}])
+        if legal["pass"]:
+            kb.append([{"text": "⏭ Pass", "callback_data": "bf:pass"}])
+    elif g.get("sel"):
+        for target in BF.legal_actions(g)["targets"]:
+            name = g["players"][target]["name"]
+            kb.append([{"text": f"🎯 {name}", "callback_data": f"bf:t:{g['sel']['card']}:{target}"}])
+        kb.append([{"text": "↩️ Back", "callback_data": "bf:back"}])
+    else:
+        current = BF.actor(g)
+        player = g["players"][current]
+        if not player["ship"]:
+            for index, ship in enumerate(g["ship_row"]):
+                kb.append([{"text": f"🚢 {index + 1} {BF.ship_info(ship)['name']}",
+                            "callback_data": f"bf:s:{index}"}])
+            if g["ship_deck"] or g["ship_discard"]:
+                kb.append([{"text": "🚢 Blind deck", "callback_data": "bf:s:deck"}])
+        else:
+            row = []
+            for index, card in enumerate(player["hand"]):
+                row.append({"text": f"🃏 {index + 1} {BF.CARD_INFO[card][0]}",
+                            "callback_data": f"bf:p:{index}"})
+                if len(row) == 3:
+                    kb.append(row)
+                    row = []
+            if row:
+                kb.append(row)
+            legal = BF.legal_actions(g)
+            extra = []
+            if legal["ability"]:
+                extra.append({"text": "🔥 Extra Shot", "callback_data": "bf:a"})
+            extra.append({"text": "✅ End turn", "callback_data": "bf:e"})
+            kb.append(extra)
+    if wk:
+        kb.extend(wk)
+    return kb or None
+
+
+def blackflag_render(g, events=None):
+    lines = [html.escape(event) for event in (events or [])]
+    r = send_board(g, "blackflag", "\n".join(lines + [blackflag_board_text(g)]),
+                   blackflag_keyboard(g))
+    if r.get("ok"):
+        old = g.get("board_message_id")
+        g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=g["chat_id"], message_id=old)
+
+
+def handle_blackflag(state, msg, cmd, text, uid, name):
+    chat_id = msg["chat"]["id"]
+    g = blackflag_get(state, chat_id)
+    if cmd == "/blackflag_rules":
+        send(chat_id, BLACKFLAG_RULES)
+        return True
+    if cmd == "/blackflag":
+        if not g:
+            creator_name = msg.get("from", {}).get("first_name") or "Player"
+            g = BF.new_game(chat_id, uid, creator_name)
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state.setdefault("blackflag", {})[str(chat_id)] = g
+            blackflag_render(g, [f"🏴‍☠️ Black Flag game created by {html.escape(creator_name)}!"])
+        else:
+            blackflag_render(g)
+        return True
+    if not g:
+        send(chat_id, "No Black Flag game here yet - send /blackflag to create one.")
+        return True
+    g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd == "/blackflag_join_npc":
+        err = add_npc("blackflag", g)
+        send(chat_id, err or "🤖 NPC joined - anyone can play for it!")
+        if not err:
+            blackflag_render(g)
+        return True
+    if cmd == "/blackflag_join":
+        err = BF.join_game(g, uid, msg.get("from", {}).get("first_name") or "Player")
+        send(chat_id, f"⛔ {err}" if err else f"🙋 <b>{name}</b> joined Black Flag.")
+        if not err:
+            blackflag_render(g)
+        return True
+    if cmd == "/blackflag_start":
+        ev = []
+        err = BF.start_game(g, ev)
+        send(chat_id, f"⛔ {err}" if err else "🏴‍☠️ Black Flag started!")
+        if not err:
+            blackflag_render(g, ev)
+        return True
+    if cmd == "/blackflag_cancel":
+        if uid != g["created_by"]:
+            send(chat_id, "⛔ Only the creator can cancel.")
+        else:
+            del state["blackflag"][str(chat_id)]
+            send(chat_id, "🗑 Black Flag game cancelled.")
+        return True
+    if cmd == "/blackflag_rematch":
+        ev, err = rematch_game(state, "blackflag", chat_id, uid)
+        send(chat_id, f"⛔ {err}" if err else "🔄 Rematch!")
+        return True
+    idx = blackflag_actor_idx(g, uid)
+    if idx is None:
+        send(chat_id, "⛔ You're not in this game (or it isn't your turn).")
+        return True
+    parts = text.split()[1:]
+    ev = []
+    params = {}
+    if cmd == "/blackflag_ship":
+        action = "ship"
+        params["choice"] = parts[0] if parts and parts[0].isdigit() else "deck"
+    elif cmd == "/blackflag_play":
+        action = "play"
+        if not parts or not parts[0].isdigit():
+            send(chat_id, "Usage: /blackflag_play &lt;card#&gt; [target#]")
+            return True
+        params["index"] = int(parts[0]) - 1
+        if len(parts) > 1 and parts[1].isdigit():
+            params["target"] = int(parts[1]) - 1
+    elif cmd == "/blackflag_defend":
+        action = "defend"
+        if not parts or not parts[0].isdigit():
+            send(chat_id, "Usage: /blackflag_defend &lt;card#&gt;")
+            return True
+        params["index"] = int(parts[0]) - 1
+    elif cmd == "/blackflag_pass":
+        action = "pass"
+    elif cmd == "/blackflag_end":
+        action = "end"
+    elif cmd == "/blackflag_ability":
+        action = "ability"
+        params["indices"] = [int(part) - 1 for part in parts if part.isdigit()]
+    else:
+        return False
+    err = BF.apply_action(g, idx, action, params, ev)
+    if err:
+        send(chat_id, f"⛔ {err}")
+    else:
+        g["sel"] = None
+        blackflag_render(g, ev)
+    return True
+
+
+def blackflag_board_json(g, viewer_id=None):
+    board = BF.board_json(g, viewer_id)
+    board.update({
+        "chat_id": g["chat_id"], "rules": BLACKFLAG_RULES,
+        "log": board["log"], "is_player": board["me"] is not None,
+    })
+    return board
+
+
+def blackflag_api_move(state, chat_id, user_id, body):
+    g = blackflag_get(state, chat_id)
+    if not g:
+        return [], "no Black Flag game in that chat"
+    action = body.get("action")
+    ev = []
+    mine = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
+    if action == "join":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        if mine is not None:
+            return ev, None
+        name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
+        err = BF.join_game(g, user_id, name)
+        if err:
+            return [], err
+        ev.append("🙋 joined Black Flag.")
+    elif action == "npc":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        err = add_npc("blackflag", g)
+        if err:
+            return [], err
+        ev.append("🤖 NPC joined - anyone can play for it.")
+    elif action == "start":
+        if g["phase"] != "lobby":
+            return [], "already started"
+        err = BF.start_game(g, ev)
+        if err:
+            return [], err
+    elif action == "rematch":
+        return rematch_game(state, "blackflag", chat_id, user_id)
+    else:
+        actor = blackflag_actor_idx(g, user_id)
+        if actor is None:
+            return [], "not in this game"
+        params = dict(body)
+        try:
+            if "index" in params:
+                params["index"] = int(params["index"])
+            if params.get("target") not in (None, ""):
+                params["target"] = int(params["target"])
+            if "choice" in params and str(params["choice"]).isdigit():
+                params["choice"] = int(params["choice"])
+        except (TypeError, ValueError):
+            return [], "bad move"
+        err = BF.apply_action(g, actor, action, params, ev)
+        if err:
+            return [], err
+    g["sel"] = None
+    blackflag_render(g, ev)
+    return ev, None
+
+
 REMATCH_END_PHASES = dict(GR.REMATCH_END_PHASES)
 
 RENDERERS = {"games": render, "regicide": rg_render, "odin": odin_render,
@@ -5313,9 +5575,9 @@ RENDERERS = {"games": render, "regicide": rg_render, "odin": odin_render,
              "fliptoons": fliptoons_render, "tornado": tornado_render,
               "castlecombo": castlecombo_render, "artichokes": artichokes_render,
                "fellowship": fotr_render, "azul": azul_render,
-               "toybattle": toybattle_render,
-               "tokaidoduo": tokaidoduo_render,
-                "altay": altay_render}
+                "toybattle": toybattle_render,
+                "tokaidoduo": tokaidoduo_render,
+                 "altay": altay_render, "blackflag": blackflag_render}
 
 RULES_BY_KEY = {"games": RULES, "regicide": REGICIDE_RULES, "odin": ODIN_RULES,
                 "leaves": LEAVES_MODULE.rules(), "lsd": LSD_RULES, "spots": SPOTS_RULES,
@@ -5323,8 +5585,8 @@ RULES_BY_KEY = {"games": RULES, "regicide": REGICIDE_RULES, "odin": ODIN_RULES,
                 "tornado": TORNADO_RULES, "castlecombo": CASTLECOMBO_RULES,
                 "artichokes": ARTICHOKES_RULES, "fellowship": FTR_RULES,
                  "azul": AZUL_RULES, "toybattle": TOYBATTLE_RULES,
-                 "tokaidoduo": TOKAIDODUO_RULES,
-                 "altay": ALTAY_RULES}
+                  "tokaidoduo": TOKAIDODUO_RULES,
+                  "altay": ALTAY_RULES, "blackflag": BLACKFLAG_RULES}
 
 
 def guide_payload(key):
@@ -5354,6 +5616,7 @@ PLAYER_MAKERS = {
     "toybattle": lambda u, n: TB.new_player(u, n),
     "tokaidoduo": lambda u, n: TD.new_player(u, n),
     "altay": lambda u, n: AL.new_player(u, n),
+    "blackflag": lambda u, n: BF.new_player(u, n),
 }
 
 GAME_MAKERS = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
@@ -5362,8 +5625,8 @@ GAME_MAKERS = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
                "castlecombo": CC.new_game, "artichokes": AT.new_game,
                 "fellowship": FTR.new_game, "azul": AZ.new_game,
                 "toybattle": TB.new_game,
-               "tokaidoduo": TD.new_game,
-                "altay": AL.new_game}
+                "tokaidoduo": TD.new_game,
+                 "altay": AL.new_game, "blackflag": BF.new_game}
 
 
 def rematch_game(state, key, chat_id, uid):
@@ -5491,6 +5754,9 @@ def handle_command(state, msg):
         return
     if cmd.startswith("/altay"):
         handle_altay(state, msg, cmd, text, uid, name)
+        return
+    if cmd.startswith("/blackflag"):
+        handle_blackflag(state, msg, cmd, text, uid, name)
         return
     if cmd in ("/start", "/help", "/commands"):
         send(chat_id, HELP)
@@ -5723,6 +5989,90 @@ def handle_callback(state, cb):
         if not err:
             g["sel"] = None
             altay_render(g, ev)
+        return
+    if data.startswith("bf:"):
+        g = blackflag_get(state, chat_id)
+        if not g:
+            return answer_cb(cb["id"], "No Black Flag game here.")
+        parts = data.split(":")
+        action = parts[1] if len(parts) > 1 else ""
+        ev = []
+        if action == "join":
+            if g["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            err = BF.join_game(g, uid, cb["from"].get("first_name") or "Player")
+            answer_cb(cb["id"], err or "Joined!")
+            if not err:
+                blackflag_render(g, [f"🙋 {cb['from'].get('first_name')} joined Black Flag."])
+            return
+        if action == "npc":
+            err = add_npc("blackflag", g)
+            answer_cb(cb["id"], err or "🤖 NPC joined")
+            if not err:
+                blackflag_render(g)
+            return
+        if action == "start":
+            if g["phase"] != "lobby":
+                return answer_cb(cb["id"], "Already started.")
+            err = BF.start_game(g, ev)
+            answer_cb(cb["id"], err or "Started")
+            if not err:
+                blackflag_render(g, ev)
+            return
+        if action == "rematch":
+            ev, err = rematch_game(state, "blackflag", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
+            return
+        actor = blackflag_actor_idx(g, uid)
+        if actor is None:
+            return answer_cb(cb["id"], "Not your turn.")
+        if action == "p":
+            try:
+                card_index = int(parts[2])
+            except (IndexError, ValueError):
+                return answer_cb(cb["id"], "Bad card.")
+            if card_index >= len(g["players"][actor]["hand"]):
+                return answer_cb(cb["id"], "Bad card.")
+            card = g["players"][actor]["hand"][card_index]
+            if card in BLACKFLAG_TARGET_CARDS:
+                g["sel"] = {"card": card_index}
+                answer_cb(cb["id"], "Choose a target")
+                blackflag_render(g)
+                return
+            err = BF.apply_action(g, actor, "play", {"index": card_index}, ev)
+        elif action == "t":
+            try:
+                card_index, target = int(parts[2]), int(parts[3])
+            except (IndexError, ValueError):
+                return answer_cb(cb["id"], "Bad target.")
+            err = BF.apply_action(g, actor, "play", {"index": card_index, "target": target}, ev)
+        elif action == "s":
+            choice = parts[2] if len(parts) > 2 else "deck"
+            if choice.isdigit():
+                choice = int(choice)
+            err = BF.apply_action(g, actor, "ship", {"choice": choice}, ev)
+        elif action == "d":
+            try:
+                err = BF.apply_action(g, actor, "defend", {"index": int(parts[2])}, ev)
+            except (IndexError, ValueError):
+                return answer_cb(cb["id"], "Bad card.")
+        elif action == "pass":
+            err = BF.apply_action(g, actor, "pass", {}, ev)
+        elif action == "e":
+            err = BF.apply_action(g, actor, "end", {}, ev)
+        elif action == "a":
+            err = BF.apply_action(g, actor, "ability", {}, ev)
+        elif action == "back":
+            g["sel"] = None
+            err = None
+        else:
+            return answer_cb(cb["id"], "Unknown button.")
+        answer_cb(cb["id"], err or "Done")
+        if not err:
+            g["sel"] = None
+            blackflag_render(g, ev)
         return
     if data.startswith("tb:"):
         g = toybattle_get(state, chat_id)
@@ -7336,7 +7686,9 @@ def start_web_server(state):
                   "/tokaidoduo-board.webp",
                   "/altay-board.webp", "/altay-actions.webp",
                   "/altay-achievements.webp", "/altay-markers.webp",
-                  "/altay-tokens.webp"):
+                   "/altay-tokens.webp",
+                   "/blackflag-cards.webp", "/blackflag-ships.webp",
+                   "/blackflag-board.webp", "/blackflag-cardback.webp"):
                 p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
                 if os.path.exists(p):
                     return self._send(200, open(p, "rb").read(), "image/webp",
@@ -7549,6 +7901,25 @@ def start_web_server(state):
                 with STATE_LOCK:
                     g = altay_get(state, chat_id)
                     board = altay_board_json(g, uid) if g else None
+                return self._send(200 if board else 404, {"ok": bool(board), "game": board})
+            if u.path == "/api/blackflag/mygames":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                with STATE_LOCK:
+                    games = [blackflag_board_json(g, uid) for g in state.get("blackflag", {}).values()
+                             if any(p["user_id"] == uid for p in g["players"])]
+                return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/blackflag/game":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                chat_id = q.get("chat_id", [""])[0]
+                with STATE_LOCK:
+                    g = blackflag_get(state, chat_id)
+                    board = blackflag_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/tokaidoduo/mygames":
                 q = urllib.parse.parse_qs(u.query)
@@ -8099,6 +8470,52 @@ def start_web_server(state):
                     events, err = altay_api_move(state, chat_id, uid, body)
                     g = altay_get(state, chat_id)
                     board = altay_board_json(g, uid) if g else None
+                    save_state(state)
+                return self._send(200 if not err else 400,
+                                  {"ok": not err, "error": err, "events": events, "game": board})
+            if path in ("/api/blackflag/create", "/api/blackflag/move"):
+                try:
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                except Exception:
+                    return self._send(400, {"ok": False, "error": "bad json"})
+                iu = init_user(body.get("init_data", ""))
+                if iu is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                uid, name, start_param, chat_instance = iu
+                if path == "/api/blackflag/create":
+                    chat_id = None
+                    for cand in (start_param, str(body.get("chat_id") or ""), chat_instance):
+                        cand = str(cand)
+                        if cand.startswith("blackflag"):
+                            cand = cand[len("blackflag"):]
+                        try:
+                            chat_id = int(cand)
+                            break
+                        except (TypeError, ValueError):
+                            continue
+                    if not chat_id:
+                        return self._send(400, {"ok": False, "error": "open the Mini App from a chat (startapp link)"})
+                    with STATE_LOCK:
+                        g = blackflag_get(state, chat_id)
+                        if g and g["phase"] != "game_end":
+                            return self._send(200, {"ok": True, "game": blackflag_board_json(g, uid), "created": False})
+                        g = BF.new_game(chat_id, uid, name)
+                        g["chat_type"] = "supergroup" if chat_id < 0 else "private"
+                        state.setdefault("blackflag", {})[str(chat_id)] = g
+                        blackflag_render(g, [f"🏴‍☠️ Black Flag created by {html.escape(name)} via Mini App!"])
+                        save_state(state)
+                        board = blackflag_board_json(g, uid)
+                    return self._send(200, {"ok": True, "game": board, "created": True})
+                chat_id = body.get("chat_id")
+                if not chat_id and str(start_param).startswith("blackflag"):
+                    try:
+                        chat_id = int(str(start_param)[len("blackflag"):])
+                    except ValueError:
+                        pass
+                with STATE_LOCK:
+                    events, err = blackflag_api_move(state, chat_id, uid, body)
+                    g = blackflag_get(state, chat_id)
+                    board = blackflag_board_json(g, uid) if g else None
                     save_state(state)
                 return self._send(200 if not err else 400,
                                   {"ok": not err, "error": err, "events": events, "game": board})

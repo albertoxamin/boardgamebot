@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch
 
 import bot
+import blackflag as BF
 import fellowship as FTR
 import game_registry as GR
 import web_assets
@@ -271,6 +272,87 @@ class RegistryTests(unittest.TestCase):
         state = {"altay": {"7": game}}
         with patch.object(bot, "send_board", return_value={"ok": False}):
             events, err = bot.altay_api_move(state, 7, 42, {"action": "npc"})
+        self.assertIsNone(err)
+        self.assertTrue(game["players"][1]["npc"])
+        self.assertTrue(events)
+
+
+class BlackFlagTests(unittest.TestCase):
+    def test_deck_and_role_metadata_are_consistent(self):
+        self.assertEqual(set(BF.CARD_DECK), set(BF.CARD_INFO))
+        self.assertTrue(all(copies > 0 for copies in BF.CARD_DECK.values()))
+        self.assertEqual(set(BF.CAPTAIN_SHIP), set(BF.CAPTAINS))
+        self.assertTrue(all(ship in BF.SHIPS for ship in BF.CAPTAIN_SHIP.values()))
+        for count in range(BF.MIN_PLAYERS, BF.MAX_PLAYERS + 1):
+            roles = BF.ROLE_DECKS[count]
+            self.assertEqual(len(roles), count)
+            self.assertIn(905, roles)
+
+    def test_setup_deals_cards_and_hides_info(self):
+        game = BF.new_game(7, 42, "Ada")
+        for uid, name in ((43, "Ben"), (44, "Cy"), (45, "Dee")):
+            self.assertIsNone(BF.join_game(game, uid, name))
+        events = []
+        self.assertIsNone(BF.start_game(game, events))
+        total = sum(len(p["hand"]) for p in game["players"]) + len(game["deck"]) + len(game["discard"])
+        self.assertEqual(total, sum(BF.CARD_DECK.values()))
+        self.assertEqual(len(game["ship_row"]), 3)
+        self.assertEqual(game["hourglass"], 7)
+        self.assertEqual(len({p["role"] for p in game["players"]}), 4)
+        self.assertTrue(events)
+        outsider = BF.board_json(game, 999)
+        self.assertTrue(all(p["hand"] == [] for p in outsider["players"]))
+        own = BF.board_json(game, 42)
+        self.assertEqual(len(own["players"][0]["hand"]), len(game["players"][0]["hand"]))
+
+    def test_shot_can_be_passed_and_damages_target(self):
+        game = BF.new_game(7, 42, "Ada")
+        for uid, name in ((43, "Ben"), (44, "Cy"), (45, "Dee")):
+            BF.join_game(game, uid, name)
+        BF.start_game(game, [])
+        current = game["current"]
+        game["players"][current]["ship"] = 400
+        targets = BF._target_options(game, current, attack=True)
+        self.assertTrue(targets)
+        target = targets[0]
+        game["players"][current]["hand"] = [929]
+        before = game["players"][target]["barrels"]
+        events = []
+        self.assertIsNone(BF.play_card(game, current, 0, target, events))
+        self.assertEqual(game["pending"]["target"], target)
+        self.assertIsNone(BF.pass_defense(game, target, events))
+        self.assertIsNone(game["pending"])
+        self.assertEqual(game["players"][target]["barrels"], before - 2)
+        self.assertTrue(events)
+
+    def test_npc_can_be_controlled_and_hands_are_private(self):
+        game = bot.BF.new_game(7, 42, "Ada")
+        BF.join_game(game, 43, "Ben")
+        BF.join_game(game, 44, "Cy")
+        self.assertIsNone(bot.add_npc("blackflag", game))
+        events = []
+        self.assertIsNone(bot.BF.start_game(game, events))
+        npc_index = len(game["players"]) - 1
+        game["current"] = npc_index
+        self.assertEqual(bot.blackflag_actor_idx(game, 42), npc_index)
+        board = bot.blackflag_board_json(game, 42)
+        self.assertTrue(board["can_act"])
+        self.assertTrue(board["players"][npc_index]["hand"])
+        game["players"][npc_index]["npc"] = False
+        game["players"][npc_index]["user_id"] = 99
+        board = bot.blackflag_board_json(game, 42)
+        self.assertEqual(board["players"][npc_index]["hand"], [])
+        self.assertFalse(board["can_act"])
+        state = {"blackflag": {"7": game}}
+        with patch.object(bot, "send_board", return_value={"ok": False}):
+            _, err = bot.blackflag_api_move(state, 7, 99, {"action": "end"})
+        self.assertIsNone(err)
+
+    def test_api_can_add_npc_from_lobby(self):
+        game = bot.BF.new_game(7, 42, "Ada")
+        state = {"blackflag": {"7": game}}
+        with patch.object(bot, "send_board", return_value={"ok": False}):
+            events, err = bot.blackflag_api_move(state, 7, 42, {"action": "npc"})
         self.assertIsNone(err)
         self.assertTrue(game["players"][1]["npc"])
         self.assertTrue(events)

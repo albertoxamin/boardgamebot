@@ -211,6 +211,20 @@ GAME_SPECS = (
         static_assets=("altay.js", "altay-board.webp", "altay-actions.webp",
                        "altay-achievements.webp", "altay-markers.webp", "altay-tokens.webp"),
     ),
+    GameSpec(
+        key="blackflag", name="🏴‍☠️ Black Flag", command="/blackflag", join_command="/blackflag_join",
+        description="4-8 players: ship, shoot, sink and race the treasure chest to your flag",
+        help_commands=("/blackflag_join", "/blackflag_join_npc", "/blackflag_start",
+                       "/blackflag_ship", "/blackflag_play", "/blackflag_defend",
+                       "/blackflag_pass", "/blackflag_end", "/blackflag_rules",
+                       "/blackflag_cancel", "/blackflag_rematch"),
+        web_label="🎮 Play Black Flag (HTML)", callback_prefix="bf",
+        min_players=4, max_players=8, npc_full="⛔ Black Flag is 4-8 players (full).",
+        rematch_phases=("game_end",), cover="blackflag.jpg",
+        module="blackflag", web_module="blackflag",
+        static_assets=("blackflag.js", "blackflag-cards.webp", "blackflag-ships.webp",
+                       "blackflag-board.webp", "blackflag-cardback.webp"),
+    ),
 )
 
 GAMES_BY_KEY = {spec.key: spec for spec in GAME_SPECS}

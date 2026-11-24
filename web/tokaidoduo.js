@@ -90,7 +90,9 @@ function tdMeeple(x, y, color, char, title) {
   // FB-0025: the marker is the BGA character icon from
   // tokaidoduo-icons.webp (parasol / merchant grid / paintbrush),
   // picked by the td{char} class — no more emoji letters. The player
-  // colour is the ring around the icon (see .tdmeeple in flip7.html).
+  // colour is unmissable (FB-0027): the whole disc is filled with it
+  // (it shows through the icon's transparent parts), plus a 4px ring
+  // and a coloured halo (see .tdmeeple in flip7.html).
   return '<span class="tdmeeple td' + color + ' td' + char + '" style="top:' + y.toFixed(1) +
          '%;left:' + x.toFixed(1) + '%;" title="' + escapeHtml(title) + '"></span>';
 }

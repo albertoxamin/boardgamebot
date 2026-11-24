@@ -397,6 +397,12 @@ def test_character_markers_use_bga_icons_on_boutique_symbols():
     assert ".tdmeeple.tdartist{background-position:100% 0}" in html
     assert ".tdmeeple.tdpurple{border-color:#7c3aed}" in html
     assert ".tdmeeple.tdgreen{border-color:#059669}" in html
+    # FB-0027: the player colour must be unmissable on the token — the
+    # whole disc is filled with it (the icon has transparent parts) and
+    # it gets a coloured halo, not just a thin ring.
+    assert ".tdmeeple.tdpurple{background-color:#7c3aed;box-shadow:0 0 0 2px #7c3aedcc" in html
+    assert ".tdmeeple.tdgreen{background-color:#059669;box-shadow:0 0 0 2px #059669cc" in html
+    assert "border:4px solid #fff" in html
 
 
 def test_pending_move_options_carry_board_positions():

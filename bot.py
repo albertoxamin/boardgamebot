@@ -22,6 +22,7 @@ import tornado as TS
 import fellowship as FTR
 import azul as AZ
 import toybattle as TB
+import tokaidoduo as TD
 import game_registry as GR
 import web_assets
 from game_modules.leaves import LEAVES_MODULE
@@ -433,6 +434,7 @@ NPC_PLAYERS = {
     "fellowship": _fellowship_npc,
     "azul": lambda: {**AZ.new_player(NPC_ID, "🤖 NPC"), **_npc_player()},
     "toybattle": lambda: {**TB.new_player(NPC_ID, "🤖 NPC"), **_npc_player()},
+    "tokaidoduo": lambda: {**TD.new_player(NPC_ID, "🤖 NPC"), **_npc_player()},
 }
 
 
@@ -4672,6 +4674,280 @@ def toybattle_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
+TOKAIDODUO_RULES = """🗾 <b>Tokaido Duo rules</b> (2 players, Shikoku): each player controls a Pilgrim, a Merchant and an Artist. Score Faith + Commerce + Culture; highest total wins (tie: more coins, then shared).
+• Each round the first picker rolls 3 dice (one per character). Draft is 1-2-1: first picker takes one, the other takes one, first picker takes the last. First picker alternates each round. A chosen character <b>must</b> move the exact die value.
+• <b>Pilgrim ⛩️</b> moves clockwise around the 37-station ring. May pass occupied stations, but may not land on one - jumps to the next empty station. Coastal Town: gain the boutique coins (2-4). Temple: +1 Temple (9 ends the game). Garden: +1 Garden (6 ends the game). Hot Spring: take the token (steal it from your opponent); use it on a future pick to repeat a move. Seashore: take a Wave tile from the board (or steal one).
+• <b>Merchant 💰</b> moves along orange Trade routes (Mountain &lt;-&gt; Coastal towns), exactly the die value; if no path of that length exists, no move. Mountain town: draw 2-4 Wares (store at most 5). Coastal town: sell matching Wares for the boutique price each. 10 coins = 1 gold slab (6th slab ends the game). Commerce = 0/5/11/18/26/35/45 for 0-6 slabs.
+• <b>Artist 🎨</b> moves through zones (never revisiting a zone, never through a Mountain town). Then Paint (reveal as many Painting tiles as other meeples in the arrival zone) OR Gift (if the arrival zone matches the topmost revealed Painting, remove it; 10th gift ends the game). Culture = points for Paintings gifted.
+• <b>Wave tiles</b>: Pilgrim Hasty (+1 move) / Tranquil (-1), Merchant Crafty (+1 coin per Ware) / Robust (+1 Ware drawn, store 6), Artist Proficient (+1 tile when Painting) / Inspired (Gift any icon on your path). Side is random at setup and fixed.
+• Game ends at the end of the round when a trigger fires. Faith = Temple x Garden.
+• Commands: /tokaidoduo_pick &lt;pilgrim|merchant|artist&gt;, /tokaidoduo_choose &lt;value&gt; (or use buttons/Mini App)."""
+
+
+def tokaidoduo_get(state, chat_id):
+    return state.setdefault("tokaidoduo", {}).get(str(chat_id))
+
+
+def tokaidoduo_actor_idx(g, uid):
+    if g["phase"] != "play":
+        return None
+    ref = TD.current_picker(g)
+    if ref is None:
+        return None
+    return _actor_idx(g, uid, ref)
+
+
+def tokaidoduo_board_text(g):
+    if g["phase"] == "lobby":
+        return "\n".join(TD.board_lines(g))
+    lines = list(TD.board_lines(g))
+    if g.get("pending"):
+        lines.append("⚡ Choose: " + " · ".join(
+            o["label"] for o in TD.pending_options(g, g["pending"]["by"])))
+    else:
+        lines.append("🎮 /tokaidoduo_pick &lt;pilgrim|merchant|artist&gt; (or tap buttons / Mini App).")
+    return "\n".join(lines)
+
+
+def tokaidoduo_keyboard(g):
+    if g["phase"] == "game_end":
+        kb = [[{"text": "🔄 Rematch!", "callback_data": "td:rematch"}]]
+    else:
+        ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
+        wk = web_keyboard(ct, g["chat_id"], game="tokaidoduo")
+        if g["phase"] == "lobby":
+            kb = [[{"text": "🙋 Join Tokaido Duo", "callback_data": "td:join"}]]
+            if not any(_is_npc(p) for p in g["players"]):
+                kb.append([{"text": "🤖 Add NPC", "callback_data": "td:npc"}])
+            kb.append([{"text": "▶️ Start game", "callback_data": "td:start"}])
+            return kb + (wk or [])
+        kb = []
+        pend = g.get("pending")
+        if pend:
+            for opt in TD.pending_options(g, pend["by"]):
+                kb.append([{"text": opt["label"][:60],
+                            "callback_data": f"td:c:{opt['value']}"}])
+        elif g["phase"] == "play":
+            for ch in TD.available_dice(g):
+                kb.append([{"text": f"{TD.CHAR_EMOJI[ch]} {ch.title()} ({g['dice'][ch]})",
+                            "callback_data": f"td:pick:{ch}"}])
+        if wk:
+            kb.extend(wk)
+    return kb or None
+
+
+def tokaidoduo_render(g, events=None):
+    lines = [html.escape(e) for e in (events or [])]
+    if g["phase"] == "play":
+        ref = TD.current_picker(g)
+        if ref is not None:
+            p = g["players"][ref]
+            if _is_npc(p):
+                lines.append("👉 🤖 NPC's turn - anyone can play for it!")
+            else:
+                lines.append(f"👉 {tokaidoduo_mention(g, p['user_id'])} - your move.")
+    text = "\n".join(lines + [tokaidoduo_board_text(g)])
+    r = send_board(g, "tokaidoduo", text, tokaidoduo_keyboard(g))
+    if r.get("ok"):
+        old = g.get("board_message_id")
+        g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=g["chat_id"], message_id=old)
+
+
+def tokaidoduo_mention(g, user_id):
+    return f'<a href="tg://user?id={user_id}">{html.escape(TD.name_of(g, user_id) if user_id in [p["user_id"] for p in g["players"]] else "player")}</a>'
+
+
+def handle_tokaidoduo(state, msg, cmd, text, uid, name):
+    chat_id = msg["chat"]["id"]
+    g = tokaidoduo_get(state, chat_id)
+    if cmd == "/tokaidoduo_rules":
+        send(chat_id, TOKAIDODUO_RULES)
+        return True
+    if cmd == "/tokaidoduo":
+        if not g:
+            _name = msg.get("from", {}).get("first_name") or "Player"
+            g = TD.new_game(chat_id, uid, _name)
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state.setdefault("tokaidoduo", {})[str(chat_id)] = g
+            tokaidoduo_render(g, [f"🗾 Tokaido Duo game created by {html.escape(_name)}!"])
+        else:
+            tokaidoduo_render(g)
+        return True
+    if not g:
+        send(chat_id, "No Tokaido Duo game here yet - send /tokaidoduo to create one.")
+        return True
+    g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd == "/tokaidoduo_join_npc":
+        err = add_npc("tokaidoduo", g)
+        send(chat_id, err or "🤖 NPC joined - anyone can play for it!")
+        if not err:
+            tokaidoduo_render(g)
+        return True
+    if cmd == "/tokaidoduo_join":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p["user_id"] == uid for p in g["players"]):
+            send(chat_id, "You're already in!")
+        elif len(g["players"]) >= TD_LEN:
+            send(chat_id, "⛔ Tokaido Duo is 2 players (full).")
+        else:
+            g["players"].append(TD.new_player(uid, msg.get("from", {}).get("first_name") or "Player"))
+            send(chat_id, f"🙋 <b>{name}</b> joined Tokaido Duo.")
+            tokaidoduo_render(g)
+        return True
+    if cmd == "/tokaidoduo_start":
+        if g["phase"] != "lobby":
+            send(chat_id, "Already started.")
+        else:
+            ev = []
+            err = TD.start_game(g, ev)
+            send(chat_id, f"⛔ {err}" if err else "🗾 Tokaido Duo started!")
+            if not err:
+                tokaidoduo_render(g, ev)
+        return True
+    if cmd == "/tokaidoduo_cancel":
+        if uid != g["created_by"]:
+            send(chat_id, "⛔ Only the creator can cancel.")
+        else:
+            del state["tokaidoduo"][str(chat_id)]
+            send(chat_id, "🗑 Tokaido Duo game cancelled.")
+        return True
+    if cmd == "/tokaidoduo_rematch":
+        ev, err = rematch_game(state, "tokaidoduo", chat_id, uid)
+        send(chat_id, f"⛔ {err}" if err else "🔄 Rematch!")
+        return True
+    idx = tokaidoduo_actor_idx(g, uid)
+    if idx is None:
+        send(chat_id, "⛔ You're not in this game (or it isn't your turn).")
+        return True
+    parts = text.split()[1:]
+    ev = []
+    if cmd == "/tokaidoduo_pick":
+        if not parts or parts[0] not in TD.CHARACTERS:
+            err = "Usage: /tokaidoduo_pick &lt;pilgrim|merchant|artist&gt;"
+        else:
+            err = TD.pick_die(g, idx, parts[0], ev)
+    elif cmd in ("/tokaidoduo_choose", "/tokaidoduo_skip"):
+        if cmd == "/tokaidoduo_skip":
+            pend = g.get("pending") or {}
+            value = "done" if pend.get("kind") == "sell" else "skip"
+        else:
+            value = parts[0] if parts else "skip"
+        err = TD.choose(g, idx, value, ev)
+    else:
+        return False
+    if err:
+        send(chat_id, f"⛔ {err}")
+    else:
+        tokaidoduo_render(g, ev)
+    return True
+
+
+TD_LEN = 2
+
+
+def tokaidoduo_board_json(g, viewer_id=None):
+    me_idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == viewer_id), None)
+    actor = TD.current_picker(g) if g["phase"] == "play" else None
+    can_act = bool(actor is not None and me_idx is not None and
+                   (me_idx == actor or _is_npc(g["players"][actor])))
+    pend = g.get("pending")
+    players = []
+    for i, p in enumerate(g["players"]):
+        paintings = []
+        for t in p["paintings"]:
+            if i == me_idx or t["revealed"] or t["gifted"]:
+                paintings.append({"icon": t["icon"], "revealed": t["revealed"],
+                                  "gifted": t["gifted"]})
+            else:
+                paintings.append({"icon": None, "revealed": False, "gifted": False})
+        players.append({
+            "user_id": p["user_id"], "name": p["name"], "npc": _is_npc(p),
+            "color": p["color"], "pilgrim_pos": p["pilgrim_pos"],
+            "temple": p["temple"], "garden": p["garden"],
+            "merchant_pos": p["merchant_pos"], "artist_zone": p["artist_zone"],
+            "wares": list(p["wares"]), "coins": p["coins"], "gold": p["gold"],
+            "paintings": paintings, "gifted": p["gifted"],
+            "waves": dict(p["waves"]),
+            "faith": TD.faith_score(p), "commerce": TD.commerce_score(p),
+            "culture": TD.culture_score(p),
+            "is_current": i == actor,
+        })
+    board = {
+        "chat_id": g["chat_id"], "phase": g["phase"], "round": g["round"],
+        "first_picker": g["first_picker"], "pick_index": g["pick_index"],
+        "dice": dict(g["dice"]), "dice_taken": list(g["dice_taken"]),
+        "pick_char": g.get("pick_char"), "pick_value": g.get("pick_value"),
+        "players": players, "actor": actor, "can_act": can_act,
+        "is_player": me_idx is not None, "winner": g["winner"],
+        "end_reason": g["end_reason"], "end_triggered": g["end_triggered"],
+        "scores": g.get("scores"), "log": g["log"][-12:],
+        "hot_spring": g.get("hot_spring"),
+        "waves_board": list(g.get("waves_board", [])),
+        "boutiques": dict(g.get("boutiques", {})),
+        "stations": list(TD.STATIONS),
+        "zones": [{"icon": z["icon"], "name": z["name"]} for z in TD.ZONES],
+        "zone_adj": {str(k): v for k, v in TD.ZONE_ADJ.items()},
+        "zone_pos": TD.ZONE_POS,
+        "town_pos": TD.TOWN_POS,
+        "town_adj": {k: v for k, v in TD.TOWN_ADJ.items()},
+        "mountain_draw": TD.MOUNTAIN_DRAW,
+        "gold_points": TD.GOLD_POINTS, "culture_points": TD.CULTURE_POINTS,
+        "ware_emoji": TD.WARE_EMOJI, "char_emoji": TD.CHAR_EMOJI,
+        "zone_icon_emoji": TD.ZONE_ICON_EMOJI,
+        "legal": {}, "options": [], "pending": None,
+    }
+    if can_act:
+        board["legal"] = {"dice": TD.available_dice(g)}
+        if pend:
+            board["options"] = TD.pending_options(g, actor)
+            board["pending"] = {"kind": pend["kind"], "by": pend["by"]}
+    return board
+
+
+def tokaidoduo_api_move(state, chat_id, user_id, body):
+    g = tokaidoduo_get(state, chat_id)
+    if not g:
+        return [], "no Tokaido Duo game in that chat"
+    action = body.get("action")
+    ev = []
+    idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
+    if action == "join":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        if idx is not None:
+            return ev, None
+        if len(g["players"]) >= TD_LEN:
+            return [], "full"
+        iu_name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
+        g["players"].append(TD.new_player(user_id, iu_name))
+        ev.append("🙋 joined Tokaido Duo.")
+    elif action == "start":
+        if g["phase"] != "lobby":
+            return [], "already started"
+        err = TD.start_game(g, ev)
+        if err:
+            return [], err
+    elif action == "rematch":
+        return rematch_game(state, "tokaidoduo", chat_id, user_id)
+    else:
+        actor = tokaidoduo_actor_idx(g, user_id)
+        if actor is None:
+            return [], "not in this game"
+        if action == "pick":
+            err = TD.pick_die(g, actor, str(body.get("char", "")), ev)
+        elif action == "choose":
+            err = TD.choose(g, actor, str(body.get("value", "skip")), ev)
+        else:
+            return [], "unknown action"
+        if err:
+            return [], err
+    tokaidoduo_render(g, ev)
+    return ev, None
+
+
 REMATCH_END_PHASES = dict(GR.REMATCH_END_PHASES)
 
 RENDERERS = {"games": render, "regicide": rg_render, "odin": odin_render,
@@ -4679,14 +4955,16 @@ RENDERERS = {"games": render, "regicide": rg_render, "odin": odin_render,
              "fliptoons": fliptoons_render, "tornado": tornado_render,
               "castlecombo": castlecombo_render, "artichokes": artichokes_render,
                "fellowship": fotr_render, "azul": azul_render,
-               "toybattle": toybattle_render}
+               "toybattle": toybattle_render,
+               "tokaidoduo": tokaidoduo_render}
 
 RULES_BY_KEY = {"games": RULES, "regicide": REGICIDE_RULES, "odin": ODIN_RULES,
                 "leaves": LEAVES_MODULE.rules(), "lsd": LSD_RULES, "spots": SPOTS_RULES,
                 "yahtzee": YAHTZEE_RULES, "fliptoons": FLIPTOONS_RULES,
                 "tornado": TORNADO_RULES, "castlecombo": CASTLECOMBO_RULES,
                 "artichokes": ARTICHOKES_RULES, "fellowship": FTR_RULES,
-                 "azul": AZUL_RULES, "toybattle": TOYBATTLE_RULES}
+                 "azul": AZUL_RULES, "toybattle": TOYBATTLE_RULES,
+                 "tokaidoduo": TOKAIDODUO_RULES}
 
 
 def guide_payload(key):
@@ -4714,6 +4992,7 @@ PLAYER_MAKERS = {
     "fellowship": lambda u, n: FTR.new_player(u, n),
     "azul": lambda u, n: AZ.new_player(u, n),
     "toybattle": lambda u, n: TB.new_player(u, n),
+    "tokaidoduo": lambda u, n: TD.new_player(u, n),
 }
 
 GAME_MAKERS = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
@@ -4721,7 +5000,8 @@ GAME_MAKERS = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
                "yahtzee": Y.new_game, "fliptoons": FT.new_game, "tornado": TS.new_game,
                "castlecombo": CC.new_game, "artichokes": AT.new_game,
                 "fellowship": FTR.new_game, "azul": AZ.new_game,
-                "toybattle": TB.new_game}
+                "toybattle": TB.new_game,
+               "tokaidoduo": TD.new_game}
 
 
 def rematch_game(state, key, chat_id, uid):
@@ -4843,6 +5123,9 @@ def handle_command(state, msg):
         return
     if cmd.startswith("/toybattle"):
         handle_toybattle(state, msg, cmd, text, uid, name)
+        return
+    if cmd.startswith("/tokaidoduo"):
+        handle_tokaidoduo(state, msg, cmd, text, uid, name)
         return
     if cmd in ("/start", "/help", "/commands"):
         send(chat_id, HELP)
@@ -5059,6 +5342,57 @@ def handle_callback(state, cb):
         if not err:
             g["selected"] = None
             toybattle_render(g, ev)
+        return
+    if data.startswith("td:"):
+        g = tokaidoduo_get(state, chat_id)
+        if not g:
+            return answer_cb(cb["id"], "No Tokaido Duo game here.")
+        parts = data.split(":")
+        action = parts[1] if len(parts) > 1 else ""
+        ev = []
+        if action == "join":
+            if g["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            if any(p["user_id"] == uid for p in g["players"]):
+                return answer_cb(cb["id"], "Already in!")
+            if len(g["players"]) >= TD_LEN:
+                return answer_cb(cb["id"], "Game is full.")
+            g["players"].append(TD.new_player(uid, cb["from"].get("first_name") or "Player"))
+            answer_cb(cb["id"], "Joined!")
+            tokaidoduo_render(g, [f"🙋 {cb['from'].get('first_name')} joined Tokaido Duo."])
+            return
+        if action == "npc":
+            err = add_npc("tokaidoduo", g)
+            answer_cb(cb["id"], err or "🤖 NPC joined")
+            if not err:
+                tokaidoduo_render(g)
+            return
+        if action == "start":
+            if g["phase"] != "lobby":
+                return answer_cb(cb["id"], "Already started.")
+            err = TD.start_game(g, ev)
+            answer_cb(cb["id"], err or "Started")
+            if not err:
+                tokaidoduo_render(g, ev)
+            return
+        if action == "rematch":
+            ev, err = rematch_game(state, "tokaidoduo", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
+            return
+        idx = tokaidoduo_actor_idx(g, uid)
+        if idx is None:
+            return answer_cb(cb["id"], "Not your turn.")
+        if action == "pick":
+            err = TD.pick_die(g, idx, parts[2] if len(parts) > 2 else "", ev)
+        elif action == "c":
+            err = TD.choose(g, idx, ":".join(parts[2:]), ev)
+        else:
+            return answer_cb(cb["id"], "Unknown button.")
+        answer_cb(cb["id"], err or "Done")
+        if not err:
+            tokaidoduo_render(g, ev)
         return
     if data.startswith("lv:"):
         return handle_leaves_callback(state, cb, chat_id, uid)
@@ -6550,7 +6884,8 @@ def start_web_server(state):
             if u.path == "/castlecombo-cards.webp":
                 p = os.path.join(os.path.dirname(JS_PATH), "castlecombo-cards.webp")
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
-            if u.path in ("/toybattle-board.webp", "/toybattle-tiles.webp", "/toybattle-medals.webp"):
+            if u.path in ("/toybattle-board.webp", "/toybattle-tiles.webp", "/toybattle-medals.webp",
+                  "/tokaidoduo-board.webp"):
                 p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
                 if os.path.exists(p):
                     return self._send(200, open(p, "rb").read(), "image/webp",
@@ -6744,6 +7079,25 @@ def start_web_server(state):
                 with STATE_LOCK:
                     g = toybattle_get(state, chat_id)
                     board = toybattle_board_json(g, uid) if g else None
+                return self._send(200 if board else 404, {"ok": bool(board), "game": board})
+            if u.path == "/api/tokaidoduo/mygames":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                with STATE_LOCK:
+                    games = [tokaidoduo_board_json(g, uid) for g in state.get("tokaidoduo", {}).values()
+                             if any(p["user_id"] == uid for p in g["players"])]
+                return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/tokaidoduo/game":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                chat_id = q.get("chat_id", [""])[0]
+                with STATE_LOCK:
+                    g = tokaidoduo_get(state, chat_id)
+                    board = tokaidoduo_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/lsd/mygames":
                 q = urllib.parse.parse_qs(u.query)
@@ -7229,6 +7583,52 @@ def start_web_server(state):
                     events, err = toybattle_api_move(state, chat_id, uid, body)
                     g = toybattle_get(state, chat_id)
                     board = toybattle_board_json(g, uid) if g else None
+                    save_state(state)
+                return self._send(200 if not err else 400,
+                                  {"ok": not err, "error": err, "events": events, "game": board})
+            if path in ("/api/tokaidoduo/create", "/api/tokaidoduo/move"):
+                try:
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                except Exception:
+                    return self._send(400, {"ok": False, "error": "bad json"})
+                iu = init_user(body.get("init_data", ""))
+                if iu is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                uid, name, start_param, chat_instance = iu
+                if path == "/api/tokaidoduo/create":
+                    chat_id = None
+                    for cand in (start_param, str(body.get("chat_id") or ""), chat_instance):
+                        cand = str(cand)
+                        if cand.startswith("tokaidoduo"):
+                            cand = cand[len("tokaidoduo"):]
+                        try:
+                            chat_id = int(cand)
+                            break
+                        except (TypeError, ValueError):
+                            continue
+                    if not chat_id:
+                        return self._send(400, {"ok": False, "error": "open the Mini App from a chat (startapp link)"})
+                    with STATE_LOCK:
+                        g = tokaidoduo_get(state, chat_id)
+                        if g and g["phase"] != "game_end":
+                            return self._send(200, {"ok": True, "game": tokaidoduo_board_json(g, uid), "created": False})
+                        g = TD.new_game(chat_id, uid, name)
+                        g["chat_type"] = "supergroup" if chat_id < 0 else "private"
+                        state.setdefault("tokaidoduo", {})[str(chat_id)] = g
+                        tokaidoduo_render(g, [f"🗾 Tokaido Duo game created by {html.escape(name)} via Mini App!"])
+                        save_state(state)
+                        board = tokaidoduo_board_json(g, uid)
+                    return self._send(200, {"ok": True, "game": board, "created": True})
+                chat_id = body.get("chat_id")
+                if not chat_id and str(start_param).startswith("tokaidoduo"):
+                    try:
+                        chat_id = int(str(start_param)[len("tokaidoduo"):])
+                    except ValueError:
+                        pass
+                with STATE_LOCK:
+                    events, err = tokaidoduo_api_move(state, chat_id, uid, body)
+                    g = tokaidoduo_get(state, chat_id)
+                    board = tokaidoduo_board_json(g, uid) if g else None
                     save_state(state)
                 return self._send(200 if not err else 400,
                                   {"ok": not err, "error": err, "events": events, "game": board})

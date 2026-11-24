@@ -187,6 +187,17 @@ GAME_SPECS = (
         module="toybattle", web_module="toybattle",
         static_assets=("toybattle.js", "toybattle-tiles.webp", "toybattle-board.webp", "toybattle-medals.webp"),
     ),
+    GameSpec(
+        key="tokaidoduo", name="🗾 Tokaido Duo", command="/tokaidoduo", join_command="/tokaidoduo_join",
+        description="2-player Shikoku journey, 3 characters each",
+        help_commands=("/tokaidoduo_join", "/tokaidoduo_start", "/tokaidoduo_pick",
+                       "/tokaidoduo_choose", "/tokaidoduo_rules", "/tokaidoduo_cancel"),
+        web_label="🎮 Play Tokaido Duo (HTML)", callback_prefix="td",
+        min_players=2, max_players=2, npc_full="⛔ Tokaido Duo is 2 players (full).",
+        rematch_phases=("game_end",), cover="",
+        module="tokaidoduo", web_module="tokaidoduo",
+        static_assets=("tokaidoduo.js", "tokaidoduo-board.webp"),
+    ),
 )
 
 GAMES_BY_KEY = {spec.key: spec for spec in GAME_SPECS}

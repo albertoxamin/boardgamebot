@@ -324,11 +324,40 @@ Field layout comes from the BGA tutorial data. Text commands: `/toybattle`
 (same Main Mini App, routed by `start_param`). Engine: `toybattle.py` +
 `test_toybattle.py`.
 
+## Tokaido Duo (same bot, 2-player Shikoku journey)
+
+Tokaido Duo (Antoine Bauza, Funforge/Stonemaier, 2022), 2 players. Each
+player controls a Pilgrim, a Merchant and an Artist. Each round the first
+picker rolls 3 dice (Pilgrim 1/2/3/4/2/3, Merchant 1/2/3/1/2/3, Artist
+1/2/3/1/1/2) and the draft is 1-2-1, first picker alternating. A chosen
+character must move the exact die value. Pilgrim: clockwise around the
+37-station ring (8 Coastal, 13 Temple, 7 Garden, 5 Hot Spring, 4 Seashore);
+Temple x Garden = Faith, Temple 9 or Garden 6 ends the game. Merchant:
+along Trade routes between 4 Mountain towns (draw 4/3/3/2 Wares) and 8
+Coastal towns (sell for the Boutique price); 10 coins = 1 gold slab, 6th
+slab ends the game, Commerce = 0/5/11/18/26/35/45. Artist: through 8 zones
+(Paint or Gift a Painting); Culture = 0/2/4/7/10/14/18/23/28/34/40 for
+0-10 Paintings gifted, 10th gift ends the game. Wave tiles (Hasty/Tranquil,
+Crafty/Robust, Proficient/Inspired) and the Hot Spring token (repeat a move)
+come from Seashore / Hot Spring stations.
+
+Dice, Culture table, Boutique set (Pottery-3/4, Fan-3/2, Doll-3 x2,
+Kimono-4 x2), ring order and zone adjacency were verified from a live BGA
+table (spectated, no login) and the BGA sprite sheets, release 261120-2009;
+the sprites are kept in `sources/tokaidoduo/bga/`. Text commands:
+`/tokaidoduo` (create), `/tokaidoduo_join`, `/tokaidoduo_join_npc`,
+`/tokaidoduo_start`, `/tokaidoduo_pick <pilgrim|merchant|artist>`,
+`/tokaidoduo_choose <value>`, `/tokaidoduo_rules`, `/tokaidoduo_cancel`
+(creator), `/tokaidoduo_rematch`. Mini App: board button =
+`?startapp=tokaidoduo<chat>` (same Main Mini App, routed by `start_param`).
+Engine: `tokaidoduo.py` + `test_tokaidoduo.py`.
+
 ## Files
 
 - `game.py` – pure engine: deck, scoring, bust/Flip 7, actions, rounds.
 - `azul.py` – pure engine: factories, pattern lines, wall scoring, final bonuses.
 - `toybattle.py` – pure engine: Castle Field bases, stacks/connection, troop powers, medals, HQ win.
+- `tokaidoduo.py` – pure engine: 37-station Pilgrim ring, Merchant trade routes, Artist zones, 1-2-1 dice draft, Wave tiles, Hot Spring, scoring.
 - `yahtzee.py` – pure engine: dice, scorecard, turns, scoring.
 - `fliptoons.py` – pure engine: deck, grid, abilities, market, final flip.
 - `tornado.py` – pure engine: boats, decks, courses, ranks, movement, Grand Prix.
@@ -343,6 +372,7 @@ Field layout comes from the BGA tutorial data. Text commands: `/toybattle`
 - `test_artichokes.py` – Abandon All Artichokes unit tests: `python3 test_artichokes.py`
 - `test_fellowship.py` – Fellowship engine tests: `python3 test_fellowship.py`
 - `test_toybattle.py` – Toy Battle engine tests: `python3 test_toybattle.py`
+- `test_tokaidoduo.py` – Tokaido Duo engine tests: `python3 test_tokaidoduo.py`
 - `web/flip7.html` – standalone HTML5 Flip 7 game (hot-seat, Mini App-ready)
 - `web/yahtzee.js` – Yahtzee Mini App view (synced)
 - `web/fliptoons.js` – Fliptoons Mini App view (synced)
@@ -353,6 +383,9 @@ Field layout comes from the BGA tutorial data. Text commands: `/toybattle`
 - `web/azul.js` – Azul Mini App view (synced)
 - `web/toybattle.js` – Toy Battle Mini App view (synced, viewer-filtered racks)
 - `web/toybattle-board.webp`, `web/toybattle-tiles.webp`, `web/toybattle-medals.webp` – BGA-extracted Toy Battle art
+- `web/tokaidoduo.js` – Tokaido Duo Mini App view (synced, board + seats)
+- `web/tokaidoduo-board.webp` – BGA board art for Tokaido Duo
+- `sources/tokaidoduo/bga/` – BGA sprite sheets for Tokaido Duo (dice, wares, waves, paintings, boutiques, character boards)
 - `web/artichokes_cards/` – BGA card art (0–9 vegetables, 10–14 Artichokes, 15 Rhubarb, 16 back)
 - `web/covers/*.jpg` – box art shown as the lobby photo for each game
 - `web/server.py` – static server for the HTML game (needs HTTPS tunnel for in-Telegram use)
@@ -369,6 +402,7 @@ python3 test_artichokes.py  # Abandon All Artichokes engine tests
 python3 test_fellowship.py  # Fellowship engine tests
 python3 test_azul.py        # Azul engine tests
 python3 test_toybattle.py   # Toy Battle engine tests
+python3 test_tokaidoduo.py  # Tokaido Duo engine tests
 ```
 A full 3-player game was also simulated end-to-end (hits/stays/actions/
 round rotation → a winner at 200+ in 13 rounds) with the Telegram layer

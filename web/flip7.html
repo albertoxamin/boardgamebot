@@ -357,6 +357,13 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .track .tbtile{width:38px;height:50px}
 .track:hover .tbtile{outline:2px solid #f59e0b}
 .tblobby{min-height:120px;background:linear-gradient(#0f172ae8,#0f172ae8),url(toybattle-board.webp) center/cover;border:1px solid #475569;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800}
+.tdboard{position:relative;width:min(100%,640px);aspect-ratio:1600/789;margin:8px auto;background:#f5efe0 url(tokaidoduo-board.webp) center/100% 100% no-repeat;border:2px solid #475569;border-radius:8px}
+.tdmeeple{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:#fff;border:2px solid #fff;box-shadow:0 1px 4px #000a;z-index:3}
+.tdmeeple.tdpurple{background:#7c3aed}.tdmeeple.tdgreen{background:#059669}
+.tdlobby{min-height:120px;background:linear-gradient(#0f172ae8,#0f172ae8),url(tokaidoduo-board.webp) center/cover;border:1px solid #475569;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;text-align:center;padding:12px}
+.tdpaints{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.tdpaint{width:30px;height:30px;border-radius:6px;background:#f8fafc;color:#111;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:1px 2px 3px #0008}
+.tdpaint.back{background:#334155;color:#e2e8f0}.tdpaint.gifted{background:#065f46;color:#fff}
 .tbopt{background:#1e293b;color:#e2e8f0;border:2px solid #475569;border-radius:9px;padding:7px 10px;font-size:13px;font-weight:700;margin:0;cursor:pointer}
 .tbopt:hover{border-color:#f59e0b}
 .tbblue{color:#38bdf8}.tbred{color:#f87171}
@@ -511,6 +518,16 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <button class="primary hidden" id="tbRematch">🔄 Rematch!</button>
 <div class="log" id="tbLog"></div>
 </div>
+<div id="tokaidoduo" class="hidden">
+<div id="tdTurn" class="azturn"></div>
+<div id="tdBoard"></div>
+<div id="tdActions" class="azopts"></div>
+<button class="primary hidden" id="tdJoin">🙋 Join</button>
+<button class="primary hidden" id="tdStart">🎮 Start game</button>
+<button class="primary hidden" id="tdRematch">🔄 Rematch!</button>
+<div class="log" id="tdLog"></div>
+</div>
+</div>
 <div id="synced">
 <div id="syncBoard"></div>
 <div id="syncTurn" style="font-size:18px;font-weight:700"></div>
@@ -569,7 +586,7 @@ window.PXSCROLL={
  }
 };
 </script>
-  <script data-cfasync="false" src="flip7.js?v=28"></script>
+  <script data-cfasync="false" src="flip7.js?v=29"></script>
   <script data-cfasync="false" src="regicide.js?v=19"></script>
 
  <script data-cfasync="false" src="odin.js?v=10"></script>
@@ -585,4 +602,5 @@ window.PXSCROLL={
 <script data-cfasync="false" src="fellowship.js?v=6"></script>
 <script data-cfasync="false" src="azul.js?v=3"></script>
 <script data-cfasync="false" src="toybattle.js?v=1"></script>
+<script data-cfasync="false" src="tokaidoduo.js?v=1"></script>
 </body></html>

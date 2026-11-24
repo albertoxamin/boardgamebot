@@ -381,6 +381,23 @@ class BlackFlagTests(unittest.TestCase):
             _, err = bot.blackflag_api_move(state, 7, 99, {"action": "end"})
         self.assertIsNone(err)
 
+    def test_hand_cards_carry_descriptions_and_miniapp_shows_them(self):
+        # FB-0016: every card must carry its description in the API payload,
+        # and the Mini App hand must render a caption under each card.
+        for card in BF.CARD_DECK:
+            info = BF.card_info(card)
+            self.assertTrue(info["name"])
+            self.assertTrue(info["text"])
+        root = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(root, "web", "blackflag.js")) as fh:
+            js = fh.read()
+        self.assertIn("function bfCardCell", js)
+        self.assertIn("bfCardCell(c, g.can_act", js)
+        with open(os.path.join(root, "web", "flip7.html")) as fh:
+            html = fh.read()
+        self.assertIn(".bfcap{", html)
+        self.assertIn(".bfcardwrap{", html)
+
     def test_api_can_add_npc_from_lobby(self):
         game = bot.BF.new_game(7, 42, "Ada")
         state = {"blackflag": {"7": game}}

@@ -69,6 +69,14 @@ function bfCard(card, clickable, attrs) {
     (sprite[1] * 100 / 15) + '%" title="' + escapeHtml(card.name + ' — ' + (card.text || '')) + '" ' +
     (attrs || '') + '></div>';
 }
+// Card + a caption with its name and description: title tooltips never
+// show on touch, so what a card does must be readable under the card
+// itself (FB-0016).
+function bfCardCell(card, clickable, attrs) {
+  const cap = '<b>' + escapeHtml(card.name) + '</b><br>' + escapeHtml(card.text || '');
+  return '<div class="bfcardwrap">' + bfCard(card, clickable, attrs) +
+    '<div class="bfcap">' + cap + '</div></div>';
+}
 function bfShip(ship, clickable, attrs) {
   const sprite = ship.sprite || [9, 9];
   const cls = 'bfship' + (clickable ? ' bfclick' : '');
@@ -147,7 +155,7 @@ function bfRender() {
   } else if (visible.length) {
     const targets = legal.defend || [];
     hand.innerHTML = '<div class="bflabel">' + (g.pending ? 'Choose a defense' : 'Your hand') + '</div>' +
-      visible.map((c, i) => bfCard(c, g.can_act && (!g.pending || targets.includes(i)),
+      visible.map((c, i) => bfCardCell(c, g.can_act && (!g.pending || targets.includes(i)),
         g.pending ? 'data-defend="' + i + '"' : 'data-hand="' + i + '"')).join('');
   } else {
     hand.innerHTML = '<div class="bflabel">Hidden hand</div>' +

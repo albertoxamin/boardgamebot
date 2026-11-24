@@ -176,6 +176,17 @@ GAME_SPECS = (
         rematch_phases=("game_end",), cover="azul.png",
         module="azul", web_module="azul", static_assets=("azul.js",),
     ),
+    GameSpec(
+        key="toybattle", name="🎯 Toy Battle", command="/toybattle", join_command="/toybattle_join",
+        description="2-player troops, medals and HQ capture",
+        help_commands=("/toybattle_join", "/toybattle_start", "/toybattle_draw", "/toybattle_place",
+                       "/toybattle_choose", "/toybattle_rules", "/toybattle_cancel"),
+        web_label="🎮 Play Toy Battle (HTML)", callback_prefix="tb",
+        min_players=2, max_players=2, npc_full="⛔ Toy Battle is 2 players (full).",
+        rematch_phases=("game_end",), cover="toybattle.jpg",
+        module="toybattle", web_module="toybattle",
+        static_assets=("toybattle.js", "toybattle-tiles.webp", "toybattle-board.webp", "toybattle-medals.webp"),
+    ),
 )
 
 GAMES_BY_KEY = {spec.key: spec for spec in GAME_SPECS}

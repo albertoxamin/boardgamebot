@@ -223,6 +223,27 @@ class RegistryTests(unittest.TestCase):
             bot.fotr_render(game)
         text = send.call_args.args[2]
         self.assertIn('<a href="tg://user?id=42">A&amp;B</a>', text)
+    def test_toybattle_npc_can_be_controlled_and_racks_are_private(self):
+        game = bot.TB.new_game(7, 42, "Ada")
+        self.assertIsNone(bot.add_npc("toybattle", game))
+        self.assertTrue(game["players"][1]["npc"])
+        events = []
+        self.assertIsNone(bot.TB.start_game(game, events))
+        game["current"] = 1
+        self.assertEqual(bot.toybattle_actor_idx(game, 42), 1)
+        board = bot.toybattle_board_json(game, 42)
+        self.assertTrue(board["can_act"])
+        self.assertTrue(board["players"][1]["rack"])
+        state = {"toybattle": {"7": game}}
+        with patch.object(bot, "send_board", return_value={"ok": False}):
+            _, err = bot.toybattle_api_move(state, 7, 42, {"action": "draw"})
+            self.assertIsNone(err)
+        game["players"][1]["npc"] = False
+        game["players"][1]["user_id"] = 43
+        board = bot.toybattle_board_json(game, 42)
+        self.assertTrue(board["can_act"])
+        self.assertFalse(board["players"][1]["rack"])
+        self.assertEqual(bot.toybattle_actor_idx(game, 999), None)
 
 
 if __name__ == "__main__":

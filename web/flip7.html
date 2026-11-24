@@ -334,6 +334,28 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .azopt{background:#1e293b;color:#e2e8f0;border:1px solid #38bdf8;border-radius:8px;padding:5px 9px;font-size:15px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
 .azopt:hover{background:#334155}
 .azturn{font-size:17px;font-weight:800;background:linear-gradient(#0f172aee,#0f172aee),url(azul_assets/img/bag.webp) 8px center/30px no-repeat;border-radius:10px;padding:8px 10px 8px 46px;margin-bottom:8px}
+.tbboard{position:relative;width:min(100%,600px);aspect-ratio:600/1000;margin:8px auto;background:#0b1220 url(toybattle-board.webp) center/100% 100% no-repeat;border:2px solid #475569;border-radius:8px}
+.tbbase{position:absolute;width:44px;height:58px;transform:translate(-50%,-50%);display:flex;align-items:center;justify-content:center;border-radius:4px;z-index:2}
+.tbemptybase{width:100%;height:100%;background:#0f172acc;border:1px dashed #64748b;border-radius:4px;display:flex;align-items:center;justify-content:center;color:#fbbf24;font-size:20px}
+.tbheight{position:absolute;right:-3px;bottom:-3px;background:#f59e0b;color:#111;border-radius:999px;font-size:11px;font-weight:800;padding:0 5px}
+.tbhq{position:absolute;top:-15px;background:#111827;color:#fff;border:1px solid #f59e0b;border-radius:4px;font-size:10px;font-weight:800;padding:0 4px}
+.tbspecial{outline:1px solid #fbbf24}
+.tblegal{box-shadow:0 0 0 2px #22c55e}
+.tbselected{box-shadow:0 0 0 3px #f59e0b}
+.tbmedal{position:absolute;width:24px;height:24px;background:url(toybattle-medals.webp) 0 0/200% 100%;transform:translate(-50%,-50%);z-index:3;border-radius:50%;box-shadow:0 1px 3px #000a}
+.tbtile{display:inline-block;width:44px;height:58px;background:url(toybattle-tiles.webp) 0 0/1200% 200%;border-radius:4px;box-shadow:inset 0 0 0 1px #0007,1px 2px 3px #0009;flex:none}
+.tbackrow{border:1px solid #334155;border-radius:10px;padding:7px;margin:6px 0;background:#0f172a99}
+.tbackrow.tbcurrent{border-color:#f59e0b;box-shadow:0 0 8px #f59e0b66}
+.tbhead{font-size:13px;font-weight:800;margin-bottom:5px}
+.tbrack{display:flex;gap:3px;flex-wrap:wrap}
+.tback{display:inline-block;width:38px;height:50px;background:linear-gradient(135deg,#334155,#1e293b);border:1px solid #64748b;border-radius:4px;flex:none}
+.track{padding:0;border:0;background:transparent;cursor:pointer}
+.track .tbtile{width:38px;height:50px}
+.track:hover .tbtile{outline:2px solid #f59e0b}
+.tblobby{min-height:120px;background:linear-gradient(#0f172ae8,#0f172ae8),url(toybattle-board.webp) center/cover;border:1px solid #475569;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800}
+.tbopt{background:#1e293b;color:#e2e8f0;border:2px solid #475569;border-radius:9px;padding:7px 10px;font-size:13px;font-weight:700;margin:0;cursor:pointer}
+.tbopt:hover{border-color:#f59e0b}
+.tbblue{color:#38bdf8}.tbred{color:#f87171}
 </style></head><body>
 <h1>🎴 Flip 7</h1>
 <button id="guideBtn" class="guide-btn hidden" type="button" aria-label="How to play">?</button>
@@ -475,6 +497,16 @@ button:disabled{opacity:.45;cursor:not-allowed}
 <button class="primary hidden" id="azRematch">🔄 Rematch!</button>
 <div class="log" id="azLog"></div>
 </div>
+<div id="toybattle" class="hidden">
+<div id="tbTurn" class="azturn"></div>
+<div id="tbBoard"></div>
+<div id="tbActions" class="azopts"></div>
+<button class="primary hidden" id="tbDraw">🎁 Draw 2 troops</button>
+<button class="primary hidden" id="tbJoin">🙋 Join</button>
+<button class="primary hidden" id="tbStart">🎮 Start game</button>
+<button class="primary hidden" id="tbRematch">🔄 Rematch!</button>
+<div class="log" id="tbLog"></div>
+</div>
 <div id="synced">
 <div id="syncBoard"></div>
 <div id="syncTurn" style="font-size:18px;font-weight:700"></div>
@@ -548,4 +580,5 @@ window.PXSCROLL={
 <script data-cfasync="false" src="artichokes.js?v=13"></script>
 <script data-cfasync="false" src="fellowship.js?v=6"></script>
 <script data-cfasync="false" src="azul.js?v=2"></script>
+<script data-cfasync="false" src="toybattle.js?v=1"></script>
 </body></html>

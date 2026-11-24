@@ -21,6 +21,7 @@ import castlecombo as CC
 import tornado as TS
 import fellowship as FTR
 import azul as AZ
+import toybattle as TB
 import game_registry as GR
 import web_assets
 from game_modules.leaves import LEAVES_MODULE
@@ -34,7 +35,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 27
+WEB_VER = 28
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -431,6 +432,7 @@ NPC_PLAYERS = {
     "artichokes": _artichokes_npc,
     "fellowship": _fellowship_npc,
     "azul": lambda: {**AZ.new_player(NPC_ID, "🤖 NPC"), **_npc_player()},
+    "toybattle": lambda: {**TB.new_player(NPC_ID, "🤖 NPC"), **_npc_player()},
 }
 
 
@@ -4386,20 +4388,305 @@ def azul_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
+TOYBATTLE_RULES = """🎯 <b>Toy Battle rules</b> (2 players, Castle Field): win by placing a troop on the enemy HQ, or by being first to 7 medals.
+• On your turn choose ONE action: <b>draw 2 troops</b> (rack holds at most 8) or <b>place 1 troop</b>.
+• A troop must be placed on a base connected to your HQ by a continuous line of bases topped by YOUR troops. Empty bases, enemy bases and the enemy HQ do not conduct connection. <b>Hook</b> may ignore this for bases, but not for the HQ.
+• You may stack on your own troops freely, and on an enemy troop only with a higher number. <b>Kwak</b> is a joker: it can cover any enemy troop and can be covered by any troop.
+• Troop effects: <b>Skully</b> draw 2, <b>Cap'N</b> place 1 extra troop, <b>Jumbo</b> discard an adjacent enemy troop, <b>Hook</b> ignore connection, <b>XB-42</b> discard a random enemy rack troop, <b>Star</b> draw 1, <b>Roxy</b> none, <b>Kwak</b> none.
+• Special bases (marked on the board) let you return one of your other troops to your rack; troop effects resolve before special bases.
+• When your troops surround a whole region you permanently take its medals (they stay yours even if the region is later broken). Medals are private to no one; the board shows each player's count.
+• Commands: /toybattle_draw, /toybattle_place &lt;troop number&gt; &lt;base&gt;, /toybattle_choose &lt;value&gt; (or use buttons/Mini App)."""
+
+
+def toybattle_get(state, chat_id):
+    return state.setdefault("toybattle", {}).get(str(chat_id))
+
+
+def toybattle_actor_idx(g, uid):
+    if g["phase"] != "play":
+        return None
+    ref = g["pending"]["by"] if g.get("pending") else g["current"]
+    return _actor_idx(g, uid, ref)
+
+
+def toybattle_board_text(g):
+    if g["phase"] == "lobby":
+        return "\n".join(TB.board_lines(g))
+    lines = list(TB.board_lines(g))
+    if g.get("pending"):
+        lines.append("⚡ Choose: " + " · ".join(
+            o["label"] for o in TB.pending_options(g, g["pending"]["by"])))
+    else:
+        lines.append("🎮 /toybattle_draw or /toybattle_place &lt;troop#&gt; &lt;base&gt; (or tap buttons).")
+    return "\n".join(lines)
+
+
+def toybattle_keyboard(g):
+    if g["phase"] == "game_end":
+        kb = [[{"text": "🔄 Rematch!", "callback_data": "tb:rematch"}]]
+    else:
+        ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
+        wk = web_keyboard(ct, g["chat_id"], game="toybattle")
+        if g["phase"] == "lobby":
+            kb = [[{"text": "🙋 Join Toy Battle", "callback_data": "tb:join"}]]
+            if not any(_is_npc(p) for p in g["players"]):
+                kb.append([{"text": "🤖 Add NPC", "callback_data": "tb:npc"}])
+            kb.append([{"text": "▶️ Start game", "callback_data": "tb:start"}])
+            return kb + (wk or [])
+        kb = []
+        pend = g.get("pending")
+        if pend:
+            for opt in TB.pending_options(g, pend["by"]):
+                kb.append([{"text": opt["label"][:60],
+                            "callback_data": f"tb:c:{opt['value']}"}])
+        else:
+            kb.append([{"text": "🎁 Draw 2 troops", "callback_data": "tb:draw"}])
+            legal = TB.legal_placements(g, g["current"])
+            sel = g.get("selected") or {}
+            idx = sel.get("index")
+            if sel.get("by") == g["current"] and idx in legal and legal[idx]:
+                for b in legal[idx][:15]:
+                    kb.append([{"text": f"📍 Base {b}",
+                                "callback_data": f"tb:p:{idx}:{b}"}])
+                kb.append([{"text": "↩️ Back", "callback_data": "tb:back"}])
+            else:
+                row = []
+                for i, bases in legal.items():
+                    if bases:
+                        row.append({"text": f"🪖 {i + 1} ({len(bases)})",
+                                    "callback_data": f"tb:s:{i}"})
+                        if len(row) == 4:
+                            kb.append(row)
+                            row = []
+                if row:
+                    kb.append(row)
+        if wk:
+            kb.extend(wk)
+    return kb or None
+
+
+def toybattle_render(g, events=None):
+    lines = [html.escape(e) for e in (events or [])]
+    if g["phase"] == "play":
+        ref = g["pending"]["by"] if g.get("pending") else g["current"]
+        p = g["players"][ref]
+        if _is_npc(p):
+            lines.append("👉 🤖 NPC's turn - anyone can play for it!")
+        else:
+            lines.append(f"👉 {toybattle_mention(g, p['user_id'])} - your move.")
+    text = "\n".join(lines + [toybattle_board_text(g)])
+    r = send_board(g, "toybattle", text, toybattle_keyboard(g))
+    if r.get("ok"):
+        old = g.get("board_message_id")
+        g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=g["chat_id"], message_id=old)
+
+
+def toybattle_mention(g, user_id):
+    return f'<a href="tg://user?id={user_id}">{html.escape(TB.name_of(g, user_id) if user_id in [p["user_id"] for p in g["players"]] else "player")}</a>'
+
+
+def handle_toybattle(state, msg, cmd, text, uid, name):
+    chat_id = msg["chat"]["id"]
+    g = toybattle_get(state, chat_id)
+    if cmd == "/toybattle_rules":
+        send(chat_id, TOYBATTLE_RULES)
+        return True
+    if cmd == "/toybattle":
+        if not g:
+            _name = msg.get("from", {}).get("first_name") or "Player"
+            g = TB.new_game(chat_id, uid, _name)
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state.setdefault("toybattle", {})[str(chat_id)] = g
+            toybattle_render(g, [f"🎯 Toy Battle game created by {html.escape(_name)}!"])
+        else:
+            toybattle_render(g)
+        return True
+    if not g:
+        send(chat_id, "No Toy Battle game here yet - send /toybattle to create one.")
+        return True
+    g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd == "/toybattle_join_npc":
+        err = add_npc("toybattle", g)
+        send(chat_id, err or "🤖 NPC joined - anyone can play for it!")
+        if not err:
+            toybattle_render(g)
+        return True
+    if cmd == "/toybattle_join":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p["user_id"] == uid for p in g["players"]):
+            send(chat_id, "You're already in!")
+        elif len(g["players"]) >= TB_LEN:
+            send(chat_id, "⛔ Toy Battle is 2 players (full).")
+        else:
+            g["players"].append(TB.new_player(uid, msg.get("from", {}).get("first_name") or "Player"))
+            send(chat_id, f"🙋 <b>{name}</b> joined Toy Battle.")
+            toybattle_render(g)
+        return True
+    if cmd == "/toybattle_start":
+        if g["phase"] != "lobby":
+            send(chat_id, "Already started.")
+        else:
+            ev = []
+            err = TB.start_game(g, ev)
+            send(chat_id, f"⛔ {err}" if err else "🎯 Toy Battle started!")
+            if not err:
+                toybattle_render(g, ev)
+        return True
+    if cmd == "/toybattle_cancel":
+        if uid != g["created_by"]:
+            send(chat_id, "⛔ Only the creator can cancel.")
+        else:
+            del state["toybattle"][str(chat_id)]
+            send(chat_id, "🗑 Toy Battle game cancelled.")
+        return True
+    if cmd == "/toybattle_rematch":
+        ev, err = rematch_game(state, "toybattle", chat_id, uid)
+        send(chat_id, f"⛔ {err}" if err else "🔄 Rematch!")
+        return True
+    idx = toybattle_actor_idx(g, uid)
+    if idx is None:
+        send(chat_id, "⛔ You're not in this game (or it isn't your turn).")
+        return True
+    parts = text.split()[1:]
+    ev = []
+    if cmd == "/toybattle_draw":
+        err = TB.draw(g, idx, ev)
+    elif cmd == "/toybattle_place":
+        if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
+            err = "Usage: /toybattle_place &lt;troop number&gt; &lt;base&gt;"
+        else:
+            err = TB.place(g, idx, int(parts[0]) - 1, int(parts[1]), ev)
+    elif cmd in ("/toybattle_choose", "/toybattle_skip"):
+        err = TB.choose(g, idx, "skip" if cmd == "/toybattle_skip" else
+                        (parts[0] if parts else "skip"), ev)
+    else:
+        return False
+    if err:
+        send(chat_id, f"⛔ {err}")
+    else:
+        g["selected"] = None
+        toybattle_render(g, ev)
+    return True
+
+
+TB_LEN = 2
+
+
+def toybattle_board_json(g, viewer_id=None):
+    me_idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == viewer_id), None)
+    actor = g["current"] if g["phase"] == "play" else None
+    can_act = bool(actor is not None and me_idx is not None and
+                   (me_idx == actor or _is_npc(g["players"][actor])))
+    pend = g.get("pending")
+    if pend:
+        actor = pend["by"]
+        can_act = bool(me_idx is not None and
+                       (me_idx == actor or _is_npc(g["players"][actor])))
+    players = []
+    for i, p in enumerate(g["players"]):
+        players.append({
+            "user_id": p["user_id"], "name": p["name"], "npc": _is_npc(p),
+            "color": p["color"], "hq": p["hq"], "medals": p["medals"],
+            "reserve": len(p["reserve"]), "discard": len(p["discard"]),
+            "rack_count": len(p["rack"]),
+            "rack": list(p["rack"]) if i == me_idx or _is_npc(p) else [],
+            "is_current": i == actor,
+        })
+    bases = {}
+    for b, (top, left, adj, special) in TB.BASES.items():
+        stack = g["stacks"].get(str(b)) or []
+        bases[str(b)] = {
+            "top": stack[-1] if stack else None, "height": len(stack),
+            "special": special, "top_pos": top, "left_pos": left,
+            "adj": adj,
+        }
+    board = {
+        "chat_id": g["chat_id"], "phase": g["phase"], "turn": g["turn"],
+        "board_name": TB.BOARD_NAME, "medal_target": TB.MEDAL_TARGET,
+        "rack_limit": TB.RACK_LIMIT, "troop_names": TB.TROOP_NAMES,
+        "players": players, "actor": actor, "can_act": can_act,
+        "is_player": me_idx is not None, "winner": g["winner"],
+        "end_reason": g["end_reason"], "log": g["log"][-12:],
+        "bases": bases, "legal": {}, "options": [], "pending": None,
+        "regions": {str(r): {"bases": v[0], "medals": v[1], "claimed": g["claimed"][str(r)]}
+                    for r, v in TB.REGIONS.items()},
+        "medal_spots": {str(m): {"top": v[0], "left": v[1], "region": v[2],
+                                 "owner": g["medals"][str(m)]}
+                        for m, v in TB.MEDAL_SPOTS.items()},
+    }
+    if can_act:
+        board["legal"] = {str(k): v for k, v in TB.legal_placements(g, actor).items()}
+        if pend:
+            board["options"] = TB.pending_options(g, actor)
+            board["pending"] = {"kind": pend["kind"], "base": pend["base"]}
+    return board
+
+
+def toybattle_api_move(state, chat_id, user_id, body):
+    g = toybattle_get(state, chat_id)
+    if not g:
+        return [], "no Toy Battle game in that chat"
+    action = body.get("action")
+    ev = []
+    idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
+    if action == "join":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        if idx is not None:
+            return ev, None
+        if len(g["players"]) >= TB_LEN:
+            return [], "full"
+        iu_name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
+        g["players"].append(TB.new_player(user_id, iu_name))
+        ev.append("🙋 joined Toy Battle.")
+    elif action == "start":
+        if g["phase"] != "lobby":
+            return [], "already started"
+        err = TB.start_game(g, ev)
+        if err:
+            return [], err
+    elif action == "rematch":
+        return rematch_game(state, "toybattle", chat_id, user_id)
+    else:
+        actor = toybattle_actor_idx(g, user_id)
+        if actor is None:
+            return [], "not in this game"
+        if action == "draw":
+            err = TB.draw(g, actor, ev)
+        elif action == "place":
+            try:
+                err = TB.place(g, actor, int(body.get("index", -1)), int(body.get("base", 0)), ev)
+            except (TypeError, ValueError):
+                return [], "bad placement"
+        elif action == "choose":
+            err = TB.choose(g, actor, body.get("value", "skip"), ev)
+        else:
+            return [], "unknown action"
+        if err:
+            return [], err
+    g["selected"] = None
+    toybattle_render(g, ev)
+    return ev, None
+
+
 REMATCH_END_PHASES = dict(GR.REMATCH_END_PHASES)
 
 RENDERERS = {"games": render, "regicide": rg_render, "odin": odin_render,
              "leaves": leaves_render, "lsd": lsd_render, "spots": spots_render, "yahtzee": yahtzee_render,
              "fliptoons": fliptoons_render, "tornado": tornado_render,
               "castlecombo": castlecombo_render, "artichokes": artichokes_render,
-              "fellowship": fotr_render, "azul": azul_render}
+               "fellowship": fotr_render, "azul": azul_render,
+               "toybattle": toybattle_render}
 
 RULES_BY_KEY = {"games": RULES, "regicide": REGICIDE_RULES, "odin": ODIN_RULES,
                 "leaves": LEAVES_MODULE.rules(), "lsd": LSD_RULES, "spots": SPOTS_RULES,
                 "yahtzee": YAHTZEE_RULES, "fliptoons": FLIPTOONS_RULES,
                 "tornado": TORNADO_RULES, "castlecombo": CASTLECOMBO_RULES,
                 "artichokes": ARTICHOKES_RULES, "fellowship": FTR_RULES,
-                "azul": AZUL_RULES}
+                 "azul": AZUL_RULES, "toybattle": TOYBATTLE_RULES}
 
 
 def guide_payload(key):
@@ -4426,13 +4713,15 @@ PLAYER_MAKERS = {
     "artichokes": lambda u, n: AT.new_player(u, n),
     "fellowship": lambda u, n: FTR.new_player(u, n),
     "azul": lambda u, n: AZ.new_player(u, n),
+    "toybattle": lambda u, n: TB.new_player(u, n),
 }
 
 GAME_MAKERS = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
                "leaves": LEAVES_MODULE.new_game, "lsd": D.new_game, "spots": SP.new_game,
                "yahtzee": Y.new_game, "fliptoons": FT.new_game, "tornado": TS.new_game,
                "castlecombo": CC.new_game, "artichokes": AT.new_game,
-               "fellowship": FTR.new_game, "azul": AZ.new_game}
+                "fellowship": FTR.new_game, "azul": AZ.new_game,
+                "toybattle": TB.new_game}
 
 
 def rematch_game(state, key, chat_id, uid):
@@ -4551,6 +4840,9 @@ def handle_command(state, msg):
         return
     if cmd.startswith("/azul"):
         handle_azul(state, msg, cmd, text, uid, name)
+        return
+    if cmd.startswith("/toybattle"):
+        handle_toybattle(state, msg, cmd, text, uid, name)
         return
     if cmd in ("/start", "/help", "/commands"):
         send(chat_id, HELP)
@@ -4700,6 +4992,73 @@ def handle_callback(state, cb):
             answer_cb(cb["id"], err or "Done")
             if not err:
                 azul_render(az, ev)
+        return
+    if data.startswith("tb:"):
+        g = toybattle_get(state, chat_id)
+        if not g:
+            return answer_cb(cb["id"], "No Toy Battle game here.")
+        parts = data.split(":")
+        action = parts[1] if len(parts) > 1 else ""
+        ev = []
+        if action == "join":
+            if g["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            if any(p["user_id"] == uid for p in g["players"]):
+                return answer_cb(cb["id"], "Already in!")
+            if len(g["players"]) >= TB_LEN:
+                return answer_cb(cb["id"], "Game is full.")
+            g["players"].append(TB.new_player(uid, cb["from"].get("first_name") or "Player"))
+            answer_cb(cb["id"], "Joined!")
+            toybattle_render(g, [f"🙋 {cb['from'].get('first_name')} joined Toy Battle."])
+            return
+        if action == "npc":
+            err = add_npc("toybattle", g)
+            answer_cb(cb["id"], err or "🤖 NPC joined")
+            if not err:
+                toybattle_render(g)
+            return
+        if action == "start":
+            if g["phase"] != "lobby":
+                return answer_cb(cb["id"], "Already started.")
+            err = TB.start_game(g, ev)
+            answer_cb(cb["id"], err or "Started")
+            if not err:
+                toybattle_render(g, ev)
+            return
+        if action == "rematch":
+            ev, err = rematch_game(state, "toybattle", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
+            return
+        idx = toybattle_actor_idx(g, uid)
+        if idx is None:
+            return answer_cb(cb["id"], "Not your turn.")
+        if action == "draw":
+            err = TB.draw(g, idx, ev)
+        elif action == "s":
+            try:
+                g["selected"] = {"index": int(parts[2]), "by": idx}
+            except (IndexError, ValueError):
+                return answer_cb(cb["id"], "Bad troop.")
+            err = None
+            g["selected"] = g["selected"] if TB.legal_placements(g, idx).get(g["selected"]["index"]) else None
+        elif action == "back":
+            g["selected"] = None
+            err = None
+        elif action == "p":
+            try:
+                err = TB.place(g, idx, int(parts[2]), int(parts[3]), ev)
+            except (IndexError, ValueError):
+                return answer_cb(cb["id"], "Bad placement.")
+        elif action == "c":
+            err = TB.choose(g, idx, ":".join(parts[2:]), ev)
+        else:
+            return answer_cb(cb["id"], "Unknown button.")
+        answer_cb(cb["id"], err or "Done")
+        if not err:
+            g["selected"] = None
+            toybattle_render(g, ev)
         return
     if data.startswith("lv:"):
         return handle_leaves_callback(state, cb, chat_id, uid)
@@ -6191,6 +6550,12 @@ def start_web_server(state):
             if u.path == "/castlecombo-cards.webp":
                 p = os.path.join(os.path.dirname(JS_PATH), "castlecombo-cards.webp")
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
+            if u.path in ("/toybattle-board.webp", "/toybattle-tiles.webp", "/toybattle-medals.webp"):
+                p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
+                if os.path.exists(p):
+                    return self._send(200, open(p, "rb").read(), "image/webp",
+                                      cache="public, max-age=86400")
+                return self._send(404, {"ok": False})
             if u.path.startswith("/tornado_cards/") and u.path.endswith((".png", ".jpg", ".jpeg")):
                 _name = os.path.basename(u.path)
                 _ext = os.path.splitext(_name)[1].lower()
@@ -6360,6 +6725,25 @@ def start_web_server(state):
                 with STATE_LOCK:
                     g = azul_get(state, chat_id)
                     board = azul_board_json(g, uid) if g else None
+                return self._send(200 if board else 404, {"ok": bool(board), "game": board})
+            if u.path == "/api/toybattle/mygames":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                with STATE_LOCK:
+                    games = [toybattle_board_json(g, uid) for g in state.get("toybattle", {}).values()
+                             if any(p["user_id"] == uid for p in g["players"])]
+                return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/toybattle/game":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                chat_id = q.get("chat_id", [""])[0]
+                with STATE_LOCK:
+                    g = toybattle_get(state, chat_id)
+                    board = toybattle_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/lsd/mygames":
                 q = urllib.parse.parse_qs(u.query)
@@ -6799,6 +7183,52 @@ def start_web_server(state):
                     events, err = azul_api_move(state, chat_id, uid, body)
                     g = azul_get(state, chat_id)
                     board = azul_board_json(g, uid) if g else None
+                    save_state(state)
+                return self._send(200 if not err else 400,
+                                  {"ok": not err, "error": err, "events": events, "game": board})
+            if path in ("/api/toybattle/create", "/api/toybattle/move"):
+                try:
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                except Exception:
+                    return self._send(400, {"ok": False, "error": "bad json"})
+                iu = init_user(body.get("init_data", ""))
+                if iu is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                uid, name, start_param, chat_instance = iu
+                if path == "/api/toybattle/create":
+                    chat_id = None
+                    for cand in (start_param, str(body.get("chat_id") or ""), chat_instance):
+                        cand = str(cand)
+                        if cand.startswith("toybattle"):
+                            cand = cand[len("toybattle"):]
+                        try:
+                            chat_id = int(cand)
+                            break
+                        except (TypeError, ValueError):
+                            continue
+                    if not chat_id:
+                        return self._send(400, {"ok": False, "error": "open the Mini App from a chat (startapp link)"})
+                    with STATE_LOCK:
+                        g = toybattle_get(state, chat_id)
+                        if g and g["phase"] != "game_end":
+                            return self._send(200, {"ok": True, "game": toybattle_board_json(g, uid), "created": False})
+                        g = TB.new_game(chat_id, uid, name)
+                        g["chat_type"] = "supergroup" if chat_id < 0 else "private"
+                        state.setdefault("toybattle", {})[str(chat_id)] = g
+                        toybattle_render(g, [f"🎯 Toy Battle game created by {html.escape(name)} via Mini App!"])
+                        save_state(state)
+                        board = toybattle_board_json(g, uid)
+                    return self._send(200, {"ok": True, "game": board, "created": True})
+                chat_id = body.get("chat_id")
+                if not chat_id and str(start_param).startswith("toybattle"):
+                    try:
+                        chat_id = int(str(start_param)[len("toybattle"):])
+                    except ValueError:
+                        pass
+                with STATE_LOCK:
+                    events, err = toybattle_api_move(state, chat_id, uid, body)
+                    g = toybattle_get(state, chat_id)
+                    board = toybattle_board_json(g, uid) if g else None
                     save_state(state)
                 return self._send(200 if not err else 400,
                                   {"ok": not err, "error": err, "events": events, "game": board})

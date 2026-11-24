@@ -198,6 +198,19 @@ GAME_SPECS = (
         module="tokaidoduo", web_module="tokaidoduo",
         static_assets=("tokaidoduo.js", "tokaidoduo-board.webp"),
     ),
+    GameSpec(
+        key="altay", name="🏜️ Altay", command="/altay", join_command="/altay_join",
+        description="2-player civilization: produce, build, conquer, develop",
+        help_commands=("/altay_join", "/altay_join_npc", "/altay_start", "/altay_play",
+                       "/altay_buy", "/altay_build", "/altay_attack", "/altay_develop",
+                       "/altay_end", "/altay_score", "/altay_rules", "/altay_cancel"),
+        web_label="🎮 Play Altay (HTML)", callback_prefix="al",
+        min_players=2, max_players=2, npc_full="⛔ Altay is 2 players (full).",
+        rematch_phases=("over",), cover="altay.png",
+        module="altay", web_module="altay",
+        static_assets=("altay.js", "altay-board.webp", "altay-actions.webp",
+                       "altay-achievements.webp", "altay-markers.webp", "altay-tokens.webp"),
+    ),
 )
 
 GAMES_BY_KEY = {spec.key: spec for spec in GAME_SPECS}

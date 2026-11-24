@@ -352,12 +352,30 @@ the sprites are kept in `sources/tokaidoduo/bga/`. Text commands:
 `?startapp=tokaidoduo<chat>` (same Main Mini App, routed by `start_param`).
 Engine: `tokaidoduo.py` + `test_tokaidoduo.py`.
 
+## Altay (same bot, 2-player civilization card game)
+
+A compact two-player version of *Altay: Dawn of Civilization* (Simone Luciani,
+2023). Factions keep their BGA starting decks; each turn you play action cards
+to produce resources, acquire market cards, build settlements, fight Conquest
+Markers or opponents, and invest in one achievement at a time. Final scoring
+counts achievements, VP cards, settlements, VP markers, captured settlements,
+and Conquest Markers (1 VP per three). Board, action-card, achievement-card,
+marker and token art is extracted from the BGA client at version
+`261121-1937`. Text commands: `/altay`, `/altay_join`, `/altay_join_npc`,
+`/altay_faction <name>`, `/altay_start`, `/altay_play <card#>`, `/altay_buy
+<card>`, `/altay_build <territory>`, `/altay_attack <territory>`,
+`/altay_develop <id>`, `/altay_end`, `/altay_score`, `/altay_rules`,
+`/altay_cancel` (creator), `/altay_rematch`. Mini App: board button =
+`?startapp=altay<chat>` (same Main Mini App, routed by `start_param`). Engine:
+`altay.py` + `test_altay.py`.
+
 ## Files
 
 - `game.py` – pure engine: deck, scoring, bust/Flip 7, actions, rounds.
 - `azul.py` – pure engine: factories, pattern lines, wall scoring, final bonuses.
 - `toybattle.py` – pure engine: Castle Field bases, stacks/connection, troop powers, medals, HQ win.
 - `tokaidoduo.py` – pure engine: 37-station Pilgrim ring, Merchant trade routes, Artist zones, 1-2-1 dice draft, Wave tiles, Hot Spring, scoring.
+- `altay.py` – pure engine: faction decks, production, market, settlement building, combat, achievements, final scoring.
 - `yahtzee.py` – pure engine: dice, scorecard, turns, scoring.
 - `fliptoons.py` – pure engine: deck, grid, abilities, market, final flip.
 - `tornado.py` – pure engine: boats, decks, courses, ranks, movement, Grand Prix.
@@ -373,6 +391,7 @@ Engine: `tokaidoduo.py` + `test_tokaidoduo.py`.
 - `test_fellowship.py` – Fellowship engine tests: `python3 test_fellowship.py`
 - `test_toybattle.py` – Toy Battle engine tests: `python3 test_toybattle.py`
 - `test_tokaidoduo.py` – Tokaido Duo engine tests: `python3 test_tokaidoduo.py`
+- `test_altay.py` – Altay engine tests: `python3 test_altay.py`
 - `web/flip7.html` – standalone HTML5 Flip 7 game (hot-seat, Mini App-ready)
 - `web/yahtzee.js` – Yahtzee Mini App view (synced)
 - `web/fliptoons.js` – Fliptoons Mini App view (synced)
@@ -385,6 +404,8 @@ Engine: `tokaidoduo.py` + `test_tokaidoduo.py`.
 - `web/toybattle-board.webp`, `web/toybattle-tiles.webp`, `web/toybattle-medals.webp` – BGA-extracted Toy Battle art
 - `web/tokaidoduo.js` – Tokaido Duo Mini App view (synced, board + seats)
 - `web/tokaidoduo-board.webp` – BGA board art for Tokaido Duo
+- `web/altay.js` – Altay Mini App view (synced, viewer-filtered hands)
+- `web/altay-board.webp`, `web/altay-actions.webp`, `web/altay-achievements.webp`, `web/altay-markers.webp`, `web/altay-tokens.webp` – BGA-extracted Altay art
 - `sources/tokaidoduo/bga/` – BGA sprite sheets for Tokaido Duo (dice, wares, waves, paintings, boutiques, character boards)
 - `web/artichokes_cards/` – BGA card art (0–9 vegetables, 10–14 Artichokes, 15 Rhubarb, 16 back)
 - `web/covers/*.jpg` – box art shown as the lobby photo for each game
@@ -403,6 +424,7 @@ python3 test_fellowship.py  # Fellowship engine tests
 python3 test_azul.py        # Azul engine tests
 python3 test_toybattle.py   # Toy Battle engine tests
 python3 test_tokaidoduo.py  # Tokaido Duo engine tests
+python3 test_altay.py       # Altay engine tests
 ```
 A full 3-player game was also simulated end-to-end (hits/stays/actions/
 round rotation → a winner at 200+ in 13 rounds) with the Telegram layer

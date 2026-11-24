@@ -244,6 +244,27 @@ class RegistryTests(unittest.TestCase):
         self.assertTrue(board["can_act"])
         self.assertFalse(board["players"][1]["rack"])
         self.assertEqual(bot.toybattle_actor_idx(game, 999), None)
+    def test_altay_npc_can_be_controlled_and_hands_are_private(self):
+        game = bot.AL.new_game(7, 42, "Ada")
+        self.assertIsNone(bot.add_npc("altay", game))
+        self.assertTrue(game["players"][1]["npc"])
+        events = []
+        self.assertIsNone(bot.AL.start_game(game, events))
+        board = bot.altay_board_json(game, 42)
+        self.assertTrue(board["can_act"])
+        self.assertEqual(len(board["players"][1]["hand"]), 5)
+        self.assertEqual(len(board["market"]), 10)
+        game["players"][1]["npc"] = False
+        game["players"][1]["user_id"] = 43
+        game["current"] = 1
+        board = bot.altay_board_json(game, 42)
+        self.assertEqual(board["players"][1]["hand"], [])
+        self.assertFalse(board["can_act"])
+        state = {"altay": {"7": game}}
+        with patch.object(bot, "send_board", return_value={"ok": False}):
+            _, err = bot.altay_api_move(state, 7, 43, {"action": "end"})
+            self.assertIsNone(err)
+        self.assertEqual(game["current"], 0)
 
 
 if __name__ == "__main__":

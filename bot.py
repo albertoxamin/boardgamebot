@@ -23,6 +23,7 @@ import fellowship as FTR
 import azul as AZ
 import toybattle as TB
 import tokaidoduo as TD
+import altay as AL
 import game_registry as GR
 import web_assets
 from game_modules.leaves import LEAVES_MODULE
@@ -435,6 +436,7 @@ NPC_PLAYERS = {
     "azul": lambda: {**AZ.new_player(NPC_ID, "🤖 NPC"), **_npc_player()},
     "toybattle": lambda: {**TB.new_player(NPC_ID, "🤖 NPC"), **_npc_player()},
     "tokaidoduo": lambda: {**TD.new_player(NPC_ID, "🤖 NPC"), **_npc_player()},
+    "altay": lambda: {**AL.new_player(NPC_ID, "🤖 NPC"), **_npc_player()},
 }
 
 
@@ -4390,6 +4392,25 @@ def azul_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
+ALTAY_RULES = """🏜️ <b>Altay: Dawn of Civilization</b> (2 players, simplified): win the most VP when someone places their last settlement.
+• Each turn: play action cards, use resources to acquire market cards, build settlements, attack, and invest in an achievement in any order.
+• Played cards produce resources or give swords/builds. Unspent resources are discarded at turn end. You can acquire each market card only once per turn.
+• Build costs 2 food and needs a Village/Architect/City build token. Build in a territory with your settlements (max 4 there) or in a free territory adjacent to your settlements.
+• Attack from an adjacent territory you control. Defeat a Conquest Marker by having more settlements+swords than its number, or capture an enemy settlement if your strength beats their settlements+shields. Played sword cards are redrawn after an attack.
+• Develop: invest one resource per action in one achievement at a time. Completing it scores its VP. Secret/deluxe variants are not used.
+• Final score: achievements + VP action cards + 1 per settlement + VP markers held + 1 per captured settlement + 1 per 3 Conquest Markers. Ties break by achievements, cards, then settlements.
+• Commands: /altay_play &lt;card number&gt;, /altay_buy &lt;card&gt;, /altay_build &lt;territory&gt;, /altay_attack &lt;territory&gt;, /altay_develop &lt;id&gt;, /altay_end (or use buttons/Mini App)."""
+
+TOYBATTLE_RULES = """🎯 <b>Toy Battle rules</b> (2 players, Castle Field): win by placing a troop on the enemy HQ, or by being first to 7 medals.
+• On your turn choose ONE action: <b>draw 2 troops</b> (rack holds at most 8) or <b>place 1 troop</b>.
+• A troop must be placed on a base connected to your HQ by a continuous line of bases topped by YOUR troops. Empty bases, enemy bases and the enemy HQ do not conduct connection. <b>Hook</b> may ignore this for bases, but not for the HQ.
+• You may stack on your own troops freely, and on an enemy troop only with a higher number. <b>Kwak</b> is a joker: it can cover any enemy troop and can be covered by any troop.
+• Troop effects: <b>Skully</b> draw 2, <b>Cap'N</b> place 1 extra troop, <b>Jumbo</b> discard an adjacent enemy troop, <b>Hook</b> ignore connection, <b>XB-42</b> discard a random enemy rack troop, <b>Star</b> draw 1, <b>Roxy</b> none, <b>Kwak</b> none.
+• Special bases (marked on the board) let you return one of your other troops to your rack; troop effects resolve before special bases.
+• When your troops surround a whole region you permanently take its medals (they stay yours even if the region is later broken). Medals are private to no one; the board shows each player's count.
+• Commands: /toybattle_draw, /toybattle_place &lt;troop number&gt; &lt;base&gt;, /toybattle_choose &lt;value&gt; (or use buttons/Mini App)."""
+
+
 TOYBATTLE_RULES = """🎯 <b>Toy Battle rules</b> (2 players, Castle Field): win by placing a troop on the enemy HQ, or by being first to 7 medals.
 • On your turn choose ONE action: <b>draw 2 troops</b> (rack holds at most 8) or <b>place 1 troop</b>.
 • A troop must be placed on a base connected to your HQ by a continuous line of bases topped by YOUR troops. Empty bases, enemy bases and the enemy HQ do not conduct connection. <b>Hook</b> may ignore this for bases, but not for the HQ.
@@ -4948,6 +4969,335 @@ def tokaidoduo_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
+ALTAY_LEN = 2
+
+
+def altay_get(state, chat_id):
+    return state.setdefault("altay", {}).get(str(chat_id))
+
+
+def altay_actor_idx(g, uid):
+    if g["phase"] != "playing":
+        return None
+    return _actor_idx(g, uid, g["current"])
+
+
+def altay_mention(g, user_id):
+    name = next((p["name"] for p in g["players"] if p["user_id"] == user_id), "player")
+    return f'<a href="tg://user?id={user_id}">{html.escape(name)}</a>'
+
+
+def _altay_resources(player):
+    return " ".join(f"{AL.RESOURCE_ICONS[key]} {amount}"
+                    for key, amount in player["resources"].items() if amount) or "none"
+
+
+def altay_board_text(g):
+    if g["phase"] == "lobby":
+        lines = ["🏜️ <b>Altay</b> lobby:"]
+        for index, player in enumerate(g["players"]):
+            faction = AL.FACTIONS.get(player.get("faction"), {}).get("name", "auto")
+            lines.append(f"• {html.escape(player['name'])} — {faction}")
+        lines.append("Need 2 players. /altay_join to join, /altay_join_npc for a mock player, /altay_start to begin.")
+        return "\n".join(lines)
+    if g["phase"] == "over":
+        scores = ", ".join(f"{html.escape(p['name'])} {value}"
+                           for p, value in zip(g["players"], g["scores"] or []))
+        winner = g["players"][g["winner"]] if g.get("winner") is not None else None
+        return (f"🏁 <b>Altay finished</b>: {scores}. "
+                + (f"Winner: <b>{html.escape(winner['name'])}</b>." if winner else "Draw."))
+    current = g["current"]
+    player = g["players"][current]
+    lines = [f"🎲 Turn {g['turn'] + 1}: {altay_mention(g, player['user_id'])} — your move."]
+    lines.append("🏆 " + " · ".join(f"{html.escape(p['name'])} {AL.score(g, i)}"
+                                   for i, p in enumerate(g["players"])))
+    lines.append(f"🎒 {_altay_resources(player)} · ⚔️ {player['swords']} · 🏠 builds {player['builds']}")
+    cards = [f"{i + 1}. {AL.CARDS[card]['name']}" for i, card in enumerate(player["hand"])]
+    lines.append("🃏 " + (", ".join(cards) or "empty hand"))
+    builds = AL.legal_build(g, current)
+    attacks = AL.attack_options(g, current)
+    affordable = [card for card in AL.MARKET
+                  if AL._can_pay(player["resources"], AL.CARDS[card].get("cost", {}))
+                  and card not in player["bought"]]
+    lines.append(f"🏠 Build: {', '.join(str(region) for region in builds) or 'none'}")
+    lines.append(f"⚔️ Attack: {', '.join(str(o['region']) for o in attacks) or 'none'}")
+    lines.append(f"💰 Buy: {', '.join(affordable) or 'none'}")
+    lines.append("📜 Develop: " + (player["achievement"] or "choose one"))
+    lines.extend(html.escape(line) for line in (g.get("logs") or [])[-3:])
+    return "\n".join(lines)
+
+
+def altay_keyboard(g):
+    if g["phase"] == "over":
+        return [[{"text": "🔄 Rematch!", "callback_data": "al:rematch"}]]
+    ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
+    wk = web_keyboard(ct, g["chat_id"], game="altay")
+    if g["phase"] == "lobby":
+        kb = [[{"text": "🙋 Join Altay", "callback_data": "al:join"}]]
+        if not any(_is_npc(p) for p in g["players"]):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "al:npc"}])
+        kb.append([{"text": btn["text"], "callback_data": f"al:f:{code}"}
+                   for code, btn in zip(AL.FACTION_ORDER, [
+                       {"text": "🌍 Earthfolk"}, {"text": "🌿 Elvenfolk"},
+                       {"text": "🔥 Firefolk"}, {"text": "🧚 Smallfolk"}])])
+        kb.append([{"text": "▶️ Start game", "callback_data": "al:start"}])
+        return kb + (wk or [])
+    player = g["players"][g["current"]]
+    sel = g.get("sel")
+    kb = []
+    if sel:
+        if sel == "build":
+            for row in [AL.legal_build(g, g["current"])[i:i + 5]
+                        for i in range(0, len(AL.legal_build(g, g["current"])), 5)]:
+                kb.append([{"text": f"🏠 {region}", "callback_data": f"al:rb:{region}"}
+                           for region in row])
+        elif sel == "attack":
+            for option in AL.attack_options(g, g["current"]):
+                label = "⚔️" if option["kind"] == "neutral" else "🛡️"
+                kb.append([{"text": f"{label} {option['region']} ({option['value']})",
+                            "callback_data": f"al:ra:{option['region']}"}])
+        elif sel == "develop":
+            for achievement_id in ["irrigation", "mining", "writing", "agriculture",
+                                   "metallurgy", "amphitheatre", "pyramids", "astronomy", "epic"]:
+                if achievement_id not in player["achievements"]:
+                    kb.append([{"text": AL.ACHIEVEMENTS[achievement_id]["name"],
+                                "callback_data": f"al:rd:{achievement_id}"}])
+        elif sel == "buy":
+            for card_id in AL.MARKET:
+                if card_id not in player["bought"]:
+                    kb.append([{"text": AL.CARDS[card_id]["name"],
+                                "callback_data": f"al:rs:{card_id}"}])
+        kb.append([{"text": "↩️ Back", "callback_data": "al:back"}])
+    else:
+        row = []
+        for index, card_id in enumerate(player["hand"]):
+            row.append({"text": f"🃏 {index + 1} {AL.CARDS[card_id]['name']}",
+                        "callback_data": f"al:p:{index}"})
+            if len(row) == 2:
+                kb.append(row)
+                row = []
+        if row:
+            kb.append(row)
+        kb.append([
+            {"text": "💰 Buy", "callback_data": "al:s"},
+            {"text": "🏠 Build", "callback_data": "al:b"},
+            {"text": "⚔️ Attack", "callback_data": "al:a"},
+        ])
+        kb.append([
+            {"text": "📜 Develop", "callback_data": "al:d"},
+            {"text": "✅ End turn", "callback_data": "al:e"},
+        ])
+    if wk:
+        kb.extend(wk)
+    return kb or None
+
+
+def altay_render(g, events=None):
+    lines = [html.escape(event) for event in (events or [])]
+    if g["phase"] == "playing":
+        p = g["players"][g["current"]]
+        if _is_npc(p):
+            lines.append("👉 🤖 NPC's turn - anyone can play for it!")
+        else:
+            lines.append(f"👉 {altay_mention(g, p['user_id'])} - your move.")
+    r = send_board(g, "altay", "\n".join(lines + [altay_board_text(g)]), altay_keyboard(g))
+    if r.get("ok"):
+        old = g.get("board_message_id")
+        g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=g["chat_id"], message_id=old)
+
+
+def handle_altay(state, msg, cmd, text, uid, name):
+    chat_id = msg["chat"]["id"]
+    g = altay_get(state, chat_id)
+    if cmd == "/altay_rules":
+        send(chat_id, ALTAY_RULES)
+        return True
+    if cmd == "/altay":
+        if not g:
+            creator_name = msg.get("from", {}).get("first_name") or "Player"
+            g = AL.new_game(chat_id, uid, creator_name)
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state.setdefault("altay", {})[str(chat_id)] = g
+            altay_render(g, [f"🏜️ Altay game created by {html.escape(creator_name)}!"])
+        else:
+            altay_render(g)
+        return True
+    if not g:
+        send(chat_id, "No Altay game here yet - send /altay to create one.")
+        return True
+    g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd == "/altay_join_npc":
+        err = add_npc("altay", g)
+        send(chat_id, err or "🤖 NPC joined - anyone can play for it!")
+        if not err:
+            altay_render(g)
+        return True
+    if cmd == "/altay_join":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        else:
+            err = AL.join_game(g, uid, msg.get("from", {}).get("first_name") or "Player")
+            if err:
+                send(chat_id, f"⛔ {err}")
+            else:
+                send(chat_id, f"🙋 <b>{name}</b> joined Altay.")
+                altay_render(g)
+        return True
+    if cmd == "/altay_faction":
+        parts = text.split()[1:]
+        mine = next((i for i, p in enumerate(g["players"]) if p["user_id"] == uid), None)
+        if g["phase"] != "lobby" or mine is None:
+            send(chat_id, "⛔ Choose a faction in the lobby.")
+        elif not parts:
+            send(chat_id, "Usage: /altay_faction &lt;earthfolk|elvenfolk|firefolk|smallfolk&gt;")
+        else:
+            err = AL.set_faction(g, mine, parts[0])
+            send(chat_id, f"⛔ {err}" if err else f"🎌 {html.escape(parts[0].title())} chosen.")
+            if not err:
+                altay_render(g)
+        return True
+    if cmd == "/altay_start":
+        ev = []
+        err = AL.start_game(g, ev)
+        send(chat_id, f"⛔ {err}" if err else "🏜️ Altay started!")
+        if not err:
+            altay_render(g, ev)
+        return True
+    if cmd == "/altay_cancel":
+        if uid != g["players"][0]["user_id"]:
+            send(chat_id, "⛔ Only the creator can cancel.")
+        else:
+            del state["altay"][str(chat_id)]
+            send(chat_id, "🗑 Altay game cancelled.")
+        return True
+    if cmd == "/altay_rematch":
+        ev, err = rematch_game(state, "altay", chat_id, uid)
+        send(chat_id, f"⛔ {err}" if err else "🔄 Rematch!")
+        return True
+    if cmd == "/altay_score":
+        lines = [f"{html.escape(p['name'])}: {AL.score_breakdown(g, i)}" for i, p in enumerate(g["players"])]
+        send(chat_id, "<b>Altay scores</b>\n" + "\n".join(lines))
+        return True
+    idx = altay_actor_idx(g, uid)
+    if idx is None:
+        send(chat_id, "⛔ You're not in this game (or it isn't your turn).")
+        return True
+    parts = text.split()[1:]
+    ev = []
+    if cmd == "/altay_play":
+        if not parts or not parts[0].isdigit():
+            err = "Usage: /altay_play &lt;card number&gt;"
+        else:
+            err = AL.play_card(g, idx, int(parts[0]) - 1, ev)
+    elif cmd == "/altay_buy":
+        err = AL.buy_card(g, idx, parts[0], ev) if parts else "Usage: /altay_buy &lt;card&gt;"
+    elif cmd == "/altay_build":
+        if not parts or not parts[0].isdigit():
+            err = "Usage: /altay_build &lt;territory&gt;"
+        else:
+            err = AL.build_settlement(g, idx, int(parts[0]), ev)
+    elif cmd == "/altay_attack":
+        if not parts or not parts[0].isdigit():
+            err = "Usage: /altay_attack &lt;territory&gt;"
+        else:
+            err = AL.attack(g, idx, None, int(parts[0]), ev)
+    elif cmd == "/altay_develop":
+        err = AL.develop(g, idx, parts[0], ev) if parts else "Usage: /altay_develop &lt;id&gt;"
+    elif cmd == "/altay_end":
+        err = AL.end_turn(g, idx, ev)
+    else:
+        return False
+    if err:
+        send(chat_id, f"⛔ {err}")
+    else:
+        g["sel"] = None
+        altay_render(g, ev)
+    return True
+
+
+def altay_board_json(g, viewer_id=None):
+    board = AL.board_json(g, viewer_id)
+    me = next((i for i, p in enumerate(g["players"]) if p["user_id"] == viewer_id), None)
+    actor = g["current"] if g["phase"] == "playing" else None
+    can_act = bool(me is not None and actor is not None and
+                   (me == actor or _is_npc(g["players"][actor])))
+    board.update({
+        "chat_id": g["chat_id"], "actor": actor, "can_act": can_act,
+        "is_player": me is not None, "me": me,
+        "log": board["logs"], "rules": ALTAY_RULES,
+    })
+    if can_act:
+        board["legal"] = {
+            "build": board["build_options"],
+            "attack": board["attack_options"],
+            "buy": [card["id"] for card in board["market"]
+                    if card["id"] not in board["players"][actor]["bought"]],
+        }
+    else:
+        board["legal"] = {"build": [], "attack": [], "buy": []}
+    return board
+
+
+def altay_api_move(state, chat_id, user_id, body):
+    g = altay_get(state, chat_id)
+    if not g:
+        return [], "no Altay game in that chat"
+    action = body.get("action")
+    ev = []
+    mine = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
+    if action == "join":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        if mine is not None:
+            return ev, None
+        err = AL.join_game(g, user_id, (init_user(body.get("init_data", "")) or (None, "Player"))[1])
+        if err:
+            return [], err
+        ev.append("🙋 joined Altay.")
+    elif action == "faction":
+        if g["phase"] != "lobby" or mine is None:
+            return [], "choose a faction in the lobby"
+        err = AL.set_faction(g, mine, str(body.get("faction", "")))
+        if err:
+            return [], err
+    elif action == "start":
+        if g["phase"] != "lobby":
+            return [], "already started"
+        err = AL.start_game(g, ev)
+        if err:
+            return [], err
+    elif action == "rematch":
+        return rematch_game(state, "altay", chat_id, user_id)
+    else:
+        actor = altay_actor_idx(g, user_id)
+        if actor is None:
+            return [], "not in this game"
+        try:
+            if action == "play":
+                err = AL.play_card(g, actor, int(body.get("index", -1)), ev)
+            elif action == "buy":
+                err = AL.buy_card(g, actor, str(body.get("card", "")), ev)
+            elif action == "build":
+                err = AL.build_settlement(g, actor, int(body.get("region", -1)), ev)
+            elif action == "attack":
+                err = AL.attack(g, actor, body.get("from"), int(body.get("region", -1)), ev)
+            elif action == "develop":
+                err = AL.develop(g, actor, str(body.get("achievement", "")), ev)
+            elif action == "end":
+                err = AL.end_turn(g, actor, ev)
+            else:
+                return [], "unknown action"
+        except (TypeError, ValueError):
+            return [], "bad move"
+        if err:
+            return [], err
+    g["sel"] = None
+    altay_render(g, ev)
+    return ev, None
+
+
 REMATCH_END_PHASES = dict(GR.REMATCH_END_PHASES)
 
 RENDERERS = {"games": render, "regicide": rg_render, "odin": odin_render,
@@ -4956,7 +5306,8 @@ RENDERERS = {"games": render, "regicide": rg_render, "odin": odin_render,
               "castlecombo": castlecombo_render, "artichokes": artichokes_render,
                "fellowship": fotr_render, "azul": azul_render,
                "toybattle": toybattle_render,
-               "tokaidoduo": tokaidoduo_render}
+               "tokaidoduo": tokaidoduo_render,
+                "altay": altay_render}
 
 RULES_BY_KEY = {"games": RULES, "regicide": REGICIDE_RULES, "odin": ODIN_RULES,
                 "leaves": LEAVES_MODULE.rules(), "lsd": LSD_RULES, "spots": SPOTS_RULES,
@@ -4964,7 +5315,8 @@ RULES_BY_KEY = {"games": RULES, "regicide": REGICIDE_RULES, "odin": ODIN_RULES,
                 "tornado": TORNADO_RULES, "castlecombo": CASTLECOMBO_RULES,
                 "artichokes": ARTICHOKES_RULES, "fellowship": FTR_RULES,
                  "azul": AZUL_RULES, "toybattle": TOYBATTLE_RULES,
-                 "tokaidoduo": TOKAIDODUO_RULES}
+                 "tokaidoduo": TOKAIDODUO_RULES,
+                 "altay": ALTAY_RULES}
 
 
 def guide_payload(key):
@@ -4993,6 +5345,7 @@ PLAYER_MAKERS = {
     "azul": lambda u, n: AZ.new_player(u, n),
     "toybattle": lambda u, n: TB.new_player(u, n),
     "tokaidoduo": lambda u, n: TD.new_player(u, n),
+    "altay": lambda u, n: AL.new_player(u, n),
 }
 
 GAME_MAKERS = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
@@ -5001,7 +5354,8 @@ GAME_MAKERS = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
                "castlecombo": CC.new_game, "artichokes": AT.new_game,
                 "fellowship": FTR.new_game, "azul": AZ.new_game,
                 "toybattle": TB.new_game,
-               "tokaidoduo": TD.new_game}
+               "tokaidoduo": TD.new_game,
+                "altay": AL.new_game}
 
 
 def rematch_game(state, key, chat_id, uid):
@@ -5126,6 +5480,9 @@ def handle_command(state, msg):
         return
     if cmd.startswith("/tokaidoduo"):
         handle_tokaidoduo(state, msg, cmd, text, uid, name)
+        return
+    if cmd.startswith("/altay"):
+        handle_altay(state, msg, cmd, text, uid, name)
         return
     if cmd in ("/start", "/help", "/commands"):
         send(chat_id, HELP)
@@ -5275,6 +5632,81 @@ def handle_callback(state, cb):
             answer_cb(cb["id"], err or "Done")
             if not err:
                 azul_render(az, ev)
+        return
+    if data.startswith("al:"):
+        g = altay_get(state, chat_id)
+        if not g:
+            return answer_cb(cb["id"], "No Altay game here.")
+        parts = data.split(":")
+        action = parts[1] if len(parts) > 1 else ""
+        ev = []
+        mine = next((i for i, p in enumerate(g["players"]) if p["user_id"] == uid), None)
+        if action == "join":
+            if g["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            err = AL.join_game(g, uid, cb["from"].get("first_name") or "Player")
+            answer_cb(cb["id"], err or "Joined!")
+            if not err:
+                altay_render(g, [f"🙋 {cb['from'].get('first_name')} joined Altay."])
+            return
+        if action == "f":
+            if g["phase"] != "lobby" or mine is None:
+                return answer_cb(cb["id"], "Choose a faction in the lobby.")
+            err = AL.set_faction(g, mine, parts[2] if len(parts) > 2 else "")
+            answer_cb(cb["id"], err or "Faction chosen")
+            if not err:
+                altay_render(g)
+            return
+        if action == "start":
+            if g["phase"] != "lobby":
+                return answer_cb(cb["id"], "Already started.")
+            err = AL.start_game(g, ev)
+            answer_cb(cb["id"], err or "Started")
+            if not err:
+                altay_render(g, ev)
+            return
+        if action == "rematch":
+            ev, err = rematch_game(state, "altay", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
+            return
+        actor = altay_actor_idx(g, uid)
+        if actor is None:
+            return answer_cb(cb["id"], "Not your turn.")
+        if action in ("p", "b", "a", "d", "s"):
+            if action == "p":
+                try:
+                    err = AL.play_card(g, actor, int(parts[2]), ev)
+                except (IndexError, ValueError):
+                    return answer_cb(cb["id"], "Bad card.")
+            else:
+                g["sel"] = {"p": "play", "b": "build", "a": "attack",
+                            "d": "develop", "s": "buy"}[action]
+                err = None
+        elif action == "back":
+            g["sel"] = None
+            err = None
+        else:
+            try:
+                if action == "rb":
+                    err = AL.build_settlement(g, actor, int(parts[2]), ev)
+                elif action == "ra":
+                    err = AL.attack(g, actor, None, int(parts[2]), ev)
+                elif action == "rd":
+                    err = AL.develop(g, actor, parts[2], ev)
+                elif action == "rs":
+                    err = AL.buy_card(g, actor, parts[2], ev)
+                elif action == "e":
+                    err = AL.end_turn(g, actor, ev)
+                else:
+                    return answer_cb(cb["id"], "Unknown button.")
+            except (IndexError, ValueError):
+                return answer_cb(cb["id"], "Bad move.")
+        answer_cb(cb["id"], err or "Done")
+        if not err:
+            g["sel"] = None
+            altay_render(g, ev)
         return
     if data.startswith("tb:"):
         g = toybattle_get(state, chat_id)
@@ -6885,7 +7317,10 @@ def start_web_server(state):
                 p = os.path.join(os.path.dirname(JS_PATH), "castlecombo-cards.webp")
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
             if u.path in ("/toybattle-board.webp", "/toybattle-tiles.webp", "/toybattle-medals.webp",
-                  "/tokaidoduo-board.webp"):
+                  "/tokaidoduo-board.webp",
+                  "/altay-board.webp", "/altay-actions.webp",
+                  "/altay-achievements.webp", "/altay-markers.webp",
+                  "/altay-tokens.webp"):
                 p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
                 if os.path.exists(p):
                     return self._send(200, open(p, "rb").read(), "image/webp",
@@ -7079,6 +7514,25 @@ def start_web_server(state):
                 with STATE_LOCK:
                     g = toybattle_get(state, chat_id)
                     board = toybattle_board_json(g, uid) if g else None
+                return self._send(200 if board else 404, {"ok": bool(board), "game": board})
+            if u.path == "/api/altay/mygames":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                with STATE_LOCK:
+                    games = [altay_board_json(g, uid) for g in state.get("altay", {}).values()
+                             if any(p["user_id"] == uid for p in g["players"])]
+                return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/altay/game":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                chat_id = q.get("chat_id", [""])[0]
+                with STATE_LOCK:
+                    g = altay_get(state, chat_id)
+                    board = altay_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/tokaidoduo/mygames":
                 q = urllib.parse.parse_qs(u.query)
@@ -7583,6 +8037,52 @@ def start_web_server(state):
                     events, err = toybattle_api_move(state, chat_id, uid, body)
                     g = toybattle_get(state, chat_id)
                     board = toybattle_board_json(g, uid) if g else None
+                    save_state(state)
+                return self._send(200 if not err else 400,
+                                  {"ok": not err, "error": err, "events": events, "game": board})
+            if path in ("/api/altay/create", "/api/altay/move"):
+                try:
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                except Exception:
+                    return self._send(400, {"ok": False, "error": "bad json"})
+                iu = init_user(body.get("init_data", ""))
+                if iu is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                uid, name, start_param, chat_instance = iu
+                if path == "/api/altay/create":
+                    chat_id = None
+                    for cand in (start_param, str(body.get("chat_id") or ""), chat_instance):
+                        cand = str(cand)
+                        if cand.startswith("altay"):
+                            cand = cand[len("altay"):]
+                        try:
+                            chat_id = int(cand)
+                            break
+                        except (TypeError, ValueError):
+                            continue
+                    if not chat_id:
+                        return self._send(400, {"ok": False, "error": "open the Mini App from a chat (startapp link)"})
+                    with STATE_LOCK:
+                        g = altay_get(state, chat_id)
+                        if g and g["phase"] != "over":
+                            return self._send(200, {"ok": True, "game": altay_board_json(g, uid), "created": False})
+                        g = AL.new_game(chat_id, uid, name)
+                        g["chat_type"] = "supergroup" if chat_id < 0 else "private"
+                        state.setdefault("altay", {})[str(chat_id)] = g
+                        altay_render(g, [f"🏜️ Altay game created by {html.escape(name)} via Mini App!"])
+                        save_state(state)
+                        board = altay_board_json(g, uid)
+                    return self._send(200, {"ok": True, "game": board, "created": True})
+                chat_id = body.get("chat_id")
+                if not chat_id and str(start_param).startswith("altay"):
+                    try:
+                        chat_id = int(str(start_param)[len("altay"):])
+                    except ValueError:
+                        pass
+                with STATE_LOCK:
+                    events, err = altay_api_move(state, chat_id, uid, body)
+                    g = altay_get(state, chat_id)
+                    board = altay_board_json(g, uid) if g else None
                     save_state(state)
                 return self._send(200 if not err else 400,
                                   {"ok": not err, "error": err, "events": events, "game": board})

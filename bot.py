@@ -38,7 +38,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 53
+WEB_VER = 54
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -4949,6 +4949,7 @@ def tokaidoduo_board_json(g, viewer_id=None):
         "zone_adj": {str(k): v for k, v in TD.ZONE_ADJ.items()},
         "zone_pos": TD.ZONE_POS,
         "town_pos": TD.TOWN_POS,
+        "station_pos": TD.STATION_POS,
         "package_pos": TD.PACKAGE_POS,
         "wave_pos": TD.WAVE_POS,
         "town_adj": {k: v for k, v in TD.TOWN_ADJ.items()},

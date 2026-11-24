@@ -122,8 +122,32 @@ ZONE_SPACES = [
 ZONE_POS = [(37, 73), (38, 52), (37, 34), (45, 24),
             (62, 34), (70, 52), (70, 73), (55, 83)]
 TOWN_POS = {"m_w": (50, 68), "m_cl": (50, 53), "m_c": (55, 40), "m_e": (48, 27),
-            "c_0": (73, 18), "c_4": (85, 40), "c_9": (78, 65), "c_13": (73, 87),
-            "c_18": (32, 82), "c_23": (22, 65), "c_27": (22, 40), "c_31": (28, 18)}
+            "c_0": (72.5, 20.4), "c_4": (93.3, 44.0), "c_9": (74.5, 66.7), "c_13": (77.6, 88.1),
+            "c_18": (29.7, 85.4), "c_23": (16.7, 66.6), "c_27": (27.9, 45.9), "c_31": (9.1, 24.4)}
+# Pilgrim-ring station centres (% of the portrait board image, 789x1600),
+# measured off tokaidoduo-board.webp: each entry is the centre of that
+# station's drawn medallion (disc + bowl). FB-0042: the Mini App used to
+# place the Pilgrim on a guessed ellipse (see tdStationPos), which missed
+# the drawn medallions by up to ~15% of the board — the ring is not an
+# ellipse, it bulges around the four villages and dips to the big Hot
+# Spring circle — so the pawn floated off the stations. The coastal
+# entries equal TOWN_POS (same town icon). Note the board art also shows
+# a fifth blue seashore medallion at the very bottom (62.7%, 96.1%):
+# it is NOT one of the 37 BGA spaces (BGA help: "outer ring of 37
+# spaces"), so it has no station number here.
+STATION_POS = [(72.5, 20.4), (78.1, 27.8), (76.0, 34.8), (86.6, 38.8),
+               (93.3, 44.0), (91.5, 49.0), (80.5, 50.2), (77.8, 55.6),
+               (73.8, 60.4), (74.5, 66.7), (84.0, 70.8), (88.1, 76.6),
+               (85.3, 83.1), (77.6, 88.1), (67.4, 90.9), (54.0, 93.0),
+               (43.7, 94.4), (34.2, 90.5), (29.7, 85.4), (26.6, 78.5),
+               (12.2, 81.0), (18.4, 73.8), (8.9, 70.1), (16.7, 66.6),
+               (26.2, 62.3), (31.3, 57.1), (31.2, 51.1), (27.9, 45.9),
+               (22.8, 39.5), (16.3, 34.9), (7.2, 30.9), (9.1, 24.4),
+               (16.7, 17.1), (28.4, 14.9), (40.1, 14.5), (48.2, 18.9),
+               (60.6, 16.9)]
+assert len(STATION_POS) == len(STATIONS) == 37
+for _s in COASTAL_STATIONS:
+    assert STATION_POS[_s] == TOWN_POS["c_%d" % _s], _s
 # Centres of the wrapped-package symbols in the dashed boxes at the
 # board edge, one per coastal town (measured off tokaidoduo-board.webp).
 # The boutique pill sits exactly over its town's package (FB-0014),

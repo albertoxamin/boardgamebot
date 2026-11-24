@@ -78,11 +78,17 @@ async function tdMove(action, extra) {
   if (r.error) tdLog('⛔ ' + r.error);
   if (r.game) { TDG.board = r.game; tdRender(); }
 }
-function tdStationPos(i) {
-  // Ring stations, clockwise from the SE Coastal town (station 0).
-  // Board is displayed rotated -90deg (portrait, like BGA), so the
-  // landscape ellipse (x = 50+36cos, y = 52+40sin) maps to
-  // new_x = old_y, new_y = 100 - old_x.
+function tdStationPos(g, i) {
+  // FB-0042: the Pilgrim meeple must sit exactly on the drawn station
+  // it stands on. The ellipse below was a guess and missed the drawn
+  // medallions by up to ~15% of the board — the ring is not an ellipse,
+  // it bulges around the four villages and dips to the big Hot Spring
+  // circle — so the pawn floated off the stations. Positions are now
+  // measured off tokaidoduo-board.webp and served as station_pos (see
+  // STATION_POS in tokaidoduo.py); the ellipse stays only as a fallback
+  // for a board JSON that predates it.
+  const sp = (g && g.station_pos) || null;
+  if (sp && sp[i]) return sp[i];
   const a = (45 + i * (360 / 37)) * Math.PI / 180;
   return [52 + 40 * Math.sin(a), 50 - 36 * Math.cos(a)];
 }
@@ -223,7 +229,7 @@ function tdRender() {
     const pTownName = 'c_' + p.pilgrim_pos;
     const pTown = (g.town_pos || {})[pTownName];
     const together = !!(mTown && pTown && p.merchant_pos === pTownName);
-    const [sx, sy] = pTown || tdStationPos(p.pilgrim_pos);
+    const [sx, sy] = pTown || tdStationPos(g, p.pilgrim_pos);
     html += tdMeeple(sx + (together ? 3 : 0), sy, col, 'pilgrim', p.name + ' Pilgrim @ station ' + p.pilgrim_pos + ' (' + (g.stations[p.pilgrim_pos] || '') + ')');
     if (mTown) html += tdMeeple(mTown[0] - (together ? 3 : 0), mTown[1], col, 'merchant', p.name + ' Merchant @ ' + p.merchant_pos);
     const zp = (g.zone_pos || [])[p.artist_zone];
@@ -270,7 +276,7 @@ function tdRender() {
   if (g.pending && g.can_act) {
     (g.options || []).forEach(o => {
       let pos = null;
-      if (g.pending.kind === 'pilgrim_wave' && o.station !== undefined && o.station !== null) pos = tdStationPos(o.station);
+      if (g.pending.kind === 'pilgrim_wave' && o.station !== undefined && o.station !== null) pos = tdStationPos(g, o.station);
       else if (g.pending.kind === 'merchant_dest' && String(o.value).indexOf('dest:') === 0) pos = (g.town_pos || {})[String(o.value).slice(5)];
       else if (g.pending.kind === 'artist_dest' && String(o.value).indexOf('dest:') === 0) pos = (g.zone_pos || [])[Number(String(o.value).slice(5))];
       if (!pos) return;

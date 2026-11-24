@@ -36,6 +36,40 @@ def test_station_counts():
     assert TD.COASTAL_STATIONS == [0, 4, 9, 13, 18, 23, 27, 31]
 
 
+def test_pilgrim_stations_are_measured_off_the_board():
+    # FB-0042: the Pilgrim pawn was not clearly on the stations — the
+    # Mini App placed it on a guessed ellipse, which missed the drawn
+    # medallions by up to ~15% of the board. Every station now has a
+    # position measured off tokaidoduo-board.webp (centre of its drawn
+    # medallion), served as station_pos in the board JSON, and the JS
+    # uses it instead of the ellipse. Coastal stations sit on the same
+    # town icon as TOWN_POS, so the Merchant and the Pilgrim agree.
+    import math
+    assert len(TD.STATION_POS) == len(TD.STATIONS) == 37
+    seen = set()
+    for i, (x, y) in enumerate(TD.STATION_POS):
+        assert 0 <= x <= 100 and 0 <= y <= 100, (i, x, y)
+        assert (x, y) not in seen, (i, x, y)  # no two stations share a spot
+        seen.add((x, y))
+        assert isinstance(x, (int, float)) and isinstance(y, (int, float)), (i, x, y)
+    for s in TD.COASTAL_STATIONS:
+        assert TD.STATION_POS[s] == TD.TOWN_POS["c_%d" % s], s
+    # the ring order is right: consecutive stations (incl. 36 -> 0) are
+    # neighbours on the board, never a jump across it.
+    for i in range(37):
+        x1, y1 = TD.STATION_POS[i]
+        x2, y2 = TD.STATION_POS[(i + 1) % 37]
+        assert math.hypot(x2 - x1, y2 - y1) < 16, (i, (i + 1) % 37)
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    assert "g.station_pos" in js
+    assert "tdStationPos(g, p.pilgrim_pos)" in js
+    assert "tdStationPos(g, o.station)" in js
+    bot = open(os.path.join(os.path.dirname(__file__), "bot.py"),
+               encoding="utf-8").read()
+    assert '"station_pos": TD.STATION_POS' in bot
+
+
 def test_zone_graph_and_spaces():
     assert len(TD.ZONES) == 8
     # adjacency is symmetric, 11 trade routes

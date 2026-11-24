@@ -30,8 +30,8 @@ class LeavesGame(GameModule):
     def new_player(self, user_id, name):
         return rules.new_player(user_id, name)
 
-    def npc_player(self):
-        return {**self.new_player(NPC_ID, "🤖 NPC"), "npc": True}
+    def npc_player(self, user_id=NPC_ID, name="🤖 NPC"):
+        return {**self.new_player(user_id, name), "npc": True}
 
     def start_game(self, game, events):
         self.normalize(game)

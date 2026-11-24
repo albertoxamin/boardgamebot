@@ -106,8 +106,9 @@ Add the bot to the group and make it **admin** (or @BotFather →
 /rules             how to play (reply to a board for that game's rules)
 /cancel            reply to a game's board message to cancel that game
 Flip 7 lobbies can also be joined/started from the Mini App button; the bot's
-own Hit/Stay/Score buttons work too. Every lobby has an "Add NPC" button (same
-as /join_npc and /<game>_join_npc) to seat a mock player anyone can control.
+own Hit/Stay/Score buttons work too. While a lobby has free seats it has an
+"Add NPC" button (same as /join_npc and /<game>_join_npc) to seat another mock
+player anyone can control; NPCs get unique negative ids and distinct names.
 ```
 
 Buttons enforce whose turn it is; action cards show target buttons to the

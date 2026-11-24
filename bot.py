@@ -375,11 +375,11 @@ def save_state(state):
     os.replace(tmp, STATE_FILE)
 
 
-NPC_ID = -1  # sentinel Telegram user_id for the mock NPC player
+NPC_ID = -1  # legacy sentinel; new NPCs get unique negative user_ids
 
 
-def _npc_player():
-    return {"user_id": NPC_ID, "name": "🤖 NPC", "npc": True}
+def _npc_player(user_id=NPC_ID, name="🤖 NPC"):
+    return {"user_id": user_id, "name": name, "npc": True}
 
 
 def _is_npc(player):
@@ -390,74 +390,93 @@ NPC_MAX = dict(GR.NPC_MAX)
 NPC_FULL = dict(GR.NPC_FULL)
 
 
-def _games_npc():
-    p = G.new_player(NPC_ID, "🤖 NPC")
+def _next_npc_id(g):
+    used = {p.get("user_id") for p in g["players"]}
+    candidate = NPC_ID
+    while candidate in used:
+        candidate -= 1
+    return candidate
+
+
+def _next_npc_name(g):
+    count = sum(_is_npc(p) for p in g["players"])
+    return "🤖 NPC" if count == 0 else f"🤖 NPC {count + 1}"
+
+
+def _games_npc(uid=NPC_ID, name="🤖 NPC"):
+    p = G.new_player(uid, name)
     p["npc"] = True
     return p
 
 
-def _fliptoons_npc():
-    p = _ft_player(NPC_ID, "🤖 NPC")
+def _fliptoons_npc(uid=NPC_ID, name="🤖 NPC"):
+    p = _ft_player(uid, name)
     p["npc"] = True
     return p
 
 
-def _castlecombo_npc():
-    p = CC.new_player(NPC_ID, "🤖 NPC")
+def _castlecombo_npc(uid=NPC_ID, name="🤖 NPC"):
+    p = CC.new_player(uid, name)
     p["npc"] = True
     return p
 
 
-def _artichokes_npc():
-    p = AT.new_player(NPC_ID, "🤖 NPC")
+def _artichokes_npc(uid=NPC_ID, name="🤖 NPC"):
+    p = AT.new_player(uid, name)
     p["npc"] = True
     return p
 
 
-def _fellowship_npc():
-    p = FTR.new_player(NPC_ID, "🤖 NPC")
+def _fellowship_npc(uid=NPC_ID, name="🤖 NPC"):
+    p = FTR.new_player(uid, name)
     p["npc"] = True
     return p
 
 
-def _blackflag_npc():
-    p = BF.new_player(NPC_ID, "🤖 NPC")
+def _blackflag_npc(uid=NPC_ID, name="🤖 NPC"):
+    p = BF.new_player(uid, name)
     p["npc"] = True
     return p
 
 
 NPC_PLAYERS = {
     "games": _games_npc,
-    "regicide": lambda: {**_npc_player(), "hand": []},
-    "odin": lambda: {**_npc_player(), "hand": [], "score": O.START_SCORE},
+    "regicide": lambda uid=NPC_ID, name="🤖 NPC": {**_npc_player(uid, name), "hand": []},
+    "odin": lambda uid=NPC_ID, name="🤖 NPC": {**_npc_player(uid, name), "hand": [], "score": O.START_SCORE},
     "leaves": LEAVES_MODULE.npc_player,
-    "lsd": lambda: {**_npc_player(), "souls": 5, "candle": None,
-                    "in_play": [], "demons": [], "demon_hand": []},
-    "spots": lambda: {**_npc_player(), "dogs": [], "scored": [], "yard": [], "treats": 1},
-    "yahtzee": lambda: {**_npc_player(), **Y.new_player(NPC_ID, "🤖 NPC")},
-    "tornado": lambda: {**_npc_player(), **TS.new_player(NPC_ID, "🤖 NPC")},
+    "lsd": lambda uid=NPC_ID, name="🤖 NPC": {**_npc_player(uid, name), "souls": 5, "candle": None,
+                                              "in_play": [], "demons": [], "demon_hand": []},
+    "spots": lambda uid=NPC_ID, name="🤖 NPC": {**_npc_player(uid, name), "dogs": [], "scored": [], "yard": [], "treats": 1},
+    "yahtzee": lambda uid=NPC_ID, name="🤖 NPC": {**_npc_player(uid, name), **Y.new_player(uid, name)},
+    "tornado": lambda uid=NPC_ID, name="🤖 NPC": {**_npc_player(uid, name), **TS.new_player(uid, name)},
     "fliptoons": _fliptoons_npc,
     "castlecombo": _castlecombo_npc,
     "artichokes": _artichokes_npc,
     "fellowship": _fellowship_npc,
-    "azul": lambda: {**AZ.new_player(NPC_ID, "🤖 NPC"), **_npc_player()},
-    "toybattle": lambda: {**TB.new_player(NPC_ID, "🤖 NPC"), **_npc_player()},
-    "tokaidoduo": lambda: {**TD.new_player(NPC_ID, "🤖 NPC"), **_npc_player()},
-    "altay": lambda: {**AL.new_player(NPC_ID, "🤖 NPC"), **_npc_player()},
+    "azul": lambda uid=NPC_ID, name="🤖 NPC": {**AZ.new_player(uid, name), **_npc_player(uid, name)},
+    "toybattle": lambda uid=NPC_ID, name="🤖 NPC": {**TB.new_player(uid, name), **_npc_player(uid, name)},
+    "tokaidoduo": lambda uid=NPC_ID, name="🤖 NPC": {**TD.new_player(uid, name), **_npc_player(uid, name)},
+    "altay": lambda uid=NPC_ID, name="🤖 NPC": {**AL.new_player(uid, name), **_npc_player(uid, name)},
     "blackflag": _blackflag_npc,
 }
 
 
+def can_add_npc(key, g):
+    return g["phase"] == "lobby" and len(g["players"]) < NPC_MAX[key]
+
+
 def add_npc(key, g):
-    """Seat the shared mock player in a lobby (command or lobby button).
+    """Seat a controllable mock player in a lobby (command or button).
     Returns an error string, or None on success."""
-    if g["phase"] != "lobby":
-        return "⛔ Game already started."
-    if any(_is_npc(p) for p in g["players"]):
-        return "🤖 NPC is already in this game."
-    if len(g["players"]) >= NPC_MAX[key]:
-        return NPC_FULL[key]
-    g["players"].append(NPC_PLAYERS[key]())
+    if not can_add_npc(key, g):
+        return NPC_FULL[key] if g["phase"] == "lobby" else "⛔ Game already started."
+    uid = _next_npc_id(g)
+    name = _next_npc_name(g)
+    player = NPC_PLAYERS[key](uid, name)
+    player["user_id"] = uid
+    player["name"] = name
+    player["npc"] = True
+    g["players"].append(player)
     return None
 
 
@@ -641,7 +660,7 @@ def turn_ping(g):
 def keyboard(g):
     if g["phase"] == "lobby":
         kb = [[{"text": "🙋 Join game", "callback_data": "f7:join"}]]
-        if not any(p.get("npc") for p in g["players"]):
+        if can_add_npc("games", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "f7:npc"}])
         ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
         wk = web_keyboard(ct, g["chat_id"])
@@ -778,7 +797,7 @@ def rg_keyboard(g):
     wk = web_keyboard(ct, g["chat_id"], game="regicide")
     if g["phase"] == "lobby":
         kb = [[{"text": "🙋 Join Regicide", "callback_data": "rg:join"}]]
-        if not any(p.get("npc") for p in g["players"]):
+        if can_add_npc("regicide", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "rg:npc"}])
         return kb + (wk or [])
     kb = []
@@ -1010,7 +1029,7 @@ def odin_keyboard(g):
     wk = web_keyboard(ct, g["chat_id"], game="odin")
     if g["phase"] == "lobby":
         kb = [[{"text": "🙋 Join Odin", "callback_data": "od:join"}]]
-        if not any(p.get("npc") for p in g["players"]):
+        if can_add_npc("odin", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "od:npc"}])
         return kb + (wk or [])
     kb = []
@@ -1227,7 +1246,7 @@ def leaves_keyboard(g):
     wk = web_keyboard(ct, g["chat_id"], game="leaves")
     if g.get("phase") == "lobby":
         kb = [[{"text": "🙋 Join 13 Leaves", "callback_data": "lv:join"}]]
-        if not any(p.get("npc") for p in g["players"]):
+        if can_add_npc("leaves", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "lv:npc"}])
         return kb + (wk or [])
     kb = []
@@ -1585,7 +1604,7 @@ def fotr_keyboard(g):
     phase = g.get("phase")
     if phase == "lobby":
         kb.append([{"text": "🙋 Join", "callback_data": "fotr:join"}])
-        if not any(p.get("npc") for p in g["players"]):
+        if can_add_npc("fellowship", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "fr:npc"}])
         kb.append([{"text": "🎮 Start", "callback_data": "fotr:start"}])
     elif phase == "choosing":
@@ -1893,7 +1912,7 @@ def lsd_keyboard(g):
     wk = web_keyboard(ct, g["chat_id"], game="lsd")
     if g["phase"] == "lobby":
         kb = [[{"text": "🙋 Join Summon Demons", "callback_data": "lsd:join"}]]
-        if not any(p.get("npc") for p in g["players"]):
+        if can_add_npc("lsd", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "lsd:npc"}])
         return kb + (wk or [])
     kb = []
@@ -2173,7 +2192,7 @@ def spots_keyboard(g):
     wk = web_keyboard(ct, g["chat_id"], game="spots")
     if g["phase"] == "lobby":
         kb = [[{"text": "🙋 Join Spots", "callback_data": "spots:join"}]]
-        if not any(p.get("npc") for p in g["players"]):
+        if can_add_npc("spots", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "spots:npc"}])
         return kb + (wk or [])
     kb = []
@@ -2411,7 +2430,7 @@ def yahtzee_keyboard(g):
     wk = web_keyboard(ct, g["chat_id"], game="yahtzee")
     if g["phase"] == "lobby":
         kb = [[{"text": "🙋 Join Yahtzee", "callback_data": "yz:join"}]]
-        if not any(p.get("npc") for p in g["players"]):
+        if can_add_npc("yahtzee", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "yz:npc"}])
         return kb + (wk or [])
     kb = []
@@ -2648,7 +2667,7 @@ def tornado_keyboard(g):
         if len(g["players"]) >= 2:
             kb.append([{"text": "🏁 Start race", "callback_data": "ts:start"},
                        {"text": "🏆 Grand Prix", "callback_data": "ts:gp"}])
-        if not any(p.get("npc") for p in g["players"]):
+        if can_add_npc("tornado", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "ts:npc"}])
         return kb + (wk or [])
     if g["phase"] == "picking":
@@ -2938,7 +2957,7 @@ def fliptoons_keyboard(g):
     wk = web_keyboard(ct, g["chat_id"], game="fliptoons")
     if g["phase"] == "lobby":
         kb = [[{"text": "🙋 Join Fliptoons", "callback_data": "ft:join"}]]
-        if not any(p.get("npc") for p in g["players"]):
+        if can_add_npc("fliptoons", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "ft:npc"}])
         return kb + (wk or [])
     kb = []
@@ -3409,7 +3428,7 @@ def castlecombo_keyboard(g):
     wk = web_keyboard(ct, g["chat_id"], game="castlecombo")
     if g["phase"] == "lobby":
         kb = [[{"text": "🙋 Join Castle Combo", "callback_data": "cc:join"}]]
-        if not any(p.get("npc") for p in g["players"]):
+        if can_add_npc("castlecombo", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "cc:npc"}])
         return kb + (wk or [])
     kb = []
@@ -3818,7 +3837,7 @@ def artichokes_keyboard(g):
     wk = web_keyboard(ct, g["chat_id"], game="artichokes")
     if g["phase"] == "lobby":
         kb = [[{"text": "🙋 Join Artichokes", "callback_data": "at:join"}]]
-        if not any(p.get("npc") for p in g["players"]):
+        if can_add_npc("artichokes", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "at:npc"}])
         kb.append([{"text": "▶️ Start game", "callback_data": "at:start"}])
         return kb + (wk or [])
@@ -4142,7 +4161,7 @@ def azul_keyboard(g):
     wk = web_keyboard(ct, g["chat_id"], game="azul")
     if g["phase"] == "lobby":
         kb = [[{"text": "🙋 Join Azul", "callback_data": "az:join"}]]
-        if not any(_is_npc(p) for p in g["players"]):
+        if can_add_npc("azul", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "az:npc"}])
         kb.append([{"text": "▶️ Start game", "callback_data": "az:start"}])
         return kb + (wk or [])
@@ -4462,7 +4481,7 @@ def toybattle_keyboard(g):
         wk = web_keyboard(ct, g["chat_id"], game="toybattle")
         if g["phase"] == "lobby":
             kb = [[{"text": "🙋 Join Toy Battle", "callback_data": "tb:join"}]]
-            if not any(_is_npc(p) for p in g["players"]):
+            if can_add_npc("toybattle", g):
                 kb.append([{"text": "🤖 Add NPC", "callback_data": "tb:npc"}])
             kb.append([{"text": "▶️ Start game", "callback_data": "tb:start"}])
             return kb + (wk or [])
@@ -4748,7 +4767,7 @@ def tokaidoduo_keyboard(g):
         wk = web_keyboard(ct, g["chat_id"], game="tokaidoduo")
         if g["phase"] == "lobby":
             kb = [[{"text": "🙋 Join Tokaido Duo", "callback_data": "td:join"}]]
-            if not any(_is_npc(p) for p in g["players"]):
+            if can_add_npc("tokaidoduo", g):
                 kb.append([{"text": "🤖 Add NPC", "callback_data": "td:npc"}])
             kb.append([{"text": "▶️ Start game", "callback_data": "td:start"}])
             return kb + (wk or [])
@@ -5045,7 +5064,7 @@ def altay_keyboard(g):
     wk = web_keyboard(ct, g["chat_id"], game="altay")
     if g["phase"] == "lobby":
         kb = [[{"text": "🙋 Join Altay", "callback_data": "al:join"}]]
-        if not any(_is_npc(p) for p in g["players"]):
+        if can_add_npc("altay", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "al:npc"}])
         kb.append([{"text": btn["text"], "callback_data": f"al:f:{code}"}
                    for code, btn in zip(AL.FACTION_ORDER, [
@@ -5236,7 +5255,7 @@ def altay_board_json(g, viewer_id=None):
                    (me == actor or _is_npc(g["players"][actor])))
     board.update({
         "chat_id": g["chat_id"], "actor": actor, "can_act": can_act,
-        "is_player": me is not None, "me": me,
+        "is_player": me is not None, "me": me, "max_players": NPC_MAX["altay"],
         "log": board["logs"], "rules": ALTAY_RULES,
     })
     if can_act:
@@ -5353,7 +5372,7 @@ def blackflag_keyboard(g):
     wk = web_keyboard(ct, g["chat_id"], game="blackflag")
     if g["phase"] == "lobby":
         kb = [[{"text": "🙋 Join Black Flag", "callback_data": "bf:join"}]]
-        if not any(_is_npc(p) for p in g["players"]):
+        if can_add_npc("blackflag", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "bf:npc"}])
         kb.append([{"text": "▶️ Start game", "callback_data": "bf:start"}])
         return kb + (wk or [])
@@ -5509,6 +5528,7 @@ def blackflag_board_json(g, viewer_id=None):
     board = BF.board_json(g, viewer_id)
     board.update({
         "chat_id": g["chat_id"], "rules": BLACKFLAG_RULES,
+        "max_players": BF.MAX_PLAYERS,
         "log": board["log"], "is_player": board["me"] is not None,
     })
     return board
@@ -5640,7 +5660,7 @@ def rematch_game(state, key, chat_id, uid):
     if not any(p["user_id"] == uid for p in g["players"]):
         return [], "only players of this game can rematch"
     keep = [(p["user_id"], p["name"], _is_npc(p)) for p in g["players"]]
-    creator = next((k for k in keep if k[0] != NPC_ID), keep[0])
+    creator = next((k for k in keep if not k[2]), keep[0])
     makers = PLAYER_MAKERS
     news = GAME_MAKERS
     chat_type = g.get("chat_type", "private")

@@ -142,7 +142,7 @@ function atRender() {
     board.innerHTML = '<div class="atlobby">Join or add an NPC, then start.<br>' +
       'The board and your cards appear once the game starts.<br>' + names + '</div>';
     if (!g.is_player) join.classList.remove('hidden');
-    if (!g.players.some(p => p.npc)) npc.classList.remove('hidden');
+    if (g.players.length < (g.max_players || 2)) npc.classList.remove('hidden');
     start.classList.remove('hidden');
     return;
   }

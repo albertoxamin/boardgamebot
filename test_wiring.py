@@ -382,5 +382,58 @@ class BlackFlagTests(unittest.TestCase):
         self.assertTrue(events)
 
 
+class NpcTests(unittest.TestCase):
+    def test_multiple_npcs_get_unique_ids_and_names(self):
+        game = bot.G.new_game(7, 42, "Ada")
+        expected_ids = [-1, -2, -3, -4, -5]
+        for user_id in expected_ids:
+            self.assertIsNone(bot.add_npc("games", game))
+            player = game["players"][-1]
+            self.assertEqual(player["user_id"], user_id)
+            self.assertTrue(player["npc"])
+        self.assertEqual(len({p["user_id"] for p in game["players"]}), 6)
+        self.assertEqual(len({p["name"] for p in game["players"]}), 6)
+        self.assertEqual(bot.add_npc("games", game), bot.NPC_FULL["games"])
+        self.assertNotIn("f7:npc", json.dumps(bot.keyboard(game)))
+
+    def test_npc_button_stays_while_seats_remain(self):
+        game = bot.G.new_game(7, 42, "Ada")
+        bot.add_npc("games", game)
+        bot.add_npc("games", game)
+        self.assertIn("f7:npc", json.dumps(bot.keyboard(game)))
+        two_player = bot.TB.new_game(7, 42, "Ada")
+        bot.add_npc("toybattle", two_player)
+        self.assertEqual(bot.add_npc("toybattle", two_player), bot.NPC_FULL["toybattle"])
+
+    def test_each_npc_can_be_controlled_by_actor(self):
+        game = bot.BF.new_game(7, 42, "Ada")
+        for _ in range(3):
+            self.assertIsNone(bot.add_npc("blackflag", game))
+        events = []
+        self.assertIsNone(bot.BF.start_game(game, events))
+        self.assertEqual(len(game["players"]), 4)
+        for index in range(1, 4):
+            game["current"] = index
+            self.assertEqual(bot.blackflag_actor_idx(game, 42), index)
+            board = bot.blackflag_board_json(game, 42)
+            self.assertTrue(board["can_act"])
+            self.assertTrue(board["players"][index]["hand"])
+
+    def test_rematch_keeps_human_creator_with_multiple_npcs(self):
+        game = bot.G.new_game(7, 42, "Ada")
+        bot.add_npc("games", game)
+        bot.add_npc("games", game)
+        game["phase"] = "game_end"
+        state = {"games": {"7": game}}
+        with patch.dict(bot.RENDERERS, {"games": lambda g, ev: None}):
+            events, err = bot.rematch_game(state, "games", 7, -1)
+        self.assertIsNone(err)
+        self.assertTrue(events)
+        rematch = state["games"]["7"]
+        self.assertEqual(rematch["created_by"], 42)
+        self.assertEqual([p["user_id"] for p in rematch["players"]], [42, -1, -2])
+        self.assertTrue(all(p["npc"] for p in rematch["players"][1:]))
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

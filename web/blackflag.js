@@ -105,7 +105,7 @@ function bfRender() {
   if (g.phase === 'lobby') {
     board.innerHTML = '<div class="bflobby">Join or add an NPC, then start. ' + names + '</div>';
     if (!g.is_player) join.classList.remove('hidden');
-    if (!g.players.some(p => p.npc)) npc.classList.remove('hidden');
+    if (g.players.length < (g.max_players || 8)) npc.classList.remove('hidden');
     start.classList.remove('hidden');
     return;
   }

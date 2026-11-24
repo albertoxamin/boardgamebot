@@ -1,5 +1,6 @@
 // Azul Mini App (synced). Loaded by flip7.html router after leaves.js helpers.
-const AZ = {user_id: 0, chat_id: null, board: null, timer: null, init: ''};
+const AZ = {user_id: 0, chat_id: null, board: null, timer: null, init: '',
+            pick: null, pickKey: ''};
 const AZ_TILE_SRC = {
   blue: 'azul_assets/img/blue.svg',
   yellow: 'azul_assets/img/yellow.svg',
@@ -70,6 +71,17 @@ function azTile(t) {
   return '<img class="aztile" src="' + src + '" alt="' + escapeHtml(t) +
          '" title="' + escapeHtml(t) + '">';
 }
+function azPickColors(b, source, index) {
+  return b.options.filter(o => o.source === source && o.index === index).map(o => o.color);
+}
+function azPickTile(t, source, index) {
+  return '<button class="aztilepick" data-az-color="' + escapeHtml(t) +
+         '" data-az-src="' + source + '" data-az-index="' + index +
+         '" title="Take ' + escapeHtml(t) + '">' + azTile(t) + '</button>';
+}
+function azSourceLabel(source, index) {
+  return source === 'center' ? 'center' : 'factory ' + (index + 1);
+}
 function azSlots(tiles, size) {
   let html = '';
   const n = Math.max(size || tiles.length, tiles.length);
@@ -108,6 +120,8 @@ function azRender() {
   const join = document.getElementById('azJoin');
   const start = document.getElementById('azStart');
   const rematch = document.getElementById('azRematch');
+  const pickKey = [b.phase, b.round, b.current, b.pending ? 'p' : 'd', b.can_act].join(':');
+  if (AZ.pickKey !== pickKey) { AZ.pick = null; AZ.pickKey = pickKey; }
   [join, start, rematch].forEach(el => el.classList.add('hidden'));
   opts.innerHTML = '';
   actions.innerHTML = '';
@@ -130,12 +144,26 @@ function azRender() {
   const cur = b.players[b.current];
   turn.textContent = head + ' · ' + (cur ? escapeHtml(cur.name) : '?') + "'s turn" +
     (b.can_act ? ' (you)' : '');
-  const facs = b.factories.map(f =>
-    '<div class="azfac">' + f.tiles.map(azTile).join('') + '</div>').join('');
-  const center = (b.center.marker ? azTile('first') : '') +
-    b.center.tiles.map(azTile).join('') || '<span class="small">empty</span>';
+  const picking = b.can_act && !b.pending;
+  const facs = b.factories.map(f => {
+    const avail = azPickColors(b, 'factory', f.index);
+    const sel = picking && AZ.pick && AZ.pick.source === 'factory' && AZ.pick.index === f.index;
+    const cls = 'azfac' + (picking && avail.length ? ' azpick' : '') + (sel ? ' azsel' : '');
+    const tiles = f.tiles.map(t => sel && avail.indexOf(t) >= 0
+      ? azPickTile(t, 'factory', f.index) : azTile(t)).join('');
+    return '<div class="' + cls + '" data-az-src="factory" data-az-index="' + f.index + '">' + tiles + '</div>';
+  }).join('');
+  const centerAvail = azPickColors(b, 'center', 0);
+  const centerSel = picking && AZ.pick && AZ.pick.source === 'center';
+  const centerCls = 'azfac azcenter' + (picking && centerAvail.length ? ' azpick' : '') +
+    (centerSel ? ' azsel' : '');
+  const centerTiles = (b.center.marker ? azTile('first') : '') +
+    b.center.tiles.map(t => centerSel && centerAvail.indexOf(t) >= 0
+      ? azPickTile(t, 'center', 0) : azTile(t)).join('');
+  const centerHtml = '<div class="' + centerCls + '" data-az-src="center" data-az-index="0">' +
+    (centerTiles || '<span class="small">empty</span>') + '</div>';
   board.innerHTML = '<div class="table aztable"><div class="small">FACTORIES</div><div>' + (facs || '<span class="small">empty</span>') +
-    '</div><div class="small" style="margin-top:8px">CENTER</div><div class="azrow">' + center + '</div></div>' +
+    '</div><div class="small" style="margin-top:8px">CENTER</div>' + centerHtml + '</div>' +
     b.players.map(p => azPlayer(p, b)).join('');
   if (b.can_act && b.pending) {
     const hint = '<div class="small">Picked: ' + b.pending.tiles.map(azTile).join('') +
@@ -144,22 +172,38 @@ function azRender() {
       '<button class="azopt" data-az-act="place" data-az-row="' + r + '">Line ' + (r + 1) + '</button>').join('') +
       '<button class="azopt" data-az-act="place" data-az-row="-1">🧹 Floor</button>';
   } else if (b.can_act) {
-    opts.innerHTML = b.options.map(o => {
-      const label = (o.source === 'center' ? 'C' : 'F' + (o.index + 1)) + ' ' +
-        (o.color === 'first' ? '⭐' : azTile(o.color)) + '×' + o.count;
-      return '<button class="azopt" data-az-act="take" data-az-source="' + o.source +
-        '" data-az-index="' + o.index + '" data-az-color="' + o.color + '">' + label + '</button>';
-    }).join('');
+    if (AZ.pick) {
+      opts.innerHTML = '<div class="small">Tap a tile in the highlighted ' +
+        escapeHtml(azSourceLabel(AZ.pick.source, AZ.pick.index)) +
+        '.</div><button class="azopt" data-az-clear="1">Cancel</button>';
+    } else {
+      opts.innerHTML = '<div class="small">Tap a factory or the center, then tap a tile.</div>';
+    }
   }
 }
 (function azStart() {
   if (!document.getElementById('azBoard')) return;
   document.getElementById('azOpts').addEventListener('click', e => {
+    const clear = e.target.closest('[data-az-clear]');
+    if (clear) { AZ.pick = null; azRender(); return; }
     const btn = e.target.closest('[data-az-act]');
-    if (!btn) return;
-    if (btn.dataset.azAct === 'place') azMove('place', {row: parseInt(btn.dataset.azRow, 10)});
-    else azMove('take', {source: btn.dataset.azSource, index: parseInt(btn.dataset.azIndex, 10),
-                         color: btn.dataset.azColor});
+    if (btn && btn.dataset.azAct === 'place') azMove('place', {row: parseInt(btn.dataset.azRow, 10)});
+  });
+  document.getElementById('azBoard').addEventListener('click', e => {
+    const tile = e.target.closest('[data-az-color]');
+    if (tile) {
+      AZ.pick = null;
+      azMove('take', {source: tile.dataset.azSrc, index: parseInt(tile.dataset.azIndex, 10),
+                      color: tile.dataset.azColor});
+      return;
+    }
+    const card = e.target.closest('[data-az-src]');
+    if (!card || !AZ.board || !AZ.board.can_act || AZ.board.pending) return;
+    const source = card.dataset.azSrc;
+    const index = parseInt(card.dataset.azIndex, 10);
+    if (!azPickColors(AZ.board, source, index).length) return;
+    AZ.pick = {source: source, index: index};
+    azRender();
   });
   document.getElementById('azJoin').addEventListener('click', () => azMove('join'));
   document.getElementById('azStart').addEventListener('click', () => azMove('start'));

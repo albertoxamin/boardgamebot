@@ -5793,7 +5793,11 @@ def handle_command(state, msg):
             render(g)
         return
     if not g:
-        send(chat_id, "No Flip 7 game here yet - send /flip7 to create one, or open the Mini App via /games. /rules for how to play.")
+        if cmd in ("/flip7_join", "/flip7_start", "/join_npc", "/npc_join", "/cancel"):
+            # Recognised Flip 7 command, used when no game exists: point at /flip7.
+            send(chat_id, "No Flip 7 game here yet - send /flip7 to create one, or open the Mini App via /games. /rules for how to play.")
+        # Unknown command (e.g. meant for another bot in a shared group):
+        # stay silent instead of spamming the chat.
         return
     if cmd == "/flip7_join":
         if g["phase"] != "lobby":
@@ -5829,7 +5833,13 @@ def handle_command(state, msg):
             send(chat_id, "🤖 NPC joined - anyone can play for it!")
             render(g)
         return
-    send(chat_id, "Commands: /games /rules /cancel (reply to a board) - or use the in-game buttons.")
+    if cmd == "/cancel":
+        # /cancel without a board reply: hint at the reply form.
+        send(chat_id, "Commands: /games /rules /cancel (reply to a board) - or use the in-game buttons.")
+        return
+    # Unknown command (e.g. meant for another bot in a shared group):
+    # stay silent instead of spamming the chat.
+    return
 
 
 def handle_callback(state, cb):

@@ -132,6 +132,30 @@ class RegistryTests(unittest.TestCase):
         self.assertIn("Open lobbies in this chat", text)
         self.assertIn("🍃 13 Leaves — 2 in · /leaves_join", text)
 
+    def test_unknown_command_stays_silent(self):
+        # FB-0004: unrecognised /commands (e.g. meant for another bot in a
+        # shared group) must not make the bot reply and spam the chat.
+        for with_game in (False, True):
+            state = {key: {} for key in GR.GAME_KEYS}
+            if with_game:
+                state["games"]["7"] = {"phase": "lobby", "players": []}
+            msg = {"chat": {"id": 7, "type": "group"},
+                   "from": {"id": 42, "first_name": "A"}, "text": "/roll"}
+            with patch.object(bot, "send") as send, \
+                    patch.object(bot, "send_rich") as rich:
+                bot.handle_command(state, msg)
+            send.assert_not_called()
+            rich.assert_not_called()
+
+    def test_known_flip7_command_still_hints_when_no_game(self):
+        state = {key: {} for key in GR.GAME_KEYS}
+        msg = {"chat": {"id": 7, "type": "private"},
+               "from": {"id": 42, "first_name": "A"}, "text": "/flip7_join"}
+        with patch.object(bot, "send") as send:
+            bot.handle_command(state, msg)
+        send.assert_called_once()
+        self.assertIn("No Flip 7 game here yet", send.call_args.args[1])
+
     def test_state_json_accept_sets(self):
         state = {"leaves": {"-1": {"passed": {1, 2}, "nested": {"x": {3}}}}}
         with tempfile.TemporaryDirectory() as tmp:

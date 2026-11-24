@@ -472,6 +472,31 @@ def test_die_choice_buttons_show_die_faces():
     assert "background-image:url(tokaidoduo-dice.webp);background-size:600% 300%;" in html
 
 
+def test_miniapp_assets_are_served():
+    # FB-0039: the Hot Spring token (and the Wave tiles) were invisible
+    # on the board even though the art and the Mini App code were right:
+    # bot.py's static allowlist never included
+    # tokaidoduo-hotspring.webp / tokaidoduo-waves.webp, so the server
+    # answered 404 and the token span rendered as an empty, near
+    # invisible ring. Every tokaidoduo-*.webp the Mini App references
+    # must be in the allowlist and exist on disk.
+    import re
+    html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
+                encoding="utf-8").read()
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    referenced = set(re.findall(r"tokaidoduo-[a-z]+\.webp", html + js))
+    assert referenced, referenced
+    src = open(os.path.join(os.path.dirname(__file__), "bot.py"),
+               encoding="utf-8").read()
+    served = set(re.findall(r'"/(tokaidoduo-[a-z]+\.webp)"', src))
+    missing = referenced - served
+    assert not missing, missing
+    for name in sorted(referenced):
+        path = os.path.join(os.path.dirname(__file__), "web", name)
+        assert os.path.isfile(path), path
+
+
 def test_player_seats_use_bga_player_boards():
     # FB-0034: the player boards are the BGA boards from
     # sources/tokaidoduo/bga/spritePlateauxJoueurs.png (two 862x213

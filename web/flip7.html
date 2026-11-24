@@ -354,10 +354,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .track .tbtile{width:38px;height:50px}
 .track:hover .tbtile{outline:2px solid #f59e0b}
 .tblobby{min-height:120px;background:linear-gradient(#0f172ae8,#0f172ae8),url(toybattle-board.webp) center/cover;border:1px solid #475569;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800}
-.tdboard{position:relative;width:min(100%,420px);aspect-ratio:789/1600;margin:8px auto;background:#f5efe0 url(tokaidoduo-board.webp) center/100% 100% no-repeat;border:2px solid #475569;border-radius:8px}
+.tdboard{position:relative;width:min(100%,420px);aspect-ratio:789/1600;margin:8px auto;background:#f5efe0 url(tokaidoduo-board.webp?v=1) center/100% 100% no-repeat;border:2px solid #475569;border-radius:8px}
 .tdmeeple{position:absolute;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:900;color:#fff;border:2px solid #fff;box-shadow:0 1px 4px #000a;z-index:3}
 .tdmeeple.tdpurple{background:#7c3aed}.tdmeeple.tdgreen{background:#059669}
-.tdlobby{min-height:120px;background:linear-gradient(#0f172ae8,#0f172ae8),url(tokaidoduo-board.webp) center/cover;border:1px solid #475569;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;text-align:center;padding:12px}
+.tdlobby{min-height:120px;background:linear-gradient(#0f172ae8,#0f172ae8),url(tokaidoduo-board.webp?v=1) center/cover;border:1px solid #475569;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;text-align:center;padding:12px}
+/* Board art is cached 24h by the WebView: bump ?v= above whenever tokaidoduo-board.webp changes, or clients keep seeing the old image. */
 .tdpaints{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
 .tdpaint{width:30px;height:30px;border-radius:6px;background:#f8fafc;color:#111;font-weight:900;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:1px 2px 3px #0008}
 .tdpaint.back{background:#334155;color:#e2e8f0}.tdpaint.gifted{background:#065f46;color:#fff}

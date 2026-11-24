@@ -301,10 +301,34 @@ Text commands: `/azul` (create), `/azul_join`, `/azul_join_npc`,
 Engine: `azul.py` + `test_azul.py` (drafting, wall scoring/floor penalties,
 final bonuses, full-game simulation).
 
+## Toy Battle (same bot, 2-player troops and medals)
+
+Toy Battle (Repos Production, 2024), 2 players on the Castle Field board.
+Each player has 20 troops (3 each of 8 types, 4 removed unseen); the first
+player draws 3, then 4. A turn is either **draw 2** (rack limit 8) or **place
+1 troop**. A troop needs a continuous line of your troops from your HQ (the
+enemy HQ still needs connection); you may stack on your own troops freely,
+and on an enemy troop only with a higher number. Kwak is a joker for enemy
+troops. Effects: Skully draw 2, Cap'N place 1 extra, Jumbo discard an adjacent
+enemy troop, Hook ignore connection for bases, XB-42 discard a random enemy
+rack troop, Star draw 1, Roxy none. Special bases return one of your troops to
+your rack. Surround a region to permanently claim its medals; capture the
+enemy HQ or reach 7 medals to win. Racks are private.
+
+Board/troop/medal art is extracted from the BGA game client and the Castle
+Field layout comes from the BGA tutorial data. Text commands: `/toybattle`
+(create), `/toybattle_join`, `/toybattle_join_npc`, `/toybattle_start`,
+`/toybattle_draw`, `/toybattle_place <troop#> <base>`,
+`/toybattle_choose <value>`, `/toybattle_rules`, `/toybattle_cancel` (creator),
+`/toybattle_rematch`. Mini App: board button = `?startapp=toybattle<chat>`
+(same Main Mini App, routed by `start_param`). Engine: `toybattle.py` +
+`test_toybattle.py`.
+
 ## Files
 
 - `game.py` – pure engine: deck, scoring, bust/Flip 7, actions, rounds.
 - `azul.py` – pure engine: factories, pattern lines, wall scoring, final bonuses.
+- `toybattle.py` – pure engine: Castle Field bases, stacks/connection, troop powers, medals, HQ win.
 - `yahtzee.py` – pure engine: dice, scorecard, turns, scoring.
 - `fliptoons.py` – pure engine: deck, grid, abilities, market, final flip.
 - `tornado.py` – pure engine: boats, decks, courses, ranks, movement, Grand Prix.
@@ -318,6 +342,7 @@ final bonuses, full-game simulation).
 - `test_tornado.py` – Tornado Splash unit tests: `python3 test_tornado.py`
 - `test_artichokes.py` – Abandon All Artichokes unit tests: `python3 test_artichokes.py`
 - `test_fellowship.py` – Fellowship engine tests: `python3 test_fellowship.py`
+- `test_toybattle.py` – Toy Battle engine tests: `python3 test_toybattle.py`
 - `web/flip7.html` – standalone HTML5 Flip 7 game (hot-seat, Mini App-ready)
 - `web/yahtzee.js` – Yahtzee Mini App view (synced)
 - `web/fliptoons.js` – Fliptoons Mini App view (synced)
@@ -326,6 +351,8 @@ final bonuses, full-game simulation).
 - `web/fellowship.js` – Fellowship Mini App view (synced, viewer-filtered hands)
 - `web/fellowship_cards/` – Fellowship card/character sprite sheets from the TTS save
 - `web/azul.js` – Azul Mini App view (synced)
+- `web/toybattle.js` – Toy Battle Mini App view (synced, viewer-filtered racks)
+- `web/toybattle-board.webp`, `web/toybattle-tiles.webp`, `web/toybattle-medals.webp` – BGA-extracted Toy Battle art
 - `web/artichokes_cards/` – BGA card art (0–9 vegetables, 10–14 Artichokes, 15 Rhubarb, 16 back)
 - `web/covers/*.jpg` – box art shown as the lobby photo for each game
 - `web/server.py` – static server for the HTML game (needs HTTPS tunnel for in-Telegram use)
@@ -341,6 +368,7 @@ python3 test_tornado.py     # Tornado Splash engine tests
 python3 test_artichokes.py  # Abandon All Artichokes engine tests
 python3 test_fellowship.py  # Fellowship engine tests
 python3 test_azul.py        # Azul engine tests
+python3 test_toybattle.py   # Toy Battle engine tests
 ```
 A full 3-player game was also simulated end-to-end (hits/stays/actions/
 round rotation → a winner at 200+ in 13 rounds) with the Telegram layer

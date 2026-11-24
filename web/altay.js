@@ -1,4 +1,22 @@
-const ATG = {user_id: 0, chat_id: null, board: null, timer: null, init: '', mode: null, msgs: []};
+const ATG = {user_id: 0, chat_id: null, board: null, timer: null, init: '', mode: null, msgs: [], webVer: null, newVer: false, verAt: 0};
+
+async function atCheckVer() {
+  // FB-0026: the Mini App never reloads its own JS while open, and the
+  // ?v= cache-buster on altay.js had not been bumped — so a fix could
+  // be live on the server while the player still saw the old code with
+  // no hint why. Compare the page's ?v= with the server's version
+  // (from /healthz) and say so, instead of staying silent.
+  if (!ATG.webVer || ATG.newVer) return;
+  if (Date.now() - ATG.verAt < 60000) return;
+  ATG.verAt = Date.now();
+  try {
+    const r = await fetch('/healthz').then(r => r.json());
+    if (r.version && r.version !== ATG.webVer) {
+      ATG.newVer = true;
+      atLog('🔄 New version available — close and reopen the Mini App to see the latest fixes.');
+    }
+  } catch (e) {}
+}
 
 function atRenderLog() {
   const e = document.getElementById('ayLog');
@@ -32,6 +50,7 @@ async function atLoad() {
   ATG.user_id = tg.id;
   ATG.init = tg.init;
   const qp = new URLSearchParams(location.search);
+  ATG.webVer = parseInt(qp.get('v'), 10) || null;
   const pref = atChatId(tg.start) || atChatId(qp.get('app')) ||
                parseInt(qp.get('chat_id'), 10) || atChatId(tg.chat_instance);
   const r = await atApi('/api/altay/mygames?init_data=' + encodeURIComponent(tg.init));
@@ -57,6 +76,7 @@ async function atSelect(chat_id) {
 }
 async function atRefresh() {
   if (!ATG.chat_id) return;
+  atCheckVer();
   const q = '?chat_id=' + encodeURIComponent(ATG.chat_id) + '&init_data=' + encodeURIComponent(ATG.init);
   const r = await atApi('/api/altay/game' + q);
   if (r.game) { ATG.board = r.game; atRender(); }
@@ -193,6 +213,7 @@ function atRender() {
     g.phase === 'over' ? '🏆 ' + (g.winner === null ? 'Draw' :
       escapeHtml((g.players[g.winner] || {}).name || 'Winner')) + ' wins! · ' + names :
     '🏜️ Turn ' + (g.turn + 1) + ' · ' + names + (g.can_act ? ' · <b>your move</b>' : '');
+  if (ATG.newVer) turn.innerHTML += ' · 🔄 <b>New version — reopen the Mini App</b>';
   players.innerHTML = g.players.map((p, i) => '<div class="atplayer' +
     (i === g.current && g.phase !== 'lobby' ? ' atcurrent' : '') + '">' +
     '<span class="atfaction" style="' + atFactionStyle(p.faction) + '"></span>' +

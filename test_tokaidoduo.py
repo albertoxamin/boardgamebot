@@ -339,6 +339,25 @@ def test_boutique_pills_sit_over_package_symbols():
         assert math.hypot(px - 50, py - 50) > math.hypot(tx - 50, ty - 50), town
 
 
+def test_miniapp_notices_a_new_version():
+    # FB-0026 (Altay, same cause): the Mini App never reloads its own
+    # JS while open, and the ?v= cache-buster on tokaidoduo.js had not
+    # been bumped — a fix could be live on the server while the player
+    # still saw the old code with no hint why. The script tag must be
+    # bumped when the file changes, and the Mini App must compare the
+    # page's ?v= with the server version (/healthz) and tell the player
+    # to close and reopen when a new version is out.
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    assert "tdCheckVer" in js
+    assert "fetch('/healthz')" in js
+    assert "TDG.webVer" in js
+    assert "New version — reopen the Mini App" in js
+    html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
+                encoding="utf-8").read()
+    assert 'src="tokaidoduo.js?v=4"' in html
+
+
 def test_character_markers_use_bga_icons_on_boutique_symbols():
     # FB-0024: when a Merchant or a Pilgrim is at a boutique, its marker
     # must sit on the boutique symbol (TOWN_POS), not drift towards the

@@ -278,6 +278,27 @@ class AltayEngineTests(unittest.TestCase):
             html = f.read()
         self.assertIn(".athint{width:100%;font-size:12px;color:#94a3b8}", html)
 
+    def test_miniapp_notices_a_new_version(self):
+        """FB-0026: 'su altay, gli insediamenti sulla mappa sono come
+        prima e non sono stati modificati come richiesto' — the FB-0023
+        settlement icons were live on the server, but the player still
+        saw the old ones: the Mini App never reloads its own JS while
+        open, and the ?v= cache-buster on altay.js had not been bumped
+        for any of the day's fixes. The script tag must be bumped when
+        the file changes, and the Mini App must compare the page's ?v=
+        with the server version (/healthz) and tell the player to close
+        and reopen when a new version is out."""
+        base = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(base, "web", "flip7.html"), encoding="utf-8") as f:
+            html = f.read()
+        self.assertIn('src="altay.js?v=4"', html)
+        with open(os.path.join(base, "web", "altay.js"), encoding="utf-8") as f:
+            js = f.read()
+        self.assertIn("atCheckVer", js)
+        self.assertIn("fetch('/healthz')", js)
+        self.assertIn("ATG.webVer", js)
+        self.assertIn("New version — reopen the Mini App", js)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

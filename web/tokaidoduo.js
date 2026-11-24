@@ -1,4 +1,22 @@
-const TDG = {user_id: 0, chat_id: null, board: null, timer: null, init: ''};
+const TDG = {user_id: 0, chat_id: null, board: null, timer: null, init: '', webVer: null, newVer: false, verAt: 0};
+
+async function tdCheckVer() {
+  // FB-0026 (Altay, same cause): the Mini App never reloads its own JS
+  // while open, and the ?v= cache-buster on tokaidoduo.js had not been
+  // bumped — so a fix could be live on the server while the player
+  // still saw the old code with no hint why. Compare the page's ?v=
+  // with the server's version (from /healthz) and say so.
+  if (!TDG.webVer || TDG.newVer) return;
+  if (Date.now() - TDG.verAt < 60000) return;
+  TDG.verAt = Date.now();
+  try {
+    const r = await fetch('/healthz').then(r => r.json());
+    if (r.version && r.version !== TDG.webVer) {
+      TDG.newVer = true;
+      tdLog('🔄 New version available — close and reopen the Mini App to see the latest fixes.');
+    }
+  } catch (e) {}
+}
 
 function tdLog(s) {
   const e = document.getElementById('tdLog');
@@ -20,6 +38,7 @@ async function tdLoad() {
   TDG.user_id = tg.id;
   TDG.init = tg.init;
   const qp = new URLSearchParams(location.search);
+  TDG.webVer = parseInt(qp.get('v'), 10) || null;
   const pref = tdChatId(tg.start) || tdChatId(qp.get('app')) ||
                parseInt(qp.get('chat_id'), 10) || tdChatId(tg.chat_instance);
   const r = await tdApi('/api/tokaidoduo/mygames?init_data=' + encodeURIComponent(tg.init));
@@ -45,6 +64,7 @@ async function tdSelect(chat_id) {
 }
 async function tdRefresh() {
   if (!TDG.chat_id) return;
+  tdCheckVer();
   const q = '?chat_id=' + encodeURIComponent(TDG.chat_id) + '&init_data=' + encodeURIComponent(TDG.init);
   const r = await tdApi('/api/tokaidoduo/game' + q);
   if (r.game) { TDG.board = r.game; tdRender(); }
@@ -130,6 +150,7 @@ function tdRender() {
         escapeHtml((g.players[g.winner] || {}).name || 'Winner')) + ' wins! · ' + names
     : '🗾 Round ' + g.round + ' · 🎲 ' + dice + ' · ' + names +
       (g.can_act ? ' · <b>your move</b>' : '');
+  if (TDG.newVer) turn.innerHTML += ' · 🔄 <b>New version — reopen the Mini App</b>';
   if (g.phase === 'game_end') rematch.classList.remove('hidden');
   let html = '<div class="tdboard">';
   // meeples: pilgrim on the ring, merchant on towns, artist in zones.

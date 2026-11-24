@@ -202,6 +202,19 @@ def test_full_game_simulation():
     json.dumps(g)
 
 
+def test_factory_cards_are_small():
+    """FB-0001: 'le factories sono troppo grandi su azul' — factories
+    must be compact 2x2 cards with small tiles, and the table must
+    size to its content instead of a fixed tall aspect ratio."""
+    html = open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                             "web", "flip7.html"), encoding="utf-8").read()
+    assert ".azfac .aztile{width:20px;height:20px}" in html
+    assert "grid-template-columns:repeat(2,20px)" in html
+    assert ".azfac.azcenter{display:inline-block" in html
+    aztable = html.split(".aztable{")[1].split("}")[0]
+    assert "aspect-ratio" not in aztable
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("test_") and callable(fn)]

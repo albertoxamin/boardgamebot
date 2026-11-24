@@ -355,7 +355,7 @@ def test_miniapp_notices_a_new_version():
     assert "New version — reopen the Mini App" in js
     html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
                 encoding="utf-8").read()
-    assert 'src="tokaidoduo.js?v=6"' in html
+    assert 'src="tokaidoduo.js?v=7"' in html
 
 
 def test_character_markers_use_bga_meeples_on_boutique_symbols():
@@ -547,12 +547,14 @@ def test_player_seats_use_bga_player_boards():
 
 
 def test_hot_spring_token_shows_on_board():
-    # FB-0028 / FB-0040: the Hot Spring token (BGA art from
+    # FB-0028 / FB-0040 / FB-0041: the Hot Spring token (BGA art from
     # sources/tokaidoduo/bga/hotspring.jpg) must be visible ON the board
-    # always — not only while a player holds it. It sits in the middle
-    # of the board with the holder's colour ring, like the character
-    # tokens; while nobody holds it (every fresh game) it shows with
-    # a grey ring, so it never looks missing.
+    # always — not only while a player holds it. It sits on its drawn
+    # place: the large dashed hot-spring circle at the bottom-left of
+    # the board art (board 789x1600, centre ~x=105, y=1303), with the
+    # holder's colour ring, like the character tokens; while nobody
+    # holds it (every fresh game) it shows with a grey ring, so it
+    # never looks missing.
     from PIL import Image
     tok = Image.open(os.path.join(os.path.dirname(__file__), "web",
                                   "tokaidoduo-hotspring.webp"))
@@ -563,7 +565,7 @@ def test_hot_spring_token_shows_on_board():
     end = js.index("html += '</div>';", start)
     board_html = js[start:end]
     assert "tdhotspring" in board_html and "hot_spring" in board_html, board_html
-    assert "top:50%;left:50%" in board_html
+    assert "top:81.4%;left:13.3%" in board_html
     assert "g.players[g.hot_spring]" in board_html
     assert "' td' + (hp.color" in board_html  # held: 'td' + colour class
     assert "'purple' ? 'purple' : 'green'" in board_html

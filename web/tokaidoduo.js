@@ -229,15 +229,17 @@ function tdRender() {
     const zp = (g.zone_pos || [])[p.artist_zone];
     if (zp) html += tdMeeple(zp[0], zp[1] + 3, col, 'artist', p.name + ' Artist @ ' + ((g.zones[p.artist_zone] || {}).name || ''));
   });
-  // FB-0028 / FB-0040: the Hot Spring token itself, on the board — always.
-  // It starts unclaimed in the middle of the board (white ring: nobody
-  // holds it yet) and, once a Pilgrim visits a Hot Spring, it shows
-  // there with the holder's colour ring. Hiding it while unclaimed
-  // (the old behaviour) made it look missing in every fresh game.
+  // FB-0028 / FB-0040 / FB-0041: the Hot Spring token itself, on the
+  // board — always. It sits on its drawn place: the large dashed
+  // hot-spring circle at the bottom-left of the board art
+  // (board 789x1600: centre ~x=105, y=1303 -> 13.3%, 81.4%), not in
+  // the middle of the board — Annalisa asked for it exactly there.
+  // Grey ring while unclaimed ('nobody holds it yet'), holder's
+  // colour ring once a Pilgrim visits a Hot Spring and takes it.
   const hp = (g.hot_spring !== null && g.hot_spring !== undefined)
     ? g.players[g.hot_spring] : null;
   html += '<span class="tdhotspring' + (hp ? ' td' + (hp.color === 'purple' ? 'purple' : 'green') : ' tdnone') +
-    '" style="top:50%;left:50%;" title="♨️ Hot Spring token — ' + (hp
+    '" style="top:81.4%;left:13.3%;" title="♨️ Hot Spring token — ' + (hp
       ? 'held by ' + escapeHtml(hp.name) + ' (the other player does not have it)'
       : 'nobody holds it yet — visit a Hot Spring to take it') + '"></span>';
   // FB-0029: the face-up Wave tiles as real tokens on the board, in

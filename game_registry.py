@@ -173,7 +173,7 @@ GAME_SPECS = (
                        "/azul_place", "/azul_rules", "/azul_cancel", "/azul_rematch"),
         web_label="🎮 Play Azul (HTML)", callback_prefix="az",
         min_players=2, max_players=4, npc_full="⛔ Azul is 2-4 players (full).",
-        rematch_phases=("game_end",), cover="azul.png",
+        rematch_phases=("game_end",), cover="../azul_assets/gamemedia/box/en_280.png",
         module="azul", web_module="azul", static_assets=("azul.js",),
     ),
     GameSpec(

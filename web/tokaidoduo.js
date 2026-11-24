@@ -139,6 +139,22 @@ function tdRender() {
     const zp = (g.zone_pos || [])[p.artist_zone];
     if (zp) html += tdMeeple(zp[0], zp[1] + 3, col, '🎨', p.name + ' Artist @ ' + ((g.zones[p.artist_zone] || {}).name || ''));
   });
+  // FB-0010/FB-0011: boutiques and waves ON the board itself, not just
+  // in the card underneath it. Boutique pills sit just inside each
+  // coastal town (ware + price); the face-up Wave tiles sit in a strip
+  // across the top of the board (icon + side, full ability in the title).
+  html += '<div class="tdwaves">' + (g.waves_board || []).map(w =>
+    '<span class="tdwave" title="' + escapeHtml(tdWaveText(g, w.char, w.side)) + '">' +
+    (g.char_emoji[w.char] || '') + ' ' + w.side.charAt(0).toUpperCase() + w.side.slice(1) +
+    '</span>').join('') + '</div>';
+  Object.entries(g.boutiques || {}).forEach(([t, b]) => {
+    const tp = (g.town_pos || {})[t];
+    if (!tp) return;
+    const bx = tp[0] + (50 - tp[0]) * 0.18, by = tp[1] + (50 - tp[1]) * 0.18;
+    html += '<span class="tdbout" style="top:' + by.toFixed(1) + '%;left:' + bx.toFixed(1) +
+      '%;" title="Boutique ' + t + ': ' + b.ware + ' · ' + b.price + ' coins">' +
+      (g.ware_emoji[b.ware] || '') + ' ' + b.price + '🪙</span>';
+  });
   html += '</div>';
   // boutiques + waves on board, right under the board (not buried below
   // the seats): what each town buys, where it is, whose Merchant is there,

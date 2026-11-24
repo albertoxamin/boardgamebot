@@ -309,6 +309,21 @@ def test_merchant_no_path():
     assert g["pick_index"] == 1
 
 
+def test_miniapp_shows_boutiques_and_waves_on_board():
+    # FB-0010/FB-0011: ware+price at each coastal town and the face-up
+    # Wave tiles must be rendered ON the board (.tdboard), not only in
+    # the card underneath it.
+    import os
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    start = js.index("let html = '<div class=\"tdboard\">'")
+    end = js.index("html += '</div>';", start)
+    board_html = js[start:end]
+    assert "tdbout" in board_html and "town_pos" in board_html, board_html
+    assert "tdwave" in board_html and "waves_board" in board_html, board_html
+    assert "boutiques" in board_html
+
+
 def test_board_lines_show_boutiques_and_wave_abilities():
     g = mk()
     lines = TD.board_lines(g)

@@ -121,7 +121,16 @@ ZONE_SPACES = [
 # rotated frame: new_x = old_y, new_y = 100 - old_x.
 ZONE_POS = [(37, 73), (38, 52), (37, 34), (45, 24),
             (62, 34), (70, 52), (70, 73), (55, 83)]
-TOWN_POS = {"m_w": (50, 68), "m_cl": (50, 53), "m_c": (55, 40), "m_e": (48, 27),
+# FB-0043: the Merchant pawn did not sit on its arrival town — the
+# four Mountain towns were still guessed (rotated) positions, off by
+# up to ~13% of the board (m_cl and m_w landed in empty space, m_w
+# even on the wrong town's cluster). They are now measured off
+# tokaidoduo-board.webp: each is the centre of its drawn gold circle
+# (the cluster of houses around it is the town; the badge on it is
+# the MOUNTAIN_DRAW value — 2 for m_e, 3 for m_c and m_cl, 4 for m_w).
+# The coastal entries were measured the same way in FB-0042 and are
+# the centres of the coastal town icons (== STATION_POS, see below).
+TOWN_POS = {"m_w": (49.7, 80.0), "m_cl": (50.8, 65.5), "m_c": (56.8, 46.3), "m_e": (41.8, 30.5),
             "c_0": (72.5, 20.4), "c_4": (93.3, 44.0), "c_9": (74.5, 66.7), "c_13": (77.6, 88.1),
             "c_18": (29.7, 85.4), "c_23": (16.7, 66.6), "c_27": (27.9, 45.9), "c_31": (9.1, 24.4)}
 # Pilgrim-ring station centres (% of the portrait board image, 789x1600),

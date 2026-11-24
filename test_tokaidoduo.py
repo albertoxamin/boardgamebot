@@ -70,6 +70,44 @@ def test_pilgrim_stations_are_measured_off_the_board():
     assert '"station_pos": TD.STATION_POS' in bot
 
 
+def test_merchant_mountain_towns_are_measured_off_the_board():
+    # FB-0043: the Merchant pawns did not sit exactly on their arrival
+    # town — the four Mountain towns were still guessed (rotated)
+    # positions, off by up to ~13% of the board (m_cl and m_w landed
+    # in empty space, m_w even on the wrong town's cluster). Each is
+    # now the centre of its drawn gold circle on tokaidoduo-board.webp
+    # (badge = MOUNTAIN_DRAW value: 2 for m_e, 3 for m_c and m_cl,
+    # 4 for m_w), and the JS puts the Merchant meeple — and the
+    # merchant_dest tap highlight — exactly there via town_pos.
+    import math
+    # measured gold-circle centres (% of the 789x1600 portrait board)
+    measured = {"m_e": (41.8, 30.5), "m_c": (56.8, 46.3),
+                "m_cl": (50.8, 65.5), "m_w": (49.7, 80.0)}
+    guessed = {"m_w": (50, 68), "m_cl": (50, 53), "m_c": (55, 40),
+               "m_e": (48, 27)}
+    for town, (mx, my) in measured.items():
+        x, y = TD.TOWN_POS[town]
+        assert math.hypot(x - mx, y - my) < 0.6, (town, (x, y), (mx, my))
+        # regression guard: the old guessed spot was far from the town
+        assert math.hypot(x - guessed[town][0],
+                          y - guessed[town][1]) > 3, town
+    # mountain towns are distinct spots, and none collides with a
+    # coastal town or a Pilgrim-ring station centre.
+    spots = list(TD.TOWN_POS.values())
+    assert len(set(spots)) == len(spots) == 12
+    for town in measured:
+        for s in TD.STATION_POS:
+            assert math.hypot(TD.TOWN_POS[town][0] - s[0],
+                              TD.TOWN_POS[town][1] - s[1]) > 8, (town, s)
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    assert "(g.town_pos || {})[p.merchant_pos]" in js
+    assert "(g.town_pos || {})[String(o.value).slice(5)]" in js
+    bot = open(os.path.join(os.path.dirname(__file__), "bot.py"),
+               encoding="utf-8").read()
+    assert '"town_pos": TD.TOWN_POS' in bot
+
+
 def test_zone_graph_and_spaces():
     assert len(TD.ZONES) == 8
     # adjacency is symmetric, 11 trade routes

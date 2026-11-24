@@ -124,6 +124,12 @@ ZONE_POS = [(37, 73), (38, 52), (37, 34), (45, 24),
 TOWN_POS = {"m_w": (50, 68), "m_cl": (50, 53), "m_c": (55, 40), "m_e": (48, 27),
             "c_0": (73, 18), "c_4": (85, 40), "c_9": (78, 65), "c_13": (73, 87),
             "c_18": (32, 82), "c_23": (22, 65), "c_27": (22, 40), "c_31": (28, 18)}
+# Centres of the wrapped-package symbols in the dashed boxes at the
+# board edge, one per coastal town (measured off tokaidoduo-board.webp).
+# The boutique pill sits exactly over its town's package (FB-0014),
+# not offset towards the board centre.
+PACKAGE_POS = {"c_0": (88, 15), "c_4": (91, 33), "c_9": (90, 63), "c_13": (81, 95),
+               "c_18": (19, 91), "c_23": (9, 60), "c_27": (9, 47), "c_31": (9, 11)}
 
 # Starting positions: opposite sides. Pilgrim starts are the two
 # Temple stations marked with a parasol, Merchant starts the two

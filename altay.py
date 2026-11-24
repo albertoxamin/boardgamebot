@@ -477,7 +477,7 @@ def play_card(game, player_index, hand_index, events=None, rng=None):
         player["sword_cards"] += 1
     if card.get("shields"):
         player["shields"] += card["shields"]
-    events.append(f"{_player_name(game, player_index)} played {card['name']}.")
+    events.append(f"{_player_name(game, player_index)} played {card['name']} — {card['text']}")
     return None
 
 
@@ -728,6 +728,9 @@ def board_json(game, viewer_id=None):
             "resources": dict(player["resources"]),
             "hand": [card_info(game, index, card) for card in player["hand"]] if show_hand else [],
             "hand_count": len(player["hand"]),
+            # Played cards are public: what each player did this turn, with
+            # the card's effect text, so the effect is visible (FB-0013).
+            "played": [card_info(game, index, card) for card in player["played"]],
             "deck_count": len(player["deck"]),
             "discard_count": len(player["discard"]),
             "reserve": player["reserve"],

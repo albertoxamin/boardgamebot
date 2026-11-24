@@ -76,6 +76,15 @@ function atCard(card, clickable, attrs) {
   return '<div class="' + cls + '" style="background-position:' + x + '% ' + y +
     '%" title="' + escapeHtml(card.name + ' — ' + (card.text || '')) + '" ' + extra + '></div>';
 }
+// Card + a caption with its name and effect text: title tooltips never
+// show on touch, so the effect must be readable on the card itself
+// (FB-0013). `who` optionally prefixes the caption with the player.
+function atCardCell(card, clickable, attrs, who) {
+  const cap = (who ? escapeHtml(who) + ' · ' : '') + '<b>' + escapeHtml(card.name) +
+    '</b><br>' + escapeHtml(card.text || '');
+  return '<div class="atcardwrap">' + atCard(card, clickable, attrs) +
+    '<div class="atcap">' + cap + '</div></div>';
+}
 function atAch(ach, index) {
   const x = Number((ach.sprite || [0, 0])[0]) * 10;
   const y = Number((ach.sprite || [0, 0])[1]) * 50;
@@ -114,6 +123,7 @@ function atRender() {
   const turn = document.getElementById('ayTurn');
   const players = document.getElementById('ayPlayers');
   const board = document.getElementById('ayBoard');
+  const inv = document.getElementById('ayInv');
   const hand = document.getElementById('ayHand');
   const actions = document.getElementById('ayActions');
   const market = document.getElementById('ayMarket');
@@ -123,7 +133,7 @@ function atRender() {
   const start = document.getElementById('ayStart');
   const rematch = document.getElementById('ayRematch');
   [join, npc, start, rematch].forEach(el => el.classList.add('hidden'));
-  [board, hand, actions, market, achievements].forEach(el => { el.innerHTML = ''; });
+  [board, inv, hand, actions, market, achievements].forEach(el => { el.innerHTML = ''; });
   document.getElementById('ayLog').textContent = (g.log || []).join('\n');
   const names = g.players.map(p => escapeHtml(p.name) + (p.npc ? ' 🤖' : '') +
     ' <b style="color:' + p.color + '">' + p.score + ' VP</b>').join(' · ');
@@ -157,8 +167,26 @@ function atRender() {
     }
   }));
   const me = g.players[g.me] || {hand: []};
+  // FB-0013: a labelled inventory for the viewer — all resources even
+  // when zero, plus reserve, swords, builds and markers — and the cards
+  // played this turn, each with its effect text.
+  if (g.me !== null && g.me !== undefined && g.players[g.me]) {
+    const res = Object.entries(me.resources || {}).map(([k, n]) =>
+      (g.resource_icons[k] || k) + ' ' + n).join('  ');
+    inv.innerHTML = '<div class="atlabel">🎒 Your inventory</div><div class="atinv">' +
+      '<span class="atres">' + res + '</span><br>' +
+      '🏠 ' + me.reserve + ' settlements in reserve · ⚔️ ' + me.swords + ' swords · ' +
+      '🏠 ' + me.builds + ' builds · 🎯 ' + me.markers + ' conquest markers · ' +
+      '🃏 deck ' + me.deck_count + ' · 🗑️ discard ' + me.discard_count + '</div>';
+  }
+  const played = g.players.filter(p => (p.played || []).length);
+  if (played.length) {
+    inv.innerHTML += '<div class="atlabel">Played this turn — what each card did</div>' +
+      '<div class="atrow">' + played.map(p =>
+        p.played.map(c => atCardCell(c, false, '', p.name)).join('')).join('') + '</div>';
+  }
   hand.innerHTML = '<div class="atlabel">Your hand</div>' + (me.hand.length
-    ? me.hand.map((c, i) => atCard(c, g.can_act, 'data-hand="' + i + '"')).join('')
+    ? me.hand.map((c, i) => atCardCell(c, g.can_act, 'data-hand="' + i + '"')).join('')
     : '<span class="atcardback"></span>'.repeat(Math.max(1, me.hand_count)));
   hand.querySelectorAll('[data-hand]').forEach(el => el.addEventListener('click', () => {
     atMove('play', {index: Number(el.dataset.hand)});
@@ -185,7 +213,7 @@ function atRender() {
     const affordable = Object.entries(c.cost || {}).every(([k, n]) => (me.resources[k] || 0) >= n);
     const bought = (me.bought || []).includes(c.id);
     const clickable = g.can_act && affordable && !bought;
-    return atCard(c, clickable, 'data-buy="' + escapeHtml(c.id) + '"');
+    return atCardCell(c, clickable, 'data-buy="' + escapeHtml(c.id) + '"');
   }).join('');
   market.querySelectorAll('[data-buy]').forEach(el => el.addEventListener('click', () => {
     if (!g.can_act) return;

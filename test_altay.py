@@ -135,6 +135,21 @@ class AltayEngineTests(unittest.TestCase):
         self.assertEqual(len(game["scores"]), 2)
         json.dumps(game)
 
+    def test_play_event_names_card_effect_and_board_json_exposes_played(self):
+        # FB-0013: the effect of a played card must be visible — in the
+        # event log line and in board_json's played list (Mini App shows
+        # "Played this turn" with each card's effect text).
+        game, events = self.new_game()
+        game["players"][0]["hand"] = ["hunter", "warrior", "hunter", "hunter", "hunter"]
+        self.assertIsNone(altay.play_card(game, 0, 0, events))
+        self.assertTrue(any("Hunter" in e and "Produce 1 food" in e for e in events), events)
+        board = altay.board_json(game, 42)
+        played = board["players"][0]["played"]
+        self.assertEqual([c["id"] for c in played], ["hunter"])
+        self.assertEqual(played[0]["name"], "Hunter")
+        self.assertIn("Produce 1 food", played[0]["text"])
+        self.assertEqual(board["players"][1]["played"], [])
+
     def test_turn_order_and_wrong_player_guard(self):
         game, events = self.new_game()
         self.assertIsNotNone(altay.play_card(game, 1, 0, events))

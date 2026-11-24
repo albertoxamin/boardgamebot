@@ -319,9 +319,24 @@ def test_miniapp_shows_boutiques_and_waves_on_board():
     start = js.index("let html = '<div class=\"tdboard\">'")
     end = js.index("html += '</div>';", start)
     board_html = js[start:end]
-    assert "tdbout" in board_html and "town_pos" in board_html, board_html
+    assert "tdbout" in board_html and "package_pos" in board_html, board_html
     assert "tdwave" in board_html and "waves_board" in board_html, board_html
     assert "boutiques" in board_html
+
+
+def test_boutique_pills_sit_over_package_symbols():
+    # FB-0014: one package position per coastal town, each further from
+    # the board centre than its town (the packages are at the board
+    # edge), and the Mini App serves them in the board JSON.
+    import math
+    coastal = [t for t in TD.TOWN_POS if t.startswith("c_")]
+    assert len(coastal) == 8
+    assert set(TD.PACKAGE_POS) == set(coastal)
+    for town in coastal:
+        px, py = TD.PACKAGE_POS[town]
+        assert 0 <= px <= 100 and 0 <= py <= 100, (town, px, py)
+        tx, ty = TD.TOWN_POS[town]
+        assert math.hypot(px - 50, py - 50) > math.hypot(tx - 50, ty - 50), town
 
 
 def test_board_lines_show_boutiques_and_wave_abilities():

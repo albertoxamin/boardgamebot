@@ -362,13 +362,23 @@ Markers or opponents, and invest in one achievement at a time. Final scoring
 counts achievements, VP cards, settlements, VP markers, captured settlements,
 and Conquest Markers (1 VP per three). Board, action-card, achievement-card,
 marker and token art is extracted from the BGA client at version
-`261121-1937`. Text commands: `/altay`, `/altay_join`, `/altay_join_npc`,
-`/altay_faction <name>`, `/altay_start`, `/altay_play <card#>`, `/altay_buy
-<card>`, `/altay_build <territory>`, `/altay_attack <territory>`,
-`/altay_develop <id>`, `/altay_end`, `/altay_score`, `/altay_rules`,
-`/altay_cancel` (creator), `/altay_rematch`. Mini App: board button =
-`?startapp=altay<chat>` (same Main Mini App, routed by `start_param`). Engine:
-`altay.py` + `test_altay.py`.
+`261121-1937`.
+
+The lobby includes a simplified BGA-compatible **Seafarers** option: two sea
+zones and two island territories (conquest markers 3 and 2), 3 ships and 3
+crews per player, ships/crews support for sea travel, sea-launched attacks,
+coins as VP, Astronomy/Lighthouse achievements, Explorer/Sailor/Shipwright
+cards, and one trade per turn (3 identical or 2 different resources for 1).
+The Forgotten Sea board and Waterfolk are not implemented.
+
+Text commands: `/altay`, `/altay_join`, `/altay_join_npc`,
+`/altay_faction <name>`, `/altay_seafarers <on|off>` (creator, lobby),
+`/altay_start`, `/altay_play <card#>`, `/altay_buy <card>`,
+`/altay_build <territory>`, `/altay_attack <territory>`,
+`/altay_develop <id>`, `/altay_trade <give[:count] ...> <receive>`,
+`/altay_end`, `/altay_score`, `/altay_rules`, `/altay_cancel` (creator),
+`/altay_rematch`. Mini App: board button = `?startapp=altay<chat>` (same Main
+Mini App, routed by `start_param`). Engine: `altay.py` + `test_altay.py`.
 
 ## Black Flag! (same bot, 4-8 player naval card game)
 
@@ -402,7 +412,7 @@ live in `test_wiring.py`.
 - `azul.py` – pure engine: factories, pattern lines, wall scoring, final bonuses.
 - `toybattle.py` – pure engine: Castle Field bases, stacks/connection, troop powers, medals, HQ win.
 - `tokaidoduo.py` – pure engine: 37-station Pilgrim ring, Merchant trade routes, Artist zones, 1-2-1 dice draft, Wave tiles, Hot Spring, scoring.
-- `altay.py` – pure engine: faction decks, production, market, settlement building, combat, achievements, final scoring.
+- `altay.py` – pure engine: faction decks, production, market, settlement building, combat, achievements, final scoring, Seafarers ships/crews/routes/trade.
 - `blackflag.py` – pure engine: Captains, Ships, hidden Roles, card combat, Treasure Chest, Doubloons, Hourglass and win checks.
 - `yahtzee.py` – pure engine: dice, scorecard, turns, scoring.
 - `fliptoons.py` – pure engine: deck, grid, abilities, market, final flip.
@@ -435,6 +445,7 @@ live in `test_wiring.py`.
 - `web/tokaidoduo-board.webp` – BGA board art for Tokaido Duo
 - `web/altay.js` – Altay Mini App view (synced, viewer-filtered hands)
 - `web/altay-board.webp`, `web/altay-actions.webp`, `web/altay-achievements.webp`, `web/altay-markers.webp`, `web/altay-tokens.webp` – BGA-extracted Altay art
+- `web/altay-seafarers-*.webp` – BGA Seafarers action/achievement/token/ship art served directly as WEBP
 - `web/blackflag.js` – Black Flag Mini App view (synced, viewer-filtered hands)
 - `web/blackflag-cards.webp`, `web/blackflag-ships.webp`, `web/blackflag-board.webp`, `web/blackflag-cardback.webp` – TTS-extracted Black Flag art
 - `sources/tokaidoduo/bga/` – BGA sprite sheets for Tokaido Duo (dice, wares, waves, paintings, boutiques, character boards)

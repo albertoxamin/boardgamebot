@@ -14,6 +14,14 @@ class AltayEngineTests(unittest.TestCase):
         self.assertIsNone(altay.start_game(game, events, random.Random(seed)))
         return game, events
 
+    def new_seafarers_game(self, seed=1):
+        game = altay.new_game(7, 42, "Ada")
+        self.assertIsNone(altay.set_seafarers(game, True))
+        self.assertIsNone(altay.join_game(game, 43, "Ben"))
+        events = []
+        self.assertIsNone(altay.start_game(game, events, random.Random(seed)))
+        return game, events
+
     def test_module_contract_and_start(self):
         self.assertTrue(altay.validate())
         game, events = self.new_game()
@@ -291,13 +299,94 @@ class AltayEngineTests(unittest.TestCase):
         base = os.path.dirname(os.path.abspath(__file__))
         with open(os.path.join(base, "web", "flip7.html"), encoding="utf-8") as f:
             html = f.read()
-        self.assertIn('src="altay.js?v=4"', html)
+        self.assertIn('src="altay.js?v=5"', html)
         with open(os.path.join(base, "web", "altay.js"), encoding="utf-8") as f:
             js = f.read()
         self.assertIn("atCheckVer", js)
         self.assertIn("fetch('/healthz')", js)
         self.assertIn("ATG.webVer", js)
         self.assertIn("New version — reopen the Mini App", js)
+
+    def test_seafarers_setup_and_board_json(self):
+        game, events = self.new_seafarers_game()
+        self.assertEqual(len(game["board"]), 27)
+        self.assertEqual(sorted(game["board"][str(r)]["marker"]["value"]
+                                for r in altay.SEAFARERS_REGIONS), [2, 3])
+        for player in game["players"]:
+            self.assertEqual(player["ship_supply"], 3)
+            self.assertEqual(player["crews"], 3)
+            self.assertEqual(player["ships"], {"A": 0, "B": 0})
+        self.assertTrue(altay.ship_placements(game, 0))
+        self.assertTrue(altay.ship_placements(game, 1))
+        self.assertIn("Seafarers", " ".join(events))
+        board = altay.board_json(game, 42)
+        json.dumps(board)
+        self.assertTrue(board["seafarers"])
+        self.assertEqual(len(board["regions"]), 27)
+        self.assertEqual(len(board["market"]), 13)
+        self.assertIn("lighthouse", [a["id"] for a in board["achievements"]])
+        astronomy = next(a for a in board["achievements"] if a["id"] == "astronomy")
+        self.assertEqual(astronomy["level"], 1)
+        self.assertEqual(board["sea_anchors"]["A"], altay.SEA_ANCHORS["A"])
+
+    def test_seafarers_shipwright_and_sea_attack(self):
+        game, events = self.new_seafarers_game()
+        player = game["players"][0]
+        player["hand"].append("shipwright")
+        self.assertIsNone(altay.play_card(game, 0, len(player["hand"]) - 1, events,
+                                          None, {"zone": "A"}))
+        self.assertEqual(player["ships"]["A"], 1)
+        self.assertEqual(player["ship_supply"], 2)
+        option = next((o for o in altay.attack_options(game, 0)
+                       if o["region"] in altay.SEAFARERS_REGIONS), None)
+        self.assertIsNotNone(option)
+        self.assertEqual(option["via"], ["A"])
+        player["swords"] = 4
+        reserve = player["reserve"]
+        self.assertIsNone(altay.attack(game, 0, option["from"], option["region"], events))
+        self.assertIsNone(game["board"][str(option["region"])]["marker"])
+        self.assertIn(0, game["board"][str(option["region"])]["settlements"])
+        self.assertEqual(player["reserve"], reserve - 1)
+        self.assertEqual(player["ship_supply"], 3)
+        self.assertEqual(player["ships"]["A"], 0)
+
+    def test_seafarers_sailor_explorer_and_trade(self):
+        game, events = self.new_seafarers_game()
+        player = game["players"][0]
+        player["ships"]["A"] = 1
+        player["hand"].extend(["sailor", "explorer"])
+        self.assertIsNone(altay.play_card(game, 0, len(player["hand"]) - 2, events,
+                                          None, {"action": "crew", "zone": "A"}))
+        self.assertEqual(player["ship_crews"]["A"], 1)
+        self.assertEqual(player["crews"], 2)
+        self.assertIsNone(altay.play_card(game, 0, len(player["hand"]) - 1, events))
+        self.assertEqual(player["coins"], 3)
+        player["resources"]["food"] = 3
+        self.assertIsNone(altay.trade(game, 0, {"food": 3}, "wood", events))
+        self.assertEqual(player["resources"]["wood"], 1)
+        self.assertIsNotNone(altay.trade(game, 0, {"food": 3}, "wood", events))
+        self.assertIsNone(altay.end_turn(game, 0, events))
+        self.assertFalse(game["players"][0]["traded"])
+
+    def test_seafarers_miniapp_assets_and_controls(self):
+        base = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(base, "web", "flip7.html"), encoding="utf-8") as f:
+            html = f.read()
+        for asset in ("altay-seafarers-actions.webp", "altay-seafarers-achievements.webp"):
+            self.assertIn(asset, html)
+        with open(os.path.join(base, "game_registry.py"), encoding="utf-8") as f:
+            registry = f.read()
+        for asset in ("altay-seafarers-actions.webp", "altay-seafarers-achievements.webp",
+                      "altay-seafarers-tokens.webp", "altay-seafarers-ships.webp"):
+            self.assertIn(asset, registry)
+        self.assertIn('id="aySea"', html)
+        with open(os.path.join(base, "web", "altay.js"), encoding="utf-8") as f:
+            js = f.read()
+        self.assertIn("atSeaBadges", js)
+        self.assertIn("atMove('seafarers'", js)
+        self.assertIn("atMove('trade'", js)
+        self.assertIn("index: shipwright", js)
+        self.assertIn("action: 'resettle'", js)
 
 
 if __name__ == "__main__":

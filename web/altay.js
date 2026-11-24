@@ -107,8 +107,9 @@ function atResources(p) {
     .map(([k, n]) => (icons[k] || '') + ' ' + n).join('  ');
 }
 function atCard(card, clickable, attrs) {
+  const sea = !!(ATG.board && ATG.board.seafarers);
   const x = Number((card.sprite || [0, 0])[0]) * 100 / 9;
-  const y = Number((card.sprite || [0, 0])[1]) * 100 / 14;
+  const y = Number((card.sprite || [0, 0])[1]) * 100 / (sea ? 17 : 14);
   const cls = 'atcard' + (clickable ? ' atclick' : '');
   const extra = attrs || '';
   return '<div class="' + cls + '" style="background-position:' + x + '% ' + y +
@@ -127,8 +128,9 @@ function atCardCell(card, clickable, attrs, who) {
     '<div class="atcap">' + cap + '</div></div>';
 }
 function atAch(ach, index) {
-  const x = Number((ach.sprite || [0, 0])[0]) * 10;
-  const y = Number((ach.sprite || [0, 0])[1]) * 50;
+  const sea = !!(ATG.board && ATG.board.seafarers);
+  const x = Number((ach.sprite || [0, 0])[0]) * 100 / (sea ? 11 : 10);
+  const y = Number((ach.sprite || [0, 0])[1]) * 100 / (sea ? 3 : 2);
   const done = ach.done[index];
   const active = ach.active[index];
   const clickable = ATG.board.can_act && !done && (!ach.active[0] || active);
@@ -169,6 +171,21 @@ function atRegion(region, g) {
   }
   return html + '</div>';
 }
+function atSeaBadges(g) {
+  if (!g.seafarers) return '';
+  const me = g.players[g.me] || {};
+  return (g.sea_zones || []).map(zone => {
+    const pos = (g.sea_anchors || {})[zone] || [50, 50];
+    const ships = (me.ships || {})[zone] || 0;
+    const crew = (me.ship_crews || {})[zone] || 0;
+    return '<span class="atsea" style="top:' + pos[1] + '%;left:' + pos[0] +
+      '%">🌊 ' + zone + ' · 🚢' + ships + ' · 👥' + crew + '</span>';
+  }).join('');
+}
+function atHandIndex(id) {
+  const me = (ATG.board && ATG.board.players[ATG.board.me]) || {};
+  return (me.hand || []).findIndex(c => c.id === id);
+}
 // FB-0022: why Build/Attack cannot be used right now — the player
 // starts every turn with 0 resources, 0 builds and 0 swords (end_turn
 // discards them), so these actions only become possible after playing
@@ -202,9 +219,11 @@ function atRender() {
   const achievements = document.getElementById('ayAch');
   const join = document.getElementById('ayJoin');
   const npc = document.getElementById('ayNpc');
+  const sea = document.getElementById('aySea');
   const start = document.getElementById('ayStart');
   const rematch = document.getElementById('ayRematch');
-  [join, npc, start, rematch].forEach(el => el.classList.add('hidden'));
+  document.getElementById('altay').classList.toggle('atseaon', !!g.seafarers);
+  [join, npc, sea, start, rematch].forEach(el => el.classList.add('hidden'));
   [board, inv, hand, actions, market, achievements].forEach(el => { el.innerHTML = ''; });
   atRenderLog();
   const names = g.players.map(p => escapeHtml(p.name) + (p.npc ? ' 🤖' : '') +
@@ -220,17 +239,26 @@ function atRender() {
     '<b>' + escapeHtml(p.name) + '</b> · ' + escapeHtml(p.faction_name) + ' · ' + p.score + ' VP<br>' +
     '<span class="atres">' + atResources(p) + '</span> · 🃏 ' + p.hand_count +
     ' · 🏠 ' + p.reserve + ' · ⚔️ ' + p.captured + ' · 🎯 ' + p.markers + '<br>' +
+    (g.seafarers ? '<span class="atfleet">🪙 ' + (p.coins || 0) + ' ships ' +
+      (g.sea_zones || []).map(z => z + ':' + ((p.ships || {})[z] || 0)).join(' ') +
+      ' · supply ' + (p.ship_supply || 0) + ' · crews ' + (p.crews || 0) + '</span><br>' : '') +
     '📜 ' + escapeHtml(p.achievement || 'no active achievement') + '</div>').join('');
   if (g.phase === 'lobby') {
     board.innerHTML = '<div class="atlobby">Join or add an NPC, then start.<br>' +
+      'Seafarers: ' + (g.seafarers ? 'on' : 'off') + ' — two sea zones, two islands, ships and crews.<br>' +
       'The board and your cards appear once the game starts.<br>' + names + '</div>';
     if (!g.is_player) join.classList.remove('hidden');
     if (g.players.length < (g.max_players || 2)) npc.classList.remove('hidden');
+    if (g.me === 0) {
+      sea.textContent = '🌊 Seafarers: ' + (g.seafarers ? 'on' : 'off');
+      sea.classList.remove('hidden');
+    }
     start.classList.remove('hidden');
     return;
   }
   if (g.phase === 'over') rematch.classList.remove('hidden');
-  board.innerHTML = '<div class="atboard">' + g.regions.map(r => atRegion(r, g)).join('') + '</div>';
+  board.innerHTML = '<div class="atboard">' + g.regions.map(r => atRegion(r, g)).join('') +
+    atSeaBadges(g) + '</div>';
   board.querySelectorAll('[data-region]').forEach(el => el.addEventListener('click', () => {
     const region = Number(el.dataset.region);
     if (ATG.mode === 'build' && (g.legal.build || []).map(String).includes(String(region))) {
@@ -254,7 +282,11 @@ function atRender() {
       '<span class="atres">' + res + '</span><br>' +
       '🏠 ' + me.reserve + ' settlements in reserve · ⚔️ ' + me.swords + ' swords · ' +
       '🏠 ' + me.builds + ' builds · 🎯 ' + me.markers + ' conquest markers · ' +
-      '🃏 deck ' + me.deck_count + ' · 🗑️ discard ' + me.discard_count + '</div>';
+      '🃏 deck ' + me.deck_count + ' · 🗑️ discard ' + me.discard_count +
+      (g.seafarers ? '<br><span class="atfleet">🪙 ' + (me.coins || 0) + ' coins · 🚢 supply ' +
+        (me.ship_supply || 0) + ' · 👥 crews ' + (me.crews || 0) +
+        (g.sea_zones || []).map(z => ' · sea ' + z + ': ' + ((me.ships || {})[z] || 0) +
+          '/' + ((me.ship_crews || {})[z] || 0)).join('') + '</span>' : '') + '</div>';
   }
   const played = g.players.filter(p => (p.played || []).length);
   if (played.length) {
@@ -307,6 +339,64 @@ function atRender() {
       : '💡 No resources, builds or swords yet — play cards from your hand first, then Buy, Build, Attack and Develop work.';
     actions.appendChild(hint);
   }
+  if (g.seafarers && g.can_act) {
+    const seaRow = document.createElement('div');
+    seaRow.className = 'atrow';
+    const shipwright = atHandIndex('shipwright');
+    (g.ship_placements || []).forEach(zone => {
+      if (shipwright < 0) return;
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'atbtn'; b.textContent = '🚢 Place ship ' + zone;
+      b.addEventListener('click', () => atMove('play', {index: shipwright, params: {zone: zone}}));
+      seaRow.appendChild(b);
+    });
+    const sailor = atHandIndex('sailor');
+    if (sailor >= 0) {
+      (g.sea_zones || []).forEach(zone => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'atbtn'; b.textContent = '👥 Crew ' + zone;
+        b.addEventListener('click', () => atMove('play', {
+          index: sailor, params: {action: 'crew', zone: zone}}));
+        seaRow.appendChild(b);
+      });
+      for (const [from, to] of [['A', 'B'], ['B', 'A']]) {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'atbtn'; b.textContent = '➡️ Ship ' + from + '→' + to;
+        b.addEventListener('click', () => atMove('play', {
+          index: sailor, params: {action: 'move', from: from, to: to}}));
+        seaRow.appendChild(b);
+      }
+    }
+    const explorer = atHandIndex('explorer');
+    const islands = (g.regions || []).filter(r => r.id >= 25 && !r.marker && !(r.settlements || []).length);
+    if (explorer >= 0 && islands.length) {
+      const wrap = document.createElement('span');
+      wrap.innerHTML = '<select id="ayResettle">' + islands.map(r =>
+        '<option value="' + r.id + '">🏝️ ' + escapeHtml(r.name) + '</option>').join('') + '</select>';
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'atbtn'; b.textContent = '🧭 Resettle';
+      b.addEventListener('click', () => atMove('play', {
+        index: explorer, params: {action: 'resettle', region: Number(wrap.querySelector('select').value)}}));
+      seaRow.appendChild(wrap);
+      seaRow.appendChild(b);
+    }
+    if (seaRow.children.length) actions.appendChild(seaRow);
+    const opts = Object.keys(g.resources || {}).map(k =>
+      '<option value="' + escapeHtml(k) + '">' + escapeHtml(g.resource_icons[k] || k) + '</option>').join('');
+    const trade = document.createElement('div');
+    trade.className = 'attrade';
+    trade.innerHTML = '🔄 Trade <select id="ayGive1">' + opts + '</select>' +
+      '<select id="ayGive2"><option value="">3 of one</option>' + opts + '</select>' +
+      ' for <select id="ayReceive">' + opts + '</select>' +
+      '<button type="button" id="ayTradeGo"' + (me.traded ? ' disabled' : '') + '>Trade</button>';
+    actions.appendChild(trade);
+    trade.querySelector('#ayTradeGo').addEventListener('click', () => {
+      const first = trade.querySelector('#ayGive1').value;
+      const second = trade.querySelector('#ayGive2').value;
+      const give = second ? {[first]: 1, [second]: 1} : {[first]: 3};
+      atMove('trade', {give: give, receive: trade.querySelector('#ayReceive').value});
+    });
+  }
   market.innerHTML = '<div class="atlabel">Market — buy once per turn</div>' + (g.market || []).map(c => {
     const affordable = Object.entries(c.cost || {}).every(([k, n]) => (me.resources[k] || 0) >= n);
     const bought = (me.bought || []).includes(c.id);
@@ -326,6 +416,8 @@ function atRender() {
 }
 document.getElementById('ayJoin').addEventListener('click', () => atMove('join'));
 document.getElementById('ayNpc').addEventListener('click', () => atMove('npc'));
+document.getElementById('aySea').addEventListener('click', () =>
+  atMove('seafarers', {enabled: !(ATG.board && ATG.board.seafarers)}));
 document.getElementById('ayStart').addEventListener('click', () => atMove('start'));
 document.getElementById('ayRematch').addEventListener('click', () => atMove('rematch'));
 atLoad();

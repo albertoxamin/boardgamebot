@@ -404,6 +404,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .atbtn{background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:8px;padding:6px 10px;font-weight:800;cursor:pointer}
 .atbtn:hover{border-color:#f59e0b}
 .atbtn:disabled{opacity:.45;cursor:not-allowed}
+#altay.atseaon .atcard{background-image:url(altay-seafarers-actions.webp);background-size:1000% 1800%}
+#altay.atseaon .atach{background-image:url(altay-seafarers-achievements.webp);background-size:1200% 400%}
+.atsea{position:absolute;transform:translate(-50%,-50%);padding:2px 7px;border-radius:999px;background:#0284c7e6;color:#fff;font-size:11px;font-weight:900;white-space:nowrap;box-shadow:0 1px 4px #000a;pointer-events:none}
+.atfleet{font-size:13px;color:#e0f2fe}
+.attrade{width:100%;font-size:12px;color:#cbd5e1}
+.attrade select,.attrade button{background:#1e293b;color:#e2e8f0;border:1px solid #475569;border-radius:6px;padding:4px 6px;margin:2px;font-size:12px;font-weight:700}
 .athint{width:100%;font-size:12px;color:#94a3b8}
 .atcardwrap[data-buy],.atcardwrap[data-hand],.atachwrap[data-ach]{cursor:pointer}
 .atlobby{min-height:170px;background:linear-gradient(#0f172aee,#0f172aee),url(altay-board.webp) center/cover;border:1px solid #475569;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;font-weight:800}
@@ -596,9 +602,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
  <div id="ayActions" class="atrow"></div>
  <div id="ayMarket" class="atrow"></div>
  <div id="ayAch" class="atrow"></div>
- <button class="primary hidden" id="ayJoin">🙋 Join</button>
- <button class="primary hidden" id="ayNpc">🤖 Add NPC</button>
- <button class="primary hidden" id="ayStart">🎮 Start game</button>
+  <button class="primary hidden" id="ayJoin">🙋 Join</button>
+  <button class="primary hidden" id="ayNpc">🤖 Add NPC</button>
+  <button class="primary hidden" id="aySea">🌊 Seafarers: off</button>
+  <button class="primary hidden" id="ayStart">🎮 Start game</button>
  <button class="primary hidden" id="ayRematch">🔄 Rematch!</button>
   <div class="log" id="ayLog"></div>
   </div>
@@ -689,6 +696,6 @@ window.PXSCROLL={
 <script data-cfasync="false" src="azul.js?v=3"></script>
 <script data-cfasync="false" src="toybattle.js?v=1"></script>
 <script data-cfasync="false" src="tokaidoduo.js?v=4"></script>
-<script data-cfasync="false" src="altay.js?v=4"></script>
+<script data-cfasync="false" src="altay.js?v=5"></script>
 <script data-cfasync="false" src="blackflag.js?v=3"></script>
 </body></html>

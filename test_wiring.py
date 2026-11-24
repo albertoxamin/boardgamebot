@@ -309,6 +309,31 @@ class RegistryTests(unittest.TestCase):
         self.assertTrue(game["players"][1]["npc"])
         self.assertTrue(events)
 
+    def test_altay_api_can_enable_seafarers_and_play_sea_moves(self):
+        game = bot.AL.new_game(7, 42, "Ada")
+        state = {"altay": {"7": game}}
+        with patch.object(bot, "send_board", return_value={"ok": False}):
+            _, err = bot.altay_api_move(state, 7, 42,
+                                        {"action": "seafarers", "enabled": True})
+            self.assertIsNone(err)
+            self.assertIsNone(bot.add_npc("altay", game))
+            _, err = bot.altay_api_move(state, 7, 42, {"action": "start"})
+            self.assertIsNone(err)
+            board = bot.altay_board_json(game, 42)
+            self.assertTrue(board["seafarers"])
+            self.assertEqual(len(board["market"]), 13)
+            game["players"][0]["hand"].append("shipwright")
+            _, err = bot.altay_api_move(state, 7, 42,
+                                        {"action": "play", "index": len(game["players"][0]["hand"]) - 1,
+                                         "params": {"zone": "A"}})
+            self.assertIsNone(err)
+            self.assertEqual(game["players"][0]["ships"]["A"], 1)
+            game["players"][0]["resources"]["food"] = 3
+            _, err = bot.altay_api_move(state, 7, 42,
+                                        {"action": "trade", "give": {"food": 3}, "receive": "wood"})
+            self.assertIsNone(err)
+            self.assertEqual(game["players"][0]["resources"]["wood"], 1)
+
 
 class BlackFlagTests(unittest.TestCase):
     def test_deck_and_role_metadata_are_consistent(self):

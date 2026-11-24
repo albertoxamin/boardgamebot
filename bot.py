@@ -38,7 +38,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 46
+WEB_VER = 47
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -4426,7 +4426,8 @@ ALTAY_RULES = """🏜️ <b>Altay: Dawn of Civilization</b> (2 players, simplifi
 • Attack from an adjacent territory you control. Defeat a Conquest Marker by having more settlements+swords than its number, or capture an enemy settlement if your strength beats their settlements+shields. Played sword cards are redrawn after an attack.
 • Develop: invest one resource per action in one achievement at a time. Completing it scores its VP. Secret/deluxe variants are not used.
 • Final score: achievements + VP action cards + 1 per settlement + VP markers held + 1 per captured settlement + 1 per 3 Conquest Markers. Ties break by achievements, cards, then settlements.
-• Commands: /altay_play &lt;card number&gt;, /altay_buy &lt;card&gt;, /altay_build &lt;territory&gt;, /altay_attack &lt;territory&gt;, /altay_develop &lt;id&gt;, /altay_end (or use buttons/Mini App)."""
+• Seafarers (toggle in the lobby with /altay_seafarers &lt;on|off&gt;): the original board gains two sea zones and two islands with markers 3 and 2. Each player starts with 3 ships and 3 crews. A ship beside your settlement lets you settle or attack across that sea zone; crossing two zones costs two ships. Ships beside the target give +1 support each, and a used ship's crew is lost. Sea attacks may place a settlement in the conquered territory. Explorer grants 3 coins or a sea resettlement, Sailor gives a sword or moves a ship/places a crew, and Shipwright places a ship. Astronomy and Lighthouse are added. Coins score 1 VP each. Once per turn you may trade 3 identical or 2 different resources for 1 resource.
+• Commands: /altay_play &lt;card number&gt;, /altay_buy &lt;card&gt;, /altay_build &lt;territory&gt;, /altay_attack &lt;territory&gt;, /altay_develop &lt;id&gt;, /altay_seafarers &lt;on|off&gt;, /altay_end (or use buttons/Mini App)."""
 
 BLACKFLAG_RULES = BF.RULES
 
@@ -5025,7 +5026,8 @@ def _altay_resources(player):
 
 def altay_board_text(g):
     if g["phase"] == "lobby":
-        lines = ["🏜️ <b>Altay</b> lobby:"]
+        lines = ["🏜️ <b>Altay</b> lobby:",
+                 f"🌊 Seafarers: {'on' if AL.is_seafarers(g) else 'off'}"]
         for index, player in enumerate(g["players"]):
             faction = AL.FACTIONS.get(player.get("faction"), {}).get("name", "auto")
             lines.append(f"• {html.escape(player['name'])} — {faction}")
@@ -5043,11 +5045,16 @@ def altay_board_text(g):
     lines.append("🏆 " + " · ".join(f"{html.escape(p['name'])} {AL.score(g, i)}"
                                    for i, p in enumerate(g["players"])))
     lines.append(f"🎒 {_altay_resources(player)} · ⚔️ {player['swords']} · 🏠 builds {player['builds']}")
+    if AL.is_seafarers(g):
+        ships = ", ".join(f"{zone}:{player['ships'][zone]}" for zone in AL.SEA_ZONES)
+        lines.append(f"🌊 Ships {ships} · 🚢 supply {player['ship_supply']} · "
+                     f"👥 crews {player['crews']} · 🪙 {player['coins']} · "
+                     f"🔄 trade {'used' if player['traded'] else 'ready'}")
     cards = [f"{i + 1}. {AL.CARDS[card]['name']}" for i, card in enumerate(player["hand"])]
     lines.append("🃏 " + (", ".join(cards) or "empty hand"))
     builds = AL.legal_build(g, current)
     attacks = AL.attack_options(g, current)
-    affordable = [card for card in AL.MARKET
+    affordable = [card for card in AL.market(g)
                   if AL._can_pay(player["resources"], AL.CARDS[card].get("cost", {}))
                   and card not in player["bought"]]
     lines.append(f"🏠 Build: {', '.join(str(region) for region in builds) or 'none'}")
@@ -5071,6 +5078,8 @@ def altay_keyboard(g):
                    for code, btn in zip(AL.FACTION_ORDER, [
                        {"text": "🌍 Earthfolk"}, {"text": "🌿 Elvenfolk"},
                        {"text": "🔥 Firefolk"}, {"text": "🧚 Smallfolk"}])])
+        kb.append([{"text": f"🌊 Seafarers: {'on' if AL.is_seafarers(g) else 'off'}",
+                    "callback_data": "al:sea"}])
         kb.append([{"text": "▶️ Start game", "callback_data": "al:start"}])
         return kb + (wk or [])
     player = g["players"][g["current"]]
@@ -5088,13 +5097,12 @@ def altay_keyboard(g):
                 kb.append([{"text": f"{label} {option['region']} ({option['value']})",
                             "callback_data": f"al:ra:{option['region']}"}])
         elif sel == "develop":
-            for achievement_id in ["irrigation", "mining", "writing", "agriculture",
-                                   "metallurgy", "amphitheatre", "pyramids", "astronomy", "epic"]:
+            for achievement_id, achievement in AL.achievement_defs(g).items():
                 if achievement_id not in player["achievements"]:
-                    kb.append([{"text": AL.ACHIEVEMENTS[achievement_id]["name"],
+                    kb.append([{"text": achievement["name"],
                                 "callback_data": f"al:rd:{achievement_id}"}])
         elif sel == "buy":
-            for card_id in AL.MARKET:
+            for card_id in AL.market(g):
                 if card_id not in player["bought"]:
                     kb.append([{"text": AL.CARDS[card_id]["name"],
                                 "callback_data": f"al:rs:{card_id}"}])
@@ -5189,6 +5197,22 @@ def handle_altay(state, msg, cmd, text, uid, name):
             if not err:
                 altay_render(g)
         return True
+    if cmd == "/altay_seafarers":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ The expansion can only be changed in the lobby.")
+        elif uid != g["players"][0]["user_id"]:
+            send(chat_id, "⛔ Only the creator can change the expansion.")
+        else:
+            value = (text.split()[1] if len(text.split()) > 1 else "on").lower()
+            if value not in ("on", "off", "yes", "no", "true", "false", "1", "0"):
+                send(chat_id, "Usage: /altay_seafarers &lt;on|off&gt;")
+            else:
+                err = AL.set_seafarers(g, value in ("on", "yes", "true", "1"))
+                send(chat_id, f"⛔ {err}" if err else
+                     f"🌊 Seafarers {'enabled' if AL.is_seafarers(g) else 'disabled'}.")
+                if not err:
+                    altay_render(g)
+        return True
     if cmd == "/altay_start":
         ev = []
         err = AL.start_game(g, ev)
@@ -5236,6 +5260,18 @@ def handle_altay(state, msg, cmd, text, uid, name):
             err = AL.attack(g, idx, None, int(parts[0]), ev)
     elif cmd == "/altay_develop":
         err = AL.develop(g, idx, parts[0], ev) if parts else "Usage: /altay_develop &lt;id&gt;"
+    elif cmd == "/altay_trade":
+        if len(parts) < 3:
+            err = "Usage: /altay_trade &lt;give[:count] ...&gt; &lt;receive&gt;"
+        else:
+            give = {}
+            try:
+                for item in parts[:-1]:
+                    key, sep, count = item.partition(":")
+                    give[key] = int(count) if sep else 1
+                err = AL.trade(g, idx, give, parts[-1], ev)
+            except ValueError:
+                err = "Bad trade amount."
     elif cmd == "/altay_end":
         err = AL.end_turn(g, idx, ev)
     else:
@@ -5293,6 +5329,13 @@ def altay_api_move(state, chat_id, user_id, body):
         err = AL.set_faction(g, mine, str(body.get("faction", "")))
         if err:
             return [], err
+    elif action == "seafarers":
+        if g["phase"] != "lobby" or mine != 0:
+            return [], "only the creator can change the lobby setup"
+        err = AL.set_seafarers(g, bool(body.get("enabled")))
+        if err:
+            return [], err
+        ev.append("🌊 Seafarers " + ("enabled" if AL.is_seafarers(g) else "disabled") + ".")
     elif action == "npc":
         if g["phase"] != "lobby":
             return [], "game already started"
@@ -5314,7 +5357,8 @@ def altay_api_move(state, chat_id, user_id, body):
             return [], "not in this game"
         try:
             if action == "play":
-                err = AL.play_card(g, actor, int(body.get("index", -1)), ev)
+                err = AL.play_card(g, actor, int(body.get("index", -1)), ev, None,
+                                   body.get("params"))
             elif action == "buy":
                 err = AL.buy_card(g, actor, str(body.get("card", "")), ev)
             elif action == "build":
@@ -5323,6 +5367,8 @@ def altay_api_move(state, chat_id, user_id, body):
                 err = AL.attack(g, actor, body.get("from"), int(body.get("region", -1)), ev)
             elif action == "develop":
                 err = AL.develop(g, actor, str(body.get("achievement", "")), ev)
+            elif action == "trade":
+                err = AL.trade(g, actor, body.get("give"), str(body.get("receive", "")), ev)
             elif action == "end":
                 err = AL.end_turn(g, actor, ev)
             else:
@@ -5967,6 +6013,14 @@ def handle_callback(state, cb):
                 return answer_cb(cb["id"], "Choose a faction in the lobby.")
             err = AL.set_faction(g, mine, parts[2] if len(parts) > 2 else "")
             answer_cb(cb["id"], err or "Faction chosen")
+            if not err:
+                altay_render(g)
+            return
+        if action == "sea":
+            if g["phase"] != "lobby" or uid != g["players"][0]["user_id"]:
+                return answer_cb(cb["id"], "Only the creator can change the lobby.")
+            err = AL.set_seafarers(g, not AL.is_seafarers(g))
+            answer_cb(cb["id"], err or ("Seafarers on" if AL.is_seafarers(g) else "Seafarers off"))
             if not err:
                 altay_render(g)
             return
@@ -7717,7 +7771,9 @@ def start_web_server(state):
                   "/tokaidoduo-board.webp", "/tokaidoduo-icons.webp",
                   "/altay-board.webp", "/altay-actions.webp",
                   "/altay-achievements.webp", "/altay-markers.webp",
-                   "/altay-tokens.webp",
+                   "/altay-tokens.webp", "/altay-seafarers-actions.webp",
+                   "/altay-seafarers-achievements.webp", "/altay-seafarers-tokens.webp",
+                   "/altay-seafarers-ships.webp",
                    "/blackflag-cards.webp", "/blackflag-ships.webp",
                    "/blackflag-board.webp", "/blackflag-cardback.webp"):
                 p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))

@@ -207,6 +207,19 @@ class AltayEngineTests(unittest.TestCase):
             html = f.read()
         self.assertIn(".atachwrap{flex:none;width:88px", html)
 
+    def test_board_tokens_are_big_enough_to_see(self):
+        """FB-0021: 'on altay, make the token on the board bigger, so
+        they are easier to see' — the settlement tokens on the board
+        were 10px squares inside a 34px region circle; both the region
+        circle and the tokens (plus the conquest marker chips) must be
+        substantially larger."""
+        base = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(base, "web", "flip7.html"), encoding="utf-8") as f:
+            html = f.read()
+        self.assertIn(".atregion{position:absolute;transform:translate(-50%,-50%);width:44px;height:44px;", html)
+        self.assertIn(".atsettle{width:16px;height:16px;", html)
+        self.assertIn(".atmarkerchip{position:absolute;transform:translate(-50%,-50%);width:42px;height:28px;", html)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

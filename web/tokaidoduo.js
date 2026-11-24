@@ -77,6 +77,27 @@ function tdPaintTile(t, idx) {
   const em = (TDG.board.zone_icon_emoji || {})[t.icon] || t.icon;
   return '<span class="tdpaint" title="' + escapeHtml(t.icon) + '">' + em + '</span>';
 }
+// Coastal town locations on the portrait board, so the boutique list
+// is readable without memorising town codes.
+const TD_TOWN_WHERE = {c_0: 'top right', c_4: 'right', c_9: 'lower right',
+  c_13: 'bottom right', c_18: 'bottom left', c_23: 'lower left',
+  c_27: 'left', c_31: 'top left'};
+function tdWaveText(g, ch, side) {
+  if (!side) return '—';
+  return ((g.wave_info || {})[ch] || {})[side] || side;
+}
+function tdSellLines(g, p) {
+  const counts = {};
+  p.wares.forEach(w => { counts[w] = (counts[w] || 0) + 1; });
+  return Object.entries(counts).map(([w, n]) => {
+    const offers = Object.entries(g.boutiques || {}).filter(([, b]) => b.ware === w)
+      .map(([t, b]) => {
+        let per = b.price + (p.waves.merchant === 'crafty' ? 1 : 0);
+        return t + ' ' + per + '🪙' + (p.merchant_pos === t ? ' ★ here' : '');
+      });
+    return (g.ware_emoji[w] || '') + w + (n > 1 ? ' ×' + n : '') + ' → ' + offers.join(' / ');
+  });
+}
 function tdRender() {
   const g = TDG.board;
   if (!g) return;
@@ -119,10 +140,30 @@ function tdRender() {
     if (zp) html += tdMeeple(zp[0], zp[1] + 3, col, '🎨', p.name + ' Artist @ ' + ((g.zones[p.artist_zone] || {}).name || ''));
   });
   html += '</div>';
+  // boutiques + waves on board, right under the board (not buried below
+  // the seats): what each town buys, where it is, whose Merchant is there,
+  // and what each face-up Wave tile does.
+  const bouts = Object.entries(g.boutiques || {}).map(([t, b]) => {
+    const here = g.players.filter(pp => pp.merchant_pos === t).map(pp => pp.name);
+    return '<b>' + t + '</b> (' + (TD_TOWN_WHERE[t] || t) + ') ' +
+      (g.ware_emoji[b.ware] || '') + b.ware + ' · ' + b.price + '🪙' +
+      (here.length ? ' — ' + here.map(escapeHtml).join(', ') + ' here' : '');
+  }).join('<br>');
+  const wavesOnBoard = (g.waves_board || []).map(w =>
+    w.char + ': ' + tdWaveText(g, w.char, w.side)).join('<br>');
+  html += '<div class="card small">🏘️ <b>Boutiques</b> — sell a Ware at its town:<br>' + bouts +
+    '<br>🌊 <b>Waves on board</b>:<br>' + (wavesOnBoard || 'none') +
+    (g.hot_spring !== null && g.hot_spring !== undefined ? '<br>♨️ Hot Spring held by ' + escapeHtml((g.players[g.hot_spring] || {}).name || '') : '') +
+    (g.end_triggered ? '<br>🏁 End triggered: ' + escapeHtml(g.end_reason || '') + ' — finish this round.' : '') + '</div>';
   // player seats
   html += '<div class="seats">';
   g.players.forEach((p, i) => {
     const me = p.user_id === TDG.user_id;
+    const counts = {};
+    p.wares.forEach(w => { counts[w] = (counts[w] || 0) + 1; });
+    const waresTxt = Object.entries(counts).map(([w, n]) =>
+      (g.ware_emoji[w] || '') + w + (n > 1 ? ' ×' + n : '')).join(', ') || 'no Wares';
+    const sellTxt = tdSellLines(g, p).join('<br>') || '—';
     html += '<div class="seat' + (p.is_current ? ' current' : '') + '"><div class="seat-head"><span>' +
       (p.color === 'purple' ? '🟣 ' : '🟢 ') + escapeHtml(p.name) + (p.npc ? ' 🤖' : '') +
       (me ? ' (you)' : '') + '</span><span class="score">' +
@@ -131,19 +172,13 @@ function tdRender() {
       ' · 💰 ' + p.gold + ' slabs = ' + p.commerce +
       ' · 🎨 ' + p.gifted + '/10 = ' + p.culture +
       ' · 🪙 ' + p.coins + '</div>' +
-      '<div class="small">🎒 ' + (p.wares.map(w => (g.ware_emoji[w] || '') + w).join(', ') || 'no Wares') + '</div>' +
+      '<div class="small">🎒 ' + waresTxt + '</div>' +
+      '<div class="small">🛍️ Sell:<br>' + sellTxt + '</div>' +
       '<div class="small">🌊 Waves: ' + ['pilgrim', 'merchant', 'artist'].map(ch =>
-        p.waves[ch] || '—').join(' · ') + '</div>' +
+        ch + ': ' + tdWaveText(g, ch, p.waves[ch])).join(' · ') + '</div>' +
       '<div class="tdpaints">' + p.paintings.map(tdPaintTile).join('') + '</div></div>';
   });
   html += '</div>';
-  // boutiques + waves on board
-  const bouts = Object.entries(g.boutiques || {}).map(([t, b]) =>
-    t.replace('c_', '') + ': ' + (g.ware_emoji[b.ware] || '') + b.ware + ' ' + b.price + '🪙').join(' · ');
-  html += '<div class="card small">🏘️ Boutiques — ' + escapeHtml(bouts) +
-    '<br>🌊 Wave tiles on board: ' + (g.waves_board.map(w => w.char + ' (' + w.side + ')').join(', ') || 'none') +
-    (g.hot_spring !== null && g.hot_spring !== undefined ? '<br>♨️ Hot Spring held by ' + escapeHtml((g.players[g.hot_spring] || {}).name || '') : '') +
-    (g.end_triggered ? '<br>🏁 End triggered: ' + escapeHtml(g.end_reason || '') + ' — finish this round.' : '') + '</div>';
   board.innerHTML = html;
   // actions
   if (g.phase === 'game_end') return;

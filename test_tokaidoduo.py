@@ -309,6 +309,16 @@ def test_merchant_no_path():
     assert g["pick_index"] == 1
 
 
+def test_board_lines_show_boutiques_and_wave_abilities():
+    g = mk()
+    lines = TD.board_lines(g)
+    assert any("🏘️ Sell:" in ln for ln in lines), lines
+    assert any("🌊 Waves on board:" in ln for ln in lines), lines
+    # every Wave side has ability text (surfaced in the Mini App)
+    assert len(TD.WAVES) == 3
+    assert all(len(v) == 2 and all(t for _, t in v) for v in TD.WAVES.values())
+
+
 if __name__ == "__main__":
     for name, fn in sorted(list(globals().items())):
         if name.startswith("test_"):

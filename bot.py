@@ -4907,6 +4907,7 @@ def tokaidoduo_board_json(g, viewer_id=None):
         "scores": g.get("scores"), "log": g["log"][-12:],
         "hot_spring": g.get("hot_spring"),
         "waves_board": list(g.get("waves_board", [])),
+        "wave_info": {ch: dict(sides) for ch, sides in TD.WAVES.items()},
         "boutiques": dict(g.get("boutiques", {})),
         "stations": list(TD.STATIONS),
         "zones": [{"icon": z["icon"], "name": z["name"]} for z in TD.ZONES],

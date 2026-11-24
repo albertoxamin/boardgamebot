@@ -870,6 +870,17 @@ def board_lines(g):
                          + (" (taken)" if ch in g["dice_taken"] else "")
                          for ch in CHARACTERS)
         lines.append(f"🎲 Dice: {dice}")
+        bouts = "; ".join(
+            f"{WARE_EMOJI[w]}{w}→" + "/".join(
+                f"{t}({b['price']}🪙)" for t, b in sorted(
+                    g["boutiques"].items(), key=lambda kv: int(kv[0].split("_")[1]))
+                if b["ware"] == w)
+            for w in ("fan", "doll", "kimono", "pottery")
+            if any(b["ware"] == w for b in g["boutiques"].values()))
+        lines.append(f"🏘️ Sell: {bouts}")
+        wb = "; ".join(f"{w['char']}: {dict(WAVES[w['char']])[w['side']]}"
+                       for w in g["waves_board"])
+        lines.append(f"🌊 Waves on board: {wb}")
         if g.get("hot_spring") is not None:
             lines.append(f"♨️ Hot Spring held by {name_of(g, g['hot_spring'])}.")
         if g.get("pending"):

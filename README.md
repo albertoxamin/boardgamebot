@@ -369,6 +369,32 @@ marker and token art is extracted from the BGA client at version
 `?startapp=altay<chat>` (same Main Mini App, routed by `start_param`). Engine:
 `altay.py` + `test_altay.py`.
 
+## Black Flag! (same bot, 4-8 player naval card game)
+
+A simplified digital version of *Black Flag!* (Robert Burke, Matt Forbeck and
+James Ernest, 2018). Everyone gets a Captain, its Ship, a hidden Role and 4
+cards (6th-8th players get 5); the Admiral is revealed. On your turn take a
+Ship if you have none, draw 2, play any number of cards, then keep at most 5.
+Shots hit within your Ship's Range; Sails add 1 to your effective distance,
+while Telescope/Map add Range. Sailor and Parley can be played out of turn to
+stop a Shot. Sinking a Ship moves the Treasure Chest toward the enemy flag,
+discards its Equipment and earns the sinker a Doubloon. A Privateer/Pirate
+with 4 Doubloons wins immediately, a nation wins when the Chest reaches its
+flag, and an empty Hourglass forces a revealed symbol answer or elimination.
+Some card and ship abilities are deliberately simplified; this is a
+playable approximation, not a full rules conversion.
+
+Card, Captain, Ship and board art is extracted from the Tabletop Simulator
+component sheets into `web/blackflag-cards.webp`, `web/blackflag-ships.webp`,
+`web/blackflag-board.webp` and `web/blackflag-cardback.webp`. Text commands:
+`/blackflag`, `/blackflag_join`, `/blackflag_join_npc`, `/blackflag_start`,
+`/blackflag_ship <row|deck>`, `/blackflag_play <card#> [target#]`,
+`/blackflag_defend <card#>`, `/blackflag_pass`, `/blackflag_end`,
+`/blackflag_ability`, `/blackflag_rules`, `/blackflag_cancel` (creator),
+`/blackflag_rematch`. Mini App: board button = `?startapp=blackflag<chat>`
+(same Main Mini App, routed by `start_param`). Engine: `blackflag.py`; tests
+live in `test_wiring.py`.
+
 ## Files
 
 - `game.py` – pure engine: deck, scoring, bust/Flip 7, actions, rounds.
@@ -376,6 +402,7 @@ marker and token art is extracted from the BGA client at version
 - `toybattle.py` – pure engine: Castle Field bases, stacks/connection, troop powers, medals, HQ win.
 - `tokaidoduo.py` – pure engine: 37-station Pilgrim ring, Merchant trade routes, Artist zones, 1-2-1 dice draft, Wave tiles, Hot Spring, scoring.
 - `altay.py` – pure engine: faction decks, production, market, settlement building, combat, achievements, final scoring.
+- `blackflag.py` – pure engine: Captains, Ships, hidden Roles, card combat, Treasure Chest, Doubloons, Hourglass and win checks.
 - `yahtzee.py` – pure engine: dice, scorecard, turns, scoring.
 - `fliptoons.py` – pure engine: deck, grid, abilities, market, final flip.
 - `tornado.py` – pure engine: boats, decks, courses, ranks, movement, Grand Prix.
@@ -392,6 +419,7 @@ marker and token art is extracted from the BGA client at version
 - `test_toybattle.py` – Toy Battle engine tests: `python3 test_toybattle.py`
 - `test_tokaidoduo.py` – Tokaido Duo engine tests: `python3 test_tokaidoduo.py`
 - `test_altay.py` – Altay engine tests: `python3 test_altay.py`
+- `test_wiring.py` – registry, bot wiring and Black Flag engine tests: `python3 test_wiring.py`
 - `web/flip7.html` – standalone HTML5 Flip 7 game (hot-seat, Mini App-ready)
 - `web/yahtzee.js` – Yahtzee Mini App view (synced)
 - `web/fliptoons.js` – Fliptoons Mini App view (synced)
@@ -406,6 +434,8 @@ marker and token art is extracted from the BGA client at version
 - `web/tokaidoduo-board.webp` – BGA board art for Tokaido Duo
 - `web/altay.js` – Altay Mini App view (synced, viewer-filtered hands)
 - `web/altay-board.webp`, `web/altay-actions.webp`, `web/altay-achievements.webp`, `web/altay-markers.webp`, `web/altay-tokens.webp` – BGA-extracted Altay art
+- `web/blackflag.js` – Black Flag Mini App view (synced, viewer-filtered hands)
+- `web/blackflag-cards.webp`, `web/blackflag-ships.webp`, `web/blackflag-board.webp`, `web/blackflag-cardback.webp` – TTS-extracted Black Flag art
 - `sources/tokaidoduo/bga/` – BGA sprite sheets for Tokaido Duo (dice, wares, waves, paintings, boutiques, character boards)
 - `web/artichokes_cards/` – BGA card art (0–9 vegetables, 10–14 Artichokes, 15 Rhubarb, 16 back)
 - `web/covers/*.jpg` – box art shown as the lobby photo for each game
@@ -425,6 +455,7 @@ python3 test_azul.py        # Azul engine tests
 python3 test_toybattle.py   # Toy Battle engine tests
 python3 test_tokaidoduo.py  # Tokaido Duo engine tests
 python3 test_altay.py       # Altay engine tests
+python3 test_wiring.py      # registry, bot wiring and Black Flag tests
 ```
 A full 3-player game was also simulated end-to-end (hits/stays/actions/
 round rotation → a winner at 200+ in 13 rounds) with the Telegram layer

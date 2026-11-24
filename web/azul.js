@@ -82,33 +82,50 @@ function azPickTile(t, source, index) {
 function azSourceLabel(source, index) {
   return source === 'center' ? 'center' : 'factory ' + (index + 1);
 }
-function azSlots(tiles, size) {
-  let html = '';
-  const n = Math.max(size || tiles.length, tiles.length);
-  for (let i = 0; i < n; i++) html += i < tiles.length ? azTile(tiles[i]) : '<span class="azempty"></span>';
-  return html;
-}
-function azWall(p, colors) {
-  let html = '<div class="azwall">';
-  for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
-    const tile = p.wall[r][c];
-    html += '<div class="azcell" title="row ' + (r + 1) + ', col ' + (c + 1) + '">' +
-            (tile ? azTile(tile) : '') + '</div>';
-  }
-  return html + '</div>';
+// Printed board geometry (playerboard1.webp is 740x484). Cell rects measured
+// from the board art: pattern lines and wall share 5 rows, the wall sits
+// right of the gold arrows, the floor line is the 7 arched slots below.
+// Tiles are placed over the printed slots, like BGA does, so they land
+// exactly on the art instead of floating over a darkened backdrop.
+const AZ_BW = 740, AZ_BH = 484;
+const AZ_COLS = [8, 77, 146, 215, 284, 353];
+const AZ_WALL_X = [387, 456, 525, 593, 661, 731];
+const AZ_ROWS = [5, 76, 143, 213, 282, 351];
+const AZ_FLOOR_X = [8, 61, 114, 167, 220, 273, 326, 379];
+const AZ_FLOOR_Y = [345, 425];
+function azPos(x0, y0, x1, y1, tile) {
+  const left = ((x0 + 3) / AZ_BW * 100).toFixed(2);
+  const top = ((y0 + 3) / AZ_BH * 100).toFixed(2);
+  const w = ((x1 - x0 - 6) / AZ_BW * 100).toFixed(2);
+  const h = ((y1 - y0 - 6) / AZ_BH * 100).toFixed(2);
+  return '<span class="azpos" style="left:' + left + '%;top:' + top +
+         '%;width:' + w + '%;height:' + h + '%">' + azTile(tile) + '</span>';
 }
 function azPlayer(p, b) {
-  const lines = p.pattern.map((line, i) =>
-    '<div class="azline"><span class="azlabel">' + (i + 1) + '</span>' +
-    azSlots(line, i + 1) + '</div>').join('');
-  const penalty = [-1, -1, -2, -2, -2, -3, -3].slice(0, p.floor.length).reduce((a, x) => a + x, 0);
+  let tiles = '';
+  // Pattern lines: tiles fill each row from the right, against the wall.
+  p.pattern.forEach((line, i) => {
+    line.forEach((t, j) => {
+      const c = 4 - j;
+      tiles += azPos(AZ_COLS[c], AZ_ROWS[i], AZ_COLS[c + 1], AZ_ROWS[i + 1], t);
+    });
+  });
+  for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) {
+    const t = p.wall[r][c];
+    if (t) tiles += azPos(AZ_WALL_X[c], AZ_ROWS[r], AZ_WALL_X[c + 1], AZ_ROWS[r + 1], t);
+  }
+  p.floor.forEach((t, j) => {
+    // Floor slots are taller than wide; keep the tile square, centred
+    // in the slot instead of stretching it to fill the arch.
+    const x0 = AZ_FLOOR_X[j], x1 = AZ_FLOOR_X[j + 1];
+    const side = x1 - x0 - 6;
+    const y0 = AZ_FLOOR_Y[0] + (AZ_FLOOR_Y[1] - AZ_FLOOR_Y[0] - side) / 2 - 3;
+    tiles += azPos(x0, y0, x1, y0 + side + 6, t);
+  });
   return '<div class="azplayer' + (p.is_current ? ' azcurrent' : '') + '">' +
     '<div class="azhead"><span>' + escapeHtml(p.name) + (p.npc ? ' 🤖' : '') +
     (p.winner ? ' 🏆' : '') + '</span><span class="azscore">' + p.score + ' pts</span></div>' +
-    '<div class="azrow">' + azWall(p, b.colors) +
-    '<div style="margin-left:10px">' + lines +
-    '<div class="azline"><span class="azlabel">🧹</span>' + azSlots(p.floor, 7) +
-    '<span class="azlabel">-' + (-penalty) + '</span></div></div></div></div>';
+    '<div class="azboard">' + tiles + '</div></div>';
 }
 function azRender() {
   const b = AZ.board;

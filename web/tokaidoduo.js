@@ -60,8 +60,11 @@ async function tdMove(action, extra) {
 }
 function tdStationPos(i) {
   // Ring stations, clockwise from the SE Coastal town (station 0).
+  // Board is displayed rotated -90deg (portrait, like BGA), so the
+  // landscape ellipse (x = 50+36cos, y = 52+40sin) maps to
+  // new_x = old_y, new_y = 100 - old_x.
   const a = (45 + i * (360 / 37)) * Math.PI / 180;
-  return [50 + 36 * Math.cos(a), 52 + 40 * Math.sin(a)];
+  return [52 + 40 * Math.sin(a), 50 - 36 * Math.cos(a)];
 }
 function tdMeeple(x, y, color, label, title) {
   return '<span class="tdmeeple td' + color + '" style="top:' + y.toFixed(1) +

@@ -115,12 +115,15 @@ ZONE_SPACES = [
     {"towns": ["c_9", "c_13", "m_w", "m_cl"], "stations": [10, 11, 12]},
     {"towns": ["c_13", "c_18", "m_w"], "stations": [14, 15, 16, 17]},
 ]
-# Zone centres (% of board image) for the Mini App.
-ZONE_POS = [(27, 37), (48, 38), (66, 37), (76, 45),
-            (66, 62), (48, 70), (27, 70), (17, 55)]
-TOWN_POS = {"m_w": (32, 50), "m_cl": (47, 50), "m_c": (60, 55), "m_e": (73, 48),
-            "c_0": (82, 73), "c_4": (60, 85), "c_9": (35, 78), "c_13": (13, 73),
-            "c_18": (18, 32), "c_23": (35, 22), "c_27": (60, 22), "c_31": (82, 28)}
+# Zone centres / town positions (% of board image) for the Mini App.
+# The board art is displayed rotated -90deg (portrait), exactly as
+# BGA does (#tdn-board:before rotate(-90deg)), so these are in the
+# rotated frame: new_x = old_y, new_y = 100 - old_x.
+ZONE_POS = [(37, 73), (38, 52), (37, 34), (45, 24),
+            (62, 34), (70, 52), (70, 73), (55, 83)]
+TOWN_POS = {"m_w": (50, 68), "m_cl": (50, 53), "m_c": (55, 40), "m_e": (48, 27),
+            "c_0": (73, 18), "c_4": (85, 40), "c_9": (78, 65), "c_13": (73, 87),
+            "c_18": (32, 82), "c_23": (22, 65), "c_27": (22, 40), "c_31": (28, 18)}
 
 # Starting positions: opposite sides. Pilgrim starts are the two
 # Temple stations marked with a parasol, Merchant starts the two

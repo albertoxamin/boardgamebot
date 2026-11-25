@@ -406,6 +406,31 @@ component sheets into `web/blackflag-cards.webp`, `web/blackflag-ships.webp`,
 (same Main Mini App, routed by `start_param`). Engine: `blackflag.py`; tests
 live in `test_wiring.py`.
 
+## Rumble Nation (same bot, 2-player castle battles)
+
+A simplified 2-player digital version of *Rumble Nation* (S Renegade Games,
+2022). Eleven castles (values 2-12) are shuffled face down. On your turn roll
+3 dice, optionally reroll them all, then place each die's points as soldiers
+in any area. Tactic cards can move/copy soldiers or swap dice before placing.
+When every castle is revealed, wars are resolved from castle 2 to 12: the
+player with the most soldiers plus reinforcements in adjacent areas wins the
+castle; ties go to the higher sword chip. The winner sends reinforcements to
+adjacent unresolved areas where they still have soldiers, and takes the
+sword chip when winning castle 12. Most castles wins (tie: higher sword).
+The 11th castle and half the sword chips are removed for 2 players, and only
+3 tactic cards are in play.
+
+Board, card, dice and token art is extracted from Board Game Arena into
+`web/rumblenation-board.webp`, `web/rumblenation-cards.webp`,
+`web/rumblenation-dice.webp` and `web/rumblenation-tokens.webp`. Text commands:
+`/rumblenation`, `/rumblenation_join`, `/rumblenation_join_npc`,
+`/rumblenation_start`, `/rumblenation_roll`, `/rumblenation_reroll`,
+`/rumblenation_deploy <die> <castle>`, `/rumblenation_tactic <option>`,
+`/rumblenation_rules`, `/rumblenation_cancel` (creator),
+`/rumblenation_rematch`. Mini App: board button = `?startapp=rumblenation<chat>`
+(same Main Mini App, routed by `start_param`). Engine: `rumblenation.py`; tests
+in `test_rumblenation.py`.
+
 ## Files
 
 - `game.py` – pure engine: deck, scoring, bust/Flip 7, actions, rounds.
@@ -431,6 +456,7 @@ live in `test_wiring.py`.
 - `test_tokaidoduo.py` – Tokaido Duo engine tests: `python3 test_tokaidoduo.py`
 - `test_altay.py` – Altay engine tests: `python3 test_altay.py`
 - `test_wiring.py` – registry, bot wiring and Black Flag engine tests: `python3 test_wiring.py`
+- `test_rumblenation.py` – Rumble Nation engine tests: `python3 test_rumblenation.py`
 - `web/flip7.html` – standalone HTML5 Flip 7 game (hot-seat, Mini App-ready)
 - `web/yahtzee.js` – Yahtzee Mini App view (synced)
 - `web/fliptoons.js` – Fliptoons Mini App view (synced)
@@ -448,6 +474,8 @@ live in `test_wiring.py`.
 - `web/altay-seafarers-*.webp` – BGA Seafarers action/achievement/token/ship art served directly as WEBP
 - `web/blackflag.js` – Black Flag Mini App view (synced, viewer-filtered hands)
 - `web/blackflag-cards.webp`, `web/blackflag-ships.webp`, `web/blackflag-board.webp`, `web/blackflag-cardback.webp` – TTS-extracted Black Flag art
+- `web/rumblenation.js` – Rumble Nation Mini App view (synced, real BGA sprites)
+- `web/rumblenation-board.webp`, `web/rumblenation-cards.webp`, `web/rumblenation-dice.webp`, `web/rumblenation-tokens.webp` – BGA-extracted Rumble Nation art
 - `sources/tokaidoduo/bga/` – BGA sprite sheets for Tokaido Duo (dice, wares, waves, paintings, boutiques, character boards)
 - `web/artichokes_cards/` – BGA card art (0–9 vegetables, 10–14 Artichokes, 15 Rhubarb, 16 back)
 - `web/covers/*.jpg` – box art shown as the lobby photo for each game
@@ -468,6 +496,7 @@ python3 test_toybattle.py   # Toy Battle engine tests
 python3 test_tokaidoduo.py  # Tokaido Duo engine tests
 python3 test_altay.py       # Altay engine tests
 python3 test_wiring.py      # registry, bot wiring and Black Flag tests
+python3 test_rumblenation.py # Rumble Nation engine tests
 ```
 A full 3-player game was also simulated end-to-end (hits/stays/actions/
 round rotation → a winner at 200+ in 13 rounds) with the Telegram layer

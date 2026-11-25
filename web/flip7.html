@@ -503,6 +503,21 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .bfpill{display:inline-block;background:#f59e0b;color:#111;border-radius:999px;padding:0 7px;font-weight:900;font-size:11px}
 .bfpending{background:#7f1d1d;border:1px solid #f87171;border-radius:9px;padding:7px;margin:6px 0}
 .bflobby{min-height:170px;background:linear-gradient(#07111aee,#07111aee),url(blackflag-board.webp) center/cover;border:1px solid #475569;border-radius:10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;font-weight:800}
+.rnboard{position:relative;width:min(100%,680px);aspect-ratio:2000/1480;margin:8px auto;background:#ded3b8 url(rumblenation-board.webp) center/100% 100% no-repeat;border:2px solid #475569;border-radius:8px}
+.rnregion{position:absolute;transform:translate(-50%,-50%);display:flex;flex-direction:column;align-items:center;z-index:2}
+.rncastle{display:block;width:52px;height:51px;border-radius:50%;filter:drop-shadow(1px 2px 3px #000b)}
+.rnempty{background:#0006;border:2px dashed #fff9}
+.rntroops{display:flex;gap:2px;align-items:center;margin-top:-5px}
+.rnmeeples{position:relative;display:inline-flex;align-items:center}
+.rnmeeple{display:inline-block;border-radius:50%;filter:drop-shadow(0 1px 2px #000c)}
+.rncount{font-size:11px;background:#0f172add;border-radius:999px;padding:0 4px;margin-left:-4px}
+.rnred{color:#fca5a5}.rnblue{color:#93c5fd}
+.rndice{display:flex;gap:6px;justify-content:center;margin:8px 0}
+.rncards{display:flex;justify-content:center;gap:8px;margin:8px 0}
+.rncard{background-repeat:no-repeat;background-color:transparent;border:2px solid #334155;border-radius:5px;cursor:pointer;flex:none}
+.rncard:hover,.rncard:active{transform:scale(1.15);z-index:20;position:relative;box-shadow:0 5px 14px #000a}
+.rncard.rnused{filter:grayscale(100%) brightness(.6)}
+.rnlobby{min-height:140px;background:linear-gradient(#1e293bdd,#1e293bdd),url(rumblenation-board.webp) center/cover;border:1px solid #475569;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800}
 </style></head><body>
 <h1>🎴 Flip 7</h1>
 <button id="guideBtn" class="guide-btn hidden" type="button" aria-label="How to play">?</button>
@@ -692,6 +707,17 @@ button:disabled{opacity:.45;cursor:not-allowed}
   <button class="primary hidden" id="bfRematch">🔄 Rematch!</button>
   <div class="log" id="bfLog"></div>
  </div>
+<div id="rumblenation" class="hidden">
+ <div id="rnTurn" class="azturn"></div>
+ <div id="rnBoard"></div>
+ <div id="rnActions" class="azopts"></div>
+ <button class="primary hidden" id="rnRoll">🎲 Roll the dice</button>
+ <button class="primary hidden" id="rnReroll">🔁 Reroll all</button>
+ <button class="primary hidden" id="rnJoin">🙋 Join</button>
+ <button class="primary hidden" id="rnStart">🎮 Start game</button>
+ <button class="primary hidden" id="rnRematch">🔄 Rematch!</button>
+ <div class="log" id="rnLog"></div>
+</div>
 <div id="synced">
 <div id="syncBoard"></div>
 <div id="syncTurn" style="font-size:18px;font-weight:700"></div>
@@ -769,4 +795,5 @@ window.PXSCROLL={
 <script data-cfasync="false" src="tokaidoduo.js?v=7"></script>
 <script data-cfasync="false" src="altay.js?v=6"></script>
 <script data-cfasync="false" src="blackflag.js?v=3"></script>
+<script data-cfasync="false" src="rumblenation.js?v=1"></script>
 </body></html>

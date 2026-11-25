@@ -25,6 +25,7 @@ import toybattle as TB
 import tokaidoduo as TD
 import altay as AL
 import blackflag as BF
+import rumblenation as RN
 import game_registry as GR
 import web_assets
 from game_modules.leaves import LEAVES_MODULE
@@ -458,6 +459,7 @@ NPC_PLAYERS = {
     "tokaidoduo": lambda uid=NPC_ID, name="🤖 NPC": {**TD.new_player(uid, name), **_npc_player(uid, name)},
     "altay": lambda uid=NPC_ID, name="🤖 NPC": {**AL.new_player(uid, name), **_npc_player(uid, name)},
     "blackflag": _blackflag_npc,
+    "rumblenation": lambda uid=NPC_ID, name="🤖 NPC": {**RN.new_player(uid, name), **_npc_player(uid, name)},
 }
 
 
@@ -4725,6 +4727,241 @@ def toybattle_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
+RUMBLENATION_RULES = RN.RULES
+RN_LEN = 2
+
+
+def rumblenation_get(state, chat_id):
+    return state.setdefault("rumblenation", {}).get(str(chat_id))
+
+
+def rumblenation_actor_idx(g, uid):
+    if g["phase"] not in ("action", "select"):
+        return None
+    return _actor_idx(g, uid, g["current"])
+
+
+def rumblenation_board_text(g):
+    lines = list(RN.board_lines(g))
+    if g["phase"] == "select":
+        lines.append("🎮 /rumblenation_deploy &lt;die&gt; &lt;castle&gt;" +
+                     (" or /rumblenation_reroll (or tap buttons)." if g["rerolls"] else " (or tap buttons)."))
+    elif g["phase"] == "action":
+        lines.append("🎮 /rumblenation_roll or /rumblenation_tactic &lt;option&gt; (or tap buttons).")
+    return "\n".join(lines)
+
+
+def rumblenation_keyboard(g):
+    if g["phase"] == "game_end":
+        return [[{"text": "🔄 Rematch!", "callback_data": "rn:rematch"}]]
+    ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
+    wk = web_keyboard(ct, g["chat_id"], game="rumblenation")
+    if g["phase"] == "lobby":
+        kb = [[{"text": "🙋 Join Rumble Nation", "callback_data": "rn:join"}]]
+        if can_add_npc("rumblenation", g):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "rn:npc"}])
+        kb.append([{"text": "▶️ Start game", "callback_data": "rn:start"}])
+        return kb + (wk or [])
+    kb = []
+    sel = g.get("sel_card")
+    if g["phase"] == "action":
+        if sel:
+            opts = [o for o in RN.tactic_options(g, g["current"], sel)]
+            kb.append([{"text": "↩️ Back", "callback_data": "rn:back"}])
+            for o in opts[:30]:
+                kb.append([{"text": o["label"][:60], "callback_data": "rn:o:" + o["value"]}])
+        else:
+            kb.append([{"text": "🎲 Roll the dice", "callback_data": "rn:roll"}])
+            for cid in g["tactics"]:
+                if cid not in g["used"].values():
+                    kb.append([{"text": "🃏 " + RN.TACTICS[cid][0],
+                                "callback_data": f"rn:t:{cid}"}])
+    elif g["phase"] == "select":
+        if g["rerolls"]:
+            kb.append([{"text": "🔁 Reroll all", "callback_data": "rn:reroll"}])
+        row = []
+        for die, castle in RN.deploy_options(g, g["current"]):
+            n = min(math.ceil(die / 2), g["players"][g["current"]]["stock"])
+            row.append({"text": f"🪖 {n} → {castle}",
+                        "callback_data": f"rn:d:{die}:{castle}"})
+            if len(row) == 3:
+                kb.append(row)
+                row = []
+        if row:
+            kb.append(row)
+    return kb + (wk or [])
+
+
+def rumblenation_render(g, events=None):
+    lines = [html.escape(e) for e in (events or [])]
+    if g["phase"] in ("action", "select"):
+        p = g["players"][g["current"]]
+        if _is_npc(p):
+            lines.append("👉 🤖 NPC's turn - anyone can play for it!")
+        else:
+            lines.append(f"👉 {rumblenation_mention(g, p['user_id'])} - your move.")
+    text = "\n".join(lines + [rumblenation_board_text(g)])
+    r = send_board(g, "rumblenation", text, rumblenation_keyboard(g))
+    if r.get("ok"):
+        old = g.get("board_message_id")
+        g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=g["chat_id"], message_id=old)
+
+
+def rumblenation_mention(g, user_id):
+    return f'<a href="tg://user?id={user_id}">{html.escape(RN.name_of(g, user_id))}</a>'
+
+
+def handle_rumblenation(state, msg, cmd, text, uid, name):
+    chat_id = msg["chat"]["id"]
+    g = rumblenation_get(state, chat_id)
+    if cmd == "/rumblenation_rules":
+        send(chat_id, RUMBLENATION_RULES)
+        return True
+    if cmd == "/rumblenation":
+        if not g:
+            _name = msg.get("from", {}).get("first_name") or "Player"
+            g = RN.new_game(chat_id, uid, _name)
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state.setdefault("rumblenation", {})[str(chat_id)] = g
+            rumblenation_render(g, [f"⚔️ Rumble Nation game created by {html.escape(_name)}!"])
+        else:
+            rumblenation_render(g)
+        return True
+    if not g:
+        send(chat_id, "No Rumble Nation game here yet - send /rumblenation to create one.")
+        return True
+    g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd == "/rumblenation_join_npc":
+        err = add_npc("rumblenation", g)
+        send(chat_id, err or "🤖 NPC joined - anyone can play for it!")
+        if not err:
+            rumblenation_render(g)
+        return True
+    if cmd == "/rumblenation_join":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p["user_id"] == uid for p in g["players"]):
+            send(chat_id, "You're already in!")
+        elif len(g["players"]) >= RN_LEN:
+            send(chat_id, "⛔ Rumble Nation is 2 players (full).")
+        else:
+            g["players"].append(RN.new_player(uid, name))
+            send(chat_id, f"🙋 <b>{html.escape(name)}</b> joined Rumble Nation.")
+            rumblenation_render(g)
+        return True
+    if cmd == "/rumblenation_start":
+        if g["phase"] != "lobby":
+            send(chat_id, "Already started.")
+        else:
+            ev = []
+            err = RN.start_game(g, ev)
+            send(chat_id, f"⛔ {err}" if err else "⚔️ Rumble Nation started!")
+            if not err:
+                rumblenation_render(g, ev)
+        return True
+    if cmd == "/rumblenation_cancel":
+        if uid != g["created_by"]:
+            send(chat_id, "⛔ Only the creator can cancel.")
+        else:
+            del state["rumblenation"][str(chat_id)]
+            send(chat_id, "🗑 Rumble Nation game cancelled.")
+        return True
+    if cmd == "/rumblenation_rematch":
+        ev, err = rematch_game(state, "rumblenation", chat_id, uid)
+        send(chat_id, f"⛔ {err}" if err else "🔄 Rematch!")
+        return True
+    idx = rumblenation_actor_idx(g, uid)
+    if idx is None:
+        send(chat_id, "⛔ You're not in this game (or it isn't your turn).")
+        return True
+    parts = text.split()[1:]
+    ev = []
+    if cmd == "/rumblenation_roll":
+        err = RN.roll(g, idx, ev)
+    elif cmd == "/rumblenation_reroll":
+        err = RN.reroll(g, idx, ev)
+    elif cmd == "/rumblenation_deploy":
+        if len(parts) != 2 or not parts[0].isdigit() or not parts[1].isdigit():
+            err = "Usage: /rumblenation_deploy &lt;single die&gt; &lt;castle&gt;"
+        else:
+            err = RN.deploy(g, idx, int(parts[0]), int(parts[1]), ev)
+    elif cmd == "/rumblenation_tactic":
+        err = RN.play_tactic(g, idx, " ".join(parts), ev)
+    else:
+        return False
+    if err:
+        send(chat_id, f"⛔ {err}")
+    else:
+        g["sel_card"] = None
+        rumblenation_render(g, ev)
+    return True
+
+
+def rumblenation_board_json(g, viewer_id=None):
+    board = RN.board_json(g, viewer_id)
+    me = next((i for i, p in enumerate(g["players"]) if p["user_id"] == viewer_id), None)
+    actor = board["actor"]
+    if actor is not None and me is not None and (me == actor or _is_npc(g["players"][actor])):
+        board["can_act"] = True
+    else:
+        board["can_act"] = False
+    for i, p in enumerate(g["players"]):
+        board["players"][i]["npc"] = _is_npc(p)
+    return board
+
+
+def rumblenation_api_move(state, chat_id, user_id, body):
+    g = rumblenation_get(state, chat_id)
+    if not g:
+        return [], "no Rumble Nation game in that chat"
+    action = body.get("action")
+    ev = []
+    idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
+    if action == "join":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        if idx is not None:
+            return ev, None
+        if len(g["players"]) >= RN_LEN:
+            return [], "full"
+        iu_name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
+        g["players"].append(RN.new_player(user_id, iu_name))
+        ev.append("🙋 joined Rumble Nation.")
+    elif action == "start":
+        if g["phase"] != "lobby":
+            return [], "already started"
+        err = RN.start_game(g, ev)
+        if err:
+            return [], err
+    elif action == "rematch":
+        return rematch_game(state, "rumblenation", chat_id, user_id)
+    else:
+        actor = rumblenation_actor_idx(g, user_id)
+        if actor is None:
+            return [], "not in this game"
+        if action == "roll":
+            err = RN.roll(g, actor, ev)
+        elif action == "reroll":
+            err = RN.reroll(g, actor, ev)
+        elif action == "deploy":
+            try:
+                err = RN.deploy(g, actor, int(body.get("die", -1)),
+                                int(body.get("castle", 0)), ev)
+            except (TypeError, ValueError):
+                return [], "bad deployment"
+        elif action == "tactic":
+            err = RN.play_tactic(g, actor, str(body.get("value", "")), ev)
+        else:
+            return [], "unknown action"
+        if err:
+            return [], err
+    g["sel_card"] = None
+    rumblenation_render(g, ev)
+    return ev, None
+
+
 TOKAIDODUO_RULES = """🗾 <b>Tokaido Duo rules</b> (2 players, Shikoku): each player controls a Pilgrim, a Merchant and an Artist. Score Faith + Commerce + Culture; highest total wins (tie: more coins, then shared).
 • Each round the first picker rolls 3 dice (one per character). Draft is 1-2-1: first picker takes one, the other takes one, first picker takes the last. First picker alternates each round. A chosen character <b>must</b> move the exact die value.
 • <b>Pilgrim ⛩️</b> moves clockwise around the 37-station ring. May pass occupied stations, but may not land on one - jumps to the next empty station. Coastal Town: gain the boutique coins (2-4). Temple: +1 Temple (9 ends the game). Garden: +1 Garden (6 ends the game). Hot Spring: take the token (steal it from your opponent); use it on a future pick to repeat a move. Seashore: take a Wave tile from the board (or steal one).
@@ -5652,7 +5889,8 @@ RENDERERS = {"games": render, "regicide": rg_render, "odin": odin_render,
                "fellowship": fotr_render, "azul": azul_render,
                 "toybattle": toybattle_render,
                 "tokaidoduo": tokaidoduo_render,
-                 "altay": altay_render, "blackflag": blackflag_render}
+                 "altay": altay_render, "blackflag": blackflag_render,
+                 "rumblenation": rumblenation_render}
 
 RULES_BY_KEY = {"games": RULES, "regicide": REGICIDE_RULES, "odin": ODIN_RULES,
                 "leaves": LEAVES_MODULE.rules(), "lsd": LSD_RULES, "spots": SPOTS_RULES,
@@ -5661,7 +5899,8 @@ RULES_BY_KEY = {"games": RULES, "regicide": REGICIDE_RULES, "odin": ODIN_RULES,
                 "artichokes": ARTICHOKES_RULES, "fellowship": FTR_RULES,
                  "azul": AZUL_RULES, "toybattle": TOYBATTLE_RULES,
                   "tokaidoduo": TOKAIDODUO_RULES,
-                  "altay": ALTAY_RULES, "blackflag": BLACKFLAG_RULES}
+                  "altay": ALTAY_RULES, "blackflag": BLACKFLAG_RULES,
+                  "rumblenation": RUMBLENATION_RULES}
 
 
 def guide_payload(key):
@@ -5692,6 +5931,7 @@ PLAYER_MAKERS = {
     "tokaidoduo": lambda u, n: TD.new_player(u, n),
     "altay": lambda u, n: AL.new_player(u, n),
     "blackflag": lambda u, n: BF.new_player(u, n),
+    "rumblenation": lambda u, n: RN.new_player(u, n),
 }
 
 GAME_MAKERS = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
@@ -5701,7 +5941,8 @@ GAME_MAKERS = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
                 "fellowship": FTR.new_game, "azul": AZ.new_game,
                 "toybattle": TB.new_game,
                 "tokaidoduo": TD.new_game,
-                 "altay": AL.new_game, "blackflag": BF.new_game}
+                 "altay": AL.new_game, "blackflag": BF.new_game,
+                 "rumblenation": RN.new_game}
 
 
 def rematch_game(state, key, chat_id, uid):
@@ -5832,6 +6073,9 @@ def handle_command(state, msg):
         return
     if cmd.startswith("/blackflag"):
         handle_blackflag(state, msg, cmd, text, uid, name)
+        return
+    if cmd.startswith("/rumblenation"):
+        handle_rumblenation(state, msg, cmd, text, uid, name)
         return
     if cmd in ("/start", "/help", "/commands"):
         send(chat_id, HELP)
@@ -6166,6 +6410,81 @@ def handle_callback(state, cb):
         if not err:
             g["sel"] = None
             blackflag_render(g, ev)
+        return
+    if data.startswith("rn:"):
+        g = rumblenation_get(state, chat_id)
+        if not g:
+            return answer_cb(cb["id"], "No Rumble Nation game here.")
+        parts = data.split(":")
+        action = parts[1] if len(parts) > 1 else ""
+        ev = []
+        if action == "join":
+            if g["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            if any(p["user_id"] == uid for p in g["players"]):
+                return answer_cb(cb["id"], "Already joined.")
+            if len(g["players"]) >= RN_LEN:
+                return answer_cb(cb["id"], "Game is full.")
+            g["players"].append(RN.new_player(uid, cb["from"].get("first_name") or "Player"))
+            answer_cb(cb["id"], "Joined!")
+            rumblenation_render(g, [f"🙋 {html.escape(cb['from'].get('first_name') or 'Player')} joined."])
+            return
+        if action == "npc":
+            err = add_npc("rumblenation", g)
+            answer_cb(cb["id"], err or "🤖 NPC joined")
+            if not err:
+                rumblenation_render(g)
+            return
+        if action == "start":
+            if g["phase"] != "lobby":
+                return answer_cb(cb["id"], "Already started.")
+            err = RN.start_game(g, ev)
+            answer_cb(cb["id"], err or "Started")
+            if not err:
+                rumblenation_render(g, ev)
+            return
+        if action == "rematch":
+            ev, err = rematch_game(state, "rumblenation", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
+            return
+        actor = rumblenation_actor_idx(g, uid)
+        if actor is None:
+            return answer_cb(cb["id"], "Not your turn.")
+        if action == "back":
+            g["sel_card"] = None
+            rumblenation_render(g)
+            return answer_cb(cb["id"], "Back")
+        if action == "t":
+            try:
+                cid = int(parts[2])
+            except (IndexError, ValueError):
+                return answer_cb(cb["id"], "Bad card.")
+            if cid not in g["tactics"] or cid in g["used"].values():
+                return answer_cb(cb["id"], "Bad card.")
+            if not RN.tactic_options(g, actor, cid):
+                return answer_cb(cb["id"], "No legal use for that card.")
+            g["sel_card"] = cid
+            rumblenation_render(g)
+            return answer_cb(cb["id"], "Choose an option")
+        if action == "o":
+            err = RN.play_tactic(g, actor, parts[2] if len(parts) > 2 else "", ev)
+        elif action == "roll":
+            err = RN.roll(g, actor, ev)
+        elif action == "reroll":
+            err = RN.reroll(g, actor, ev)
+        elif action == "d":
+            try:
+                err = RN.deploy(g, actor, int(parts[2]), int(parts[3]), ev)
+            except (IndexError, ValueError):
+                return answer_cb(cb["id"], "Bad deployment.")
+        else:
+            return answer_cb(cb["id"], "Unknown button.")
+        answer_cb(cb["id"], err or "Done")
+        if not err:
+            g["sel_card"] = None
+            rumblenation_render(g, ev)
         return
     if data.startswith("tb:"):
         g = toybattle_get(state, chat_id)
@@ -7790,7 +8109,9 @@ def start_web_server(state):
                    "/altay-seafarers-achievements.webp", "/altay-seafarers-tokens.webp",
                    "/altay-seafarers-ships.webp",
                    "/blackflag-cards.webp", "/blackflag-ships.webp",
-                   "/blackflag-board.webp", "/blackflag-cardback.webp"):
+                   "/blackflag-board.webp", "/blackflag-cardback.webp",
+                   "/rumblenation-board.webp", "/rumblenation-cards.webp",
+                   "/rumblenation-dice.webp", "/rumblenation-tokens.webp"):
                 p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
                 if os.path.exists(p):
                     return self._send(200, open(p, "rb").read(), "image/webp",
@@ -8022,6 +8343,25 @@ def start_web_server(state):
                 with STATE_LOCK:
                     g = blackflag_get(state, chat_id)
                     board = blackflag_board_json(g, uid) if g else None
+                return self._send(200 if board else 404, {"ok": bool(board), "game": board})
+            if u.path == "/api/rumblenation/mygames":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                with STATE_LOCK:
+                    games = [rumblenation_board_json(g, uid) for g in state.get("rumblenation", {}).values()
+                             if any(p["user_id"] == uid for p in g["players"])]
+                return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/rumblenation/game":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                chat_id = q.get("chat_id", [""])[0]
+                with STATE_LOCK:
+                    g = rumblenation_get(state, chat_id)
+                    board = rumblenation_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/tokaidoduo/mygames":
                 q = urllib.parse.parse_qs(u.query)
@@ -8618,6 +8958,52 @@ def start_web_server(state):
                     events, err = blackflag_api_move(state, chat_id, uid, body)
                     g = blackflag_get(state, chat_id)
                     board = blackflag_board_json(g, uid) if g else None
+                    save_state(state)
+                return self._send(200 if not err else 400,
+                                  {"ok": not err, "error": err, "events": events, "game": board})
+            if path in ("/api/rumblenation/create", "/api/rumblenation/move"):
+                try:
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                except Exception:
+                    return self._send(400, {"ok": False, "error": "bad json"})
+                iu = init_user(body.get("init_data", ""))
+                if iu is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                uid, name, start_param, chat_instance = iu
+                if path == "/api/rumblenation/create":
+                    chat_id = None
+                    for cand in (start_param, str(body.get("chat_id") or ""), chat_instance):
+                        cand = str(cand)
+                        if cand.startswith("rumblenation"):
+                            cand = cand[len("rumblenation"):]
+                        try:
+                            chat_id = int(cand)
+                            break
+                        except (TypeError, ValueError):
+                            continue
+                    if not chat_id:
+                        return self._send(400, {"ok": False, "error": "open the Mini App from a chat (startapp link)"})
+                    with STATE_LOCK:
+                        g = rumblenation_get(state, chat_id)
+                        if g and g["phase"] != "game_end":
+                            return self._send(200, {"ok": True, "game": rumblenation_board_json(g, uid), "created": False})
+                        g = RN.new_game(chat_id, uid, name)
+                        g["chat_type"] = "supergroup" if chat_id < 0 else "private"
+                        state.setdefault("rumblenation", {})[str(chat_id)] = g
+                        rumblenation_render(g, [f"⚔️ Rumble Nation created by {html.escape(name)} via Mini App!"])
+                        save_state(state)
+                        board = rumblenation_board_json(g, uid)
+                    return self._send(200, {"ok": True, "game": board, "created": True})
+                chat_id = body.get("chat_id")
+                if not chat_id and str(start_param).startswith("rumblenation"):
+                    try:
+                        chat_id = int(str(start_param)[len("rumblenation"):])
+                    except ValueError:
+                        pass
+                with STATE_LOCK:
+                    events, err = rumblenation_api_move(state, chat_id, uid, body)
+                    g = rumblenation_get(state, chat_id)
+                    board = rumblenation_board_json(g, uid) if g else None
                     save_state(state)
                 return self._send(200 if not err else 400,
                                   {"ok": not err, "error": err, "events": events, "game": board})

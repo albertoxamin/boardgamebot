@@ -378,11 +378,18 @@ class AltayEngineTests(unittest.TestCase):
         for any of the day's fixes. The script tag must be bumped when
         the file changes, and the Mini App must compare the page's ?v=
         with the server version (/healthz) and tell the player to close
-        and reopen when a new version is out."""
+        and reopen when a new version is out. FB-0059: the same trap bit
+        again — FB-0057 changed altay.js and replaced altay-markers.webp
+        under the same name, but neither ?v= was bumped, so the Mini App
+        kept the old JS and the old markers sheet (served max-age=86400)
+        while the screenshot render, reading the files from disk, looked
+        fixed. The markers sheet must carry a ?v= too, bumped whenever
+        its bytes change."""
         base = os.path.dirname(os.path.abspath(__file__))
         with open(os.path.join(base, "web", "flip7.html"), encoding="utf-8") as f:
             html = f.read()
-        self.assertIn('src="altay.js?v=5"', html)
+        self.assertIn('src="altay.js?v=6"', html)
+        self.assertIn("url(altay-markers.webp?v=", html)
         with open(os.path.join(base, "web", "altay.js"), encoding="utf-8") as f:
             js = f.read()
         self.assertIn("atCheckVer", js)
@@ -484,7 +491,7 @@ class AltayEngineTests(unittest.TestCase):
         base = os.path.dirname(os.path.abspath(__file__))
         with open(os.path.join(base, "web", "flip7.html"), encoding="utf-8") as f:
             html = f.read()
-        self.assertIn("background-image:url(altay-markers.webp);background-size:300% 100%;", html)
+        self.assertIn("background-image:url(altay-markers.webp?v=1);background-size:300% 100%;", html)
         with open(os.path.join(base, "web", "altay.js"), encoding="utf-8") as f:
             js = f.read()
         self.assertIn("(col * 100 / 2)", js)

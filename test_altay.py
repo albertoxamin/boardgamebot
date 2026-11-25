@@ -412,6 +412,91 @@ class AltayEngineTests(unittest.TestCase):
         self.assertEqual(astronomy["level"], 1)
         self.assertEqual(board["sea_anchors"]["A"], altay.SEA_ANCHORS["A"])
 
+    def test_seafarers_islands_do_not_overlap(self):
+        """FB-0057: 'now the cards work but the board is weird' — in a
+        Seafarers game each island holds two territories, and the old
+        positions stacked each pair on top of the other (23 over 25, 24
+        next to 26), so the board showed a doubled blob on both islands.
+        With the expansion on, 23/24 move to the far end of their island
+        so both circles fit; the base game keeps its positions."""
+        game, _ = self.new_seafarers_game()
+        board = altay.board_json(game, 42)
+        pos = {r["id"]: r["pos"] for r in board["regions"]}
+        # Region circles are 44px on a 390px-wide board (11.3% of the
+        # width). Distances are in % of width, with the vertical
+        # component scaled by the board aspect (1451/2048).
+        aspect = 1451 / 2048
+
+        def dist(a, b):
+            dx = pos[a][0] - pos[b][0]
+            dy = (pos[a][1] - pos[b][1]) * aspect
+            return (dx * dx + dy * dy) ** 0.5
+
+        self.assertGreaterEqual(dist(23, 25), 12)
+        self.assertGreaterEqual(dist(24, 26), 12)
+        self.assertNotEqual(pos[23], altay.REGION_POS[23])
+        self.assertNotEqual(pos[24], altay.REGION_POS[24])
+        base_game, _ = self.new_game()
+        base = altay.board_json(base_game, 42)
+        base_pos = {r["id"]: r["pos"] for r in base["regions"]}
+        self.assertEqual(base_pos[23], altay.REGION_POS[23])
+        self.assertEqual(base_pos[24], altay.REGION_POS[24])
+
+    def test_sea_badges_do_not_cover_region_circles(self):
+        """FB-0057: the sea-zone badges sat on top of region circles (A
+        over 6/13, B over 20) and next to the VP stars. Both badges now
+        sit in the central lake, clear of every region circle, VP star
+        and each other, in base and Seafarers games."""
+        aspect = 1451 / 2048
+        for make in (self.new_game, self.new_seafarers_game):
+            game, _ = make()
+            board = altay.board_json(game, 42)
+            regions = {r["id"]: r["pos"] for r in board["regions"]}
+            anchors = list(board["sea_anchors"].values())
+            # badge half-size in % of board width: ~55px wide, ~17px tall
+            hw, hh = 8.0, 2.2
+            for ax, ay in anchors:
+                ay_w = ay * aspect
+                for rid, p in regions.items():
+                    dx = abs(p[0] - ax)
+                    dy = abs(p[1] * aspect - ay_w)
+                    self.assertFalse(dx < hw + 5.7 and dy < hh + 5.7,
+                                     f"sea badge covers region {rid}")
+                    if altay.VICTORY_MARKERS.get(rid):
+                        # the VP star sits up-right of its circle
+                        vx, vy = p[0] + 2.3, p[1] * aspect - 5.8
+                        self.assertFalse(abs(vx - ax) < hw + 3.9
+                                         and abs(vy - ay_w) < hh + 2.2,
+                                         f"sea badge covers the VP star of {rid}")
+            ax0, ay0 = anchors[0]
+            ax1, ay1 = anchors[1]
+            self.assertFalse(abs(ax0 - ax1) < 2 * hw
+                             and abs(ay0 - ay1) * aspect < 2 * hh,
+                             "sea badges overlap each other")
+
+    def test_marker_chips_show_one_shield_per_value(self):
+        # FB-0057: the conquest marker chips showed two half-tokens
+        # mashed together — the old sheet was sliced as 6 equal columns
+        # (col * 100 / 6) although it is a strip of assorted tokens. The
+        # rebuilt sheet is one red shield per value (3 cells of 120x80),
+        # so the CSS is 300% and the JS column is (value-1) * 100 / 2,
+        # and the number is printed on the shield, not overlaid as text.
+        base = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(base, "web", "flip7.html"), encoding="utf-8") as f:
+            html = f.read()
+        self.assertIn("background-image:url(altay-markers.webp);background-size:300% 100%;", html)
+        with open(os.path.join(base, "web", "altay.js"), encoding="utf-8") as f:
+            js = f.read()
+        self.assertIn("(col * 100 / 2)", js)
+        self.assertNotIn("col * 100 / 6", js)
+        self.assertNotIn("region.marker.value + '</span>'", js)
+        try:
+            from PIL import Image
+        except ImportError:
+            self.skipTest("PIL not installed")
+        with Image.open(os.path.join(base, "web", "altay-markers.webp")) as im:
+            self.assertEqual(im.size, (360, 80))
+
     def test_seafarers_shipwright_and_sea_attack(self):
         game, events = self.new_seafarers_game()
         player = game["players"][0]

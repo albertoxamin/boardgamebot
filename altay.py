@@ -15,7 +15,7 @@ SEA_COASTS = {
     "A": [0, 6, 12, 13, 18, 19, 23, 25],
     "B": [1, 3, 7, 8, 10, 14, 17, 20, 21, 22, 24, 26],
 }
-SEA_ANCHORS = {"A": [31.7, 18.7], "B": [80.4, 32.7]}
+SEA_ANCHORS = {"A": [50.0, 35.0], "B": [84.0, 43.7]}
 RESOURCE_NAMES = {
     "food": "Food",
     "wood": "Wood",
@@ -196,8 +196,14 @@ REGION_POS = [
     [79.7, 61.2], [80.6, 92.4], [4.4, 26.3], [39.9, 12.4], [86.4, 16.8],
     [30.7, 68.8], [36.0, 94.8], [78.1, 78.3], [10.1, 52.2], [38.3, 54.7],
     [68.9, 30.6], [92.8, 55.5], [61.7, 90.0], [28.7, 34.8], [59.5, 53.7],
-    [31.0, 34.0], [66.0, 52.0],
+    [30.5, 28.5], [68.0, 52.0],
 ]
+# FB-0057: in Seafarers games the two islands hold two territories each
+# (23 + 25 on the west island, 24 + 26 on the east one), and the base
+# positions put each pair on top of each other — the circles stacked into
+# one blob. With the expansion on, 23/24 move to the far end of their
+# island so both circles fit side by side; the base game is unchanged.
+SEAFARERS_REGION_POS = {23: [28.0, 46.0], 24: [56.0, 55.0]}
 REGION_TYPES = {}
 for _region in [0, 1, 3, 4, 5, 9, 23, 24, 25]:
     REGION_TYPES[_region] = "farmland"
@@ -1162,6 +1168,7 @@ def board_json(game, viewer_id=None):
         }
         players.append(info)
     regions = []
+    sea = is_seafarers(game)
     for region_id in region_ids(game):
         region = game["board"][str(region_id)] if game.get("board") else {"marker": None, "settlements": []}
         marker = region.get("marker")
@@ -1169,7 +1176,8 @@ def board_json(game, viewer_id=None):
             "id": region_id,
             "name": REGION_NAMES[region_id],
             "type": REGION_TYPES[region_id],
-            "pos": list(REGION_POS[region_id]),
+            "pos": list(SEAFARERS_REGION_POS.get(region_id, REGION_POS[region_id]))
+            if sea else list(REGION_POS[region_id]),
             "adj": list(ADJACENCY[region_id]),
             "vp": VICTORY_MARKERS.get(region_id, 0),
             "marker": dict(marker) if marker else None,

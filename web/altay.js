@@ -164,9 +164,13 @@ function atRegion(region, g) {
   let html = '<div class="' + cls + '" style="top:' + region.pos[1] + '%;left:' + region.pos[0] +
     '%" data-region="' + region.id + '" title="' + escapeHtml(region.name + ' — ' + region.type) + '">';
   if (region.marker) {
-    const col = Math.min(5, Math.max(0, region.marker.value - 1));
-    html += '<span class="atmarkerchip" style="background-position:' + (col * 100 / 6) +
-      '% 0">' + region.marker.value + '</span>';
+    // FB-0057: altay-markers.webp is one red shield per value (3 cells),
+    // so the column is (value-1)*100/2 % — the old /6 sliced the sheet
+    // across its neighbours and every chip showed two half-tokens mashed
+    // together. The number is printed on the shield, so no text on top.
+    const col = Math.min(2, Math.max(0, region.marker.value - 1));
+    html += '<span class="atmarkerchip" style="background-position:' + (col * 100 / 2) +
+      '% 0"></span>';
   }
   if (region.vp) html += '<span class="atvp" style="top:-9px;left:70%">★' + region.vp + '</span>';
   if (region.settlements.length) {
@@ -181,12 +185,16 @@ function atRegion(region, g) {
 function atSeaBadges(g) {
   if (!g.seafarers) return '';
   const me = g.players[g.me] || {};
+  // FB-0057: the badges used to be long pills ('🌊 A · 🚢0 · 👥0') sitting
+  // on top of region circles (A over 6/13, B over 20) — the open water
+  // is too small for pills that wide. Shorter text, smaller pill, and
+  // both badges in open water, clear of every circle and VP star.
   return (g.sea_zones || []).map(zone => {
     const pos = (g.sea_anchors || {})[zone] || [50, 50];
     const ships = (me.ships || {})[zone] || 0;
     const crew = (me.ship_crews || {})[zone] || 0;
     return '<span class="atsea" style="top:' + pos[1] + '%;left:' + pos[0] +
-      '%">🌊 ' + zone + ' · 🚢' + ships + ' · 👥' + crew + '</span>';
+      '%">' + zone + ' 🚢' + ships + ' 👥' + crew + '</span>';
   }).join('');
 }
 function atHandIndex(id) {

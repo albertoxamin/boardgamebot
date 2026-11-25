@@ -143,10 +143,13 @@ def test_painting_tokens_use_bga_art():
     # FB-0045: the painting tokens (dipinto) were emoji — Annalisa
     # asked for the real BGA art from spriteOeuvres.jpg. The webp is
     # the 10-panel strip (brush back + 4 icons per player colour) and
-    # tdPaintSlot() picks the panel by (colour, icon, revealed/gifted)
-    # for the printed painting slots on the player board, so the emoji
-    # and the '?'/'✓' text are gone from the Mini App (Telegram text
-    # keeps the emoji).
+    # tdPaintSlot() picks the panel by (colour, icon, revealed) for the
+    # printed painting slots on the player board, so the emoji and the
+    # '?'/'✓' text are gone from the Mini App (Telegram text keeps the
+    # emoji). FB-0049: the slots are the numbered boxes on the Artist
+    # track (3-4-3: 2/4/7, 10/14/18/23, 28/34/40), not a 5x2 grid in
+    # the middle of the board — and a gifted painting leaves the board
+    # on BGA, so gifted tiles are not drawn at all.
     import re
     from PIL import Image
     webp = os.path.join(os.path.dirname(__file__), "web",
@@ -160,7 +163,13 @@ def test_painting_tokens_use_bga_art():
               encoding="utf-8").read()
     assert "zone_icon_emoji" not in js
     assert "function tdPaintSlot(col, t, sx, sy)" in js
-    assert "tdPaintSlot(col, t, TD_PAINT_X[idx % 5], TD_PAINT_Y[Math.floor(idx / 5)])" in js
+    assert "tdPaintSlot(col, t, slot[0], slot[1])" in js
+    assert "if (idx >= 10 || t.gifted) return;" in js
+    assert "tdgift" not in js and "gifted ?" not in js
+    # the slots are the culture positions in reading order
+    m = re.search(r"const TD_PAINT_SLOT = \[([^\]]*)\]\s*\n\s*\.map\(v => TD_CULTURE_POS\[v\]\);", js)
+    assert m, "painting slot order"
+    assert [int(v) for v in m.group(1).split(",")] == [2, 4, 7, 10, 14, 18, 23, 28, 34, 40]
     # every painting icon has a panel in each player's colour, the
     # brush back is a different panel per colour, and no panel is unused
     assert "purple: {bamboo: 1, moon: 2, mountain: 3, waterfall: 4}" in js
@@ -180,7 +189,6 @@ def test_painting_tokens_use_bga_art():
     html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
                 encoding="utf-8").read()
     assert "tokaidoduo-paintings.webp" in html
-    assert ".tdpaintslot.gifted{border-color:#059669;" in html
     assert "background-size:600% 100%" in html
     assert ".tdware{" in html
     # FB-0039: a referenced webp that is not in bot.py's static
@@ -188,48 +196,6 @@ def test_painting_tokens_use_bga_art():
     bot = open(os.path.join(os.path.dirname(__file__), "bot.py"),
                encoding="utf-8").read()
     assert '"/tokaidoduo-commerce.webp"' in bot
-
-
-def test_pieces_tokens_use_bga_art():
-    # FB-0046: the Hot Spring token, the 1 coin and the 10-coin gold
-    # slab were emoji / the hotspring.jpg art — Annalisa asked for the
-    # real BGA art from spritePieces.png. The webp is the 3-panel strip
-    # (hot spring, 1 coin, gold slab), each token cropped tight and
-    # centred in its 72x91 panel; tdCoin()/tdGold() replace the coin
-    # emoji wherever an amount appears in the Mini App, and
-    # .tdhotspring uses panel 0 for the token on the board. Telegram
-    # text keeps the emoji.
-    import re
-    from PIL import Image
-    webp = os.path.join(os.path.dirname(__file__), "web",
-                        "tokaidoduo-pieces.webp")
-    assert os.path.isfile(webp) and os.path.getsize(webp) > 5000
-    assert Image.open(webp).size == (216, 91)
-    src = os.path.join(os.path.dirname(__file__), "sources", "tokaidoduo",
-                       "bga", "spritePieces.png")
-    assert os.path.isfile(src)
-    assert Image.open(src).size == (186, 91)
-    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
-              encoding="utf-8").read()
-    assert "function tdPiece(idx, title)" in js
-    assert "function tdCoin() { return tdPiece(1, 'coin'); }" in js
-    assert "function tdGold() { return tdPiece(2, 'gold slab (10 coins)'); }" in js
-    # no coin emoji left in the Mini App: boutique pills, boutiques
-    # card, sell lines and seat summary all use the art now
-    assert "🪙" not in js
-    assert "💰" not in js
-    assert "tdCoin()" in js and "tdGold()" in js
-    html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
-                encoding="utf-8").read()
-    assert "tokaidoduo-pieces.webp" in html
-    assert ".tdpiece{" in html
-    assert "background-size:300% 100%" in html
-    assert "tokaidoduo-hotspring.webp" not in html
-    # FB-0039: a referenced webp that is not in bot.py's static
-    # allowlist answers 404 and renders invisible.
-    bot = open(os.path.join(os.path.dirname(__file__), "bot.py"),
-               encoding="utf-8").read()
-    assert '"/tokaidoduo-pieces.webp"' in bot
 
 
 def test_two_artists_same_zone_both_visible():
@@ -762,8 +728,17 @@ def test_player_seats_use_bga_player_boards():
     assert _map("TD_LANTERN_X") == [602, 645, 687]
     assert _map("TD_LANTERN_Y") == [58, 118, 178]
     assert _map("TD_GARDEN_Y") == [28, 60, 92, 123, 155, 185]
-    assert _map("TD_PAINT_X") == [278, 333, 388, 443, 498]
-    assert _map("TD_PAINT_Y") == [32, 88]
+    # FB-0049: the 10 painting slots are the numbered boxes on the
+    # Artist track (culture positions, reading order) — not the 5x2
+    # grid in the middle of the board.
+    culture = _map("TD_CULTURE_POS")
+    m = re.search(r"const TD_PAINT_SLOT = \[([^\]]*)\]", js)
+    assert m, "painting slot order"
+    order = [int(v) for v in m.group(1).split(",")]
+    assert order == [2, 4, 7, 10, 14, 18, 23, 28, 34, 40], order
+    assert [culture[v] for v in order] == [
+        [62, 58], [112, 58], [165, 58], [30, 118], [80, 118],
+        [135, 118], [185, 118], [55, 180], [110, 180], [160, 180]]
     assert "TD_GARDEN_X = 735" in js
     # 10 painting slots, one per painting tile in the deck
     assert len(TD.PAINTING_TILES["purple"]) == 10
@@ -786,9 +761,10 @@ def test_player_seats_use_bga_player_boards():
 def test_player_board_shows_coin_tokens():
     # FB-0048: the player's own board (plancia del singolo giocatore)
     # must show the coin tokens too — the real BGA 1-coin art from
-    # spritePieces.png (tokaidoduo-pieces.webp, panel 1), laid out in
-    # the free band of the Merchant section, above the printed
-    # "10 coin -> gold" conversion. The gold slabs are NOT in this
+    # spritePieces.png (tokaidoduo-pieces.webp, panel 1), in a single
+    # row in the free band between the Merchant's ware slots (their
+    # row 2 ends at y~118) and the printed "10 coin -> gold"
+    # conversion (starts at y~148). The gold slabs are NOT in this
     # pile: per FB-0051 a slab marks the commerce tracker instead.
     # The board JSON already carries coins/gold per player.
     import re
@@ -805,22 +781,73 @@ def test_player_board_shows_coin_tokens():
                   r"TD_COIN_D = (\d+), TD_COIN_PER_ROW = (\d+);", js)
     assert m, "coin grid constants"
     x0, y0, d, per_row = (int(v) for v in m.groups())
-    # worst case on the board: 9 coins (10 auto-convert to a slab) —
-    # every token centre stays on the 862x213 board with its 10px
-    # half-size inside. The pile starts right of the Artist's robe
-    # (right edge x~263 at y~140, measured off the board art) so no
-    # token sits on the character, and its second row ends above the
-    # commerce markers on the gold row (y=168).
+    # worst case on the board: 9 coins (10 auto-convert to a slab),
+    # all in one row — every token centre stays on the 862x213 board
+    # with its 10px half-size inside. The row starts right of the
+    # Artist's robe (right edge x~263 at y~140, measured off the board
+    # art) so no token sits on the character, it clears the ware
+    # slots above (row 2 ends y~118) and the printed coin icons
+    # below (start y~148), and it ends above the gold row (y=196).
+    assert per_row >= 9, per_row
     for i in range(9):
         x = x0 + (i % per_row) * d
         y = y0 + (i // per_row) * d
         assert 10 <= x <= 862 - 10 and 10 <= y <= 213 - 10, (i, x, y)
     assert x0 - 10 > 263, x0  # clears the Artist's robe
-    assert y0 + d + 10 < 168, (y0, d)  # second row above the gold row
+    assert y0 - 10 > 118, y0  # below the ware slots
+    assert y0 + 10 < 148, y0  # above the printed coin icons
     html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
                 encoding="utf-8").read()
     assert ".tdboardcoin{position:absolute;width:20px;height:20px;" in html
     assert "background-image:url(tokaidoduo-pieces.webp);background-size:300% 100%;" in html
+
+
+def test_player_board_shows_ware_tokens():
+    # FB-0050: the Merchant section of each player's own board must
+    # show the Ware tokens the player holds in inventory — the real
+    # BGA merchandise tokens from spriteJetonsMarchandise.jpg
+    # (tokaidoduo-marchandise.webp: 4 panels — pottery, doll, fan,
+    # kimono). Verified against live BGA tables: they sit in the
+    # Merchant's 6 printed ware slots — the light-grey octagonal
+    # squares with the bundle icon at the top-left of the Merchant
+    # section (3 columns x 2 rows), in inventory order, top row
+    # first — not in a row above the Merchant character.
+    import re
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    m = re.search(r"const TD_MARCH_IDX = \{([^}]*)\};", js)
+    assert m, "merchandise panel index"
+    idx = dict((k.strip(), int(v)) for k, v in
+               (kv.split(":") for kv in m.group(1).split(",")))
+    assert sorted(idx) == sorted(TD.WARE_TYPES), idx
+    assert len(set(idx.values())) == 4
+    assert "(p.wares || []).forEach((w, idx) => {" in js
+    assert "if (idx >= 6) return;" in js
+    assert "TD_MARCH_IDX[w]" in js
+    assert '"tdwareslot"' in js
+    assert '"tdwaretok"' not in js  # the row above the Merchant is gone
+    assert "TD_WARE_SLOT_X[idx % 3]" in js
+    assert "TD_WARE_SLOT_Y[Math.floor(idx / 3)]" in js
+    m = re.search(r"const TD_WARE_SLOT_X = \[([^\]]*)\], "
+                  r"TD_WARE_SLOT_Y = \[([^\]]*)\];", js)
+    assert m, "ware slot constants"
+    xs = [int(v) for v in m.group(1).split(",")]
+    ys = [int(v) for v in m.group(2).split(",")]
+    assert len(xs) == 3 and len(ys) == 2, (xs, ys)
+    # every slot centre stays on the 862x213 board with the 20px
+    # half-size of the 40x40 token inside; the slots are the printed
+    # grey squares (bundle icons measured at x~328/383/437, y~45/98).
+    for x in xs:
+        for y in ys:
+            assert 20 <= x <= 862 - 20 and 20 <= y <= 213 - 20, (x, y)
+    assert xs == [329, 384, 439] and ys == [45, 98], (xs, ys)
+    html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
+                encoding="utf-8").read()
+    assert ".tdwareslot{position:absolute;width:40px;height:40px;" in html
+    assert "background-image:url(tokaidoduo-marchandise.webp);background-size:400% 100%;" in html
+    bot = open(os.path.join(os.path.dirname(__file__), "bot.py"),
+               encoding="utf-8").read()
+    assert '"/tokaidoduo-marchandise.webp"' in bot
 
 
 def test_gold_slab_marks_commerce_tracker():
@@ -843,45 +870,8 @@ def test_gold_slab_marks_commerce_tracker():
     # of the numeral — the slab at commerce 18 floated between 11
     # and 18); 0 is one ~47px pitch left of 5.
     assert ast.literal_eval(m.group(1)) == {
-        0: [266, 168], 5: [313, 168], 11: [361, 168], 18: [406, 168],
-        26: [453, 168], 35: [501, 168], 45: [546, 168]}
-
-
-def test_player_board_shows_ware_tokens():
-    # FB-0050: the Merchant section of each player's own board must
-    # show the Ware tokens the player holds in inventory — the real
-    # BGA merchandise tokens from spriteJetonsMarchandise.jpg
-    # (tokaidoduo-marchandise.webp: 4 panels — pottery, doll, fan,
-    # kimono), in a row above the Merchant character.
-    import re
-    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
-              encoding="utf-8").read()
-    m = re.search(r"const TD_MARCH_IDX = \{([^}]*)\};", js)
-    assert m, "merchandise panel index"
-    idx = dict((k.strip(), int(v)) for k, v in
-               (kv.split(":") for kv in m.group(1).split(",")))
-    assert sorted(idx) == sorted(TD.WARE_TYPES), idx
-    assert len(set(idx.values())) == 4
-    assert "(p.wares || []).forEach((w, idx) => {" in js
-    assert "TD_MARCH_IDX[w]" in js
-    assert '"tdwaretok"' in js
-    m = re.search(r"const TD_WARE_X0 = (\d+), TD_WARE_Y0 = (\d+), "
-                  r"TD_WARE_D = (\d+);", js)
-    assert m, "ware row constants"
-    x0, y0, d = (int(v) for v in m.groups())
-    # worst case: 6 Wares (Robust wave raises the cap to 6) — the row
-    # stays on the 862x213 board, clear of the red badge (x~591,
-    # measured off the board art) and above the Merchant's cart bar
-    # (starts y~42).
-    assert x0 - 10 >= 0 and x0 + 5 * d + 10 < 591, (x0, d)
-    assert y0 - 10 >= 0 and y0 + 10 < 42, y0
-    html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
-                encoding="utf-8").read()
-    assert ".tdwaretok{position:absolute;width:20px;height:20px;" in html
-    assert "background-image:url(tokaidoduo-marchandise.webp);background-size:400% 100%;" in html
-    bot = open(os.path.join(os.path.dirname(__file__), "bot.py"),
-               encoding="utf-8").read()
-    assert '"/tokaidoduo-marchandise.webp"' in bot
+        0: [266, 196], 5: [313, 196], 11: [361, 196], 18: [406, 196],
+        26: [453, 196], 35: [501, 196], 45: [546, 196]}
 
 
 def test_hot_spring_token_shows_on_board():

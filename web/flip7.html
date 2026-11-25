@@ -387,10 +387,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .tdboardcoin{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;background-image:url(tokaidoduo-pieces.webp);background-size:300% 100%;background-repeat:no-repeat;border-radius:4px;box-shadow:0 1px 3px #000a;z-index:2}
 /* FB-0050: the Ware tokens the player holds (tokaidoduo-marchandise.webp,
    spriteJetonsMarchandise.jpg: 4 panels — pottery, doll, fan, kimono),
-   shown in a row above the Merchant character on the player's own board.
-   The panel index is set inline by tdSeatBoard() in tokaidoduo.js as
+   shown in the Merchant's 6 printed ware slots on the player's own
+   board. Each slot is ~46x50px, so the token is 40x40px; the panel
+   index is set inline by tdSeatBoard() in tokaidoduo.js as
    background-position-x (idx * 100/3%). */
-.tdwaretok{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;background-image:url(tokaidoduo-marchandise.webp);background-size:400% 100%;background-repeat:no-repeat;border-radius:4px;box-shadow:0 1px 3px #000a;z-index:2}
+.tdwareslot{position:absolute;width:40px;height:40px;margin:-20px 0 0 -20px;background-image:url(tokaidoduo-marchandise.webp);background-size:400% 100%;background-repeat:no-repeat;border-radius:4px;box-shadow:0 1px 3px #000a;z-index:2}
 .tdpboard{position:relative;aspect-ratio:862/213;background-image:url(tokaidoduo-pboards.webp);background-size:100% 200%;background-repeat:no-repeat;border-radius:8px;margin:6px 0;border:1px solid #475569}
 .tdpboard.pb1{background-position-y:100%}
 .tdmark{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px #000a;z-index:2}
@@ -402,8 +403,6 @@ button:disabled{opacity:.45;cursor:not-allowed}
    index is set inline by tdPaintSlot() in tokaidoduo.js as
    background-position-x (idx * 100/9%). */
 .tdpaintslot{position:absolute;width:4.6%;height:23.5%;transform:translate(-50%,-50%);background-image:url(tokaidoduo-paintings.webp);background-size:1000% 100%;background-repeat:no-repeat;border:1px solid #a8a29e;border-radius:3px;z-index:2}
-.tdpaintslot.gifted{border-color:#059669;box-shadow:0 0 0 2px #059669}
-.tdgift{position:absolute;right:1px;bottom:0;font-size:11px;line-height:1;color:#fff;text-shadow:0 1px 2px #000}
 .tdbout{position:absolute;transform:translate(-50%,-50%);background:#fefce8;color:#1c1917;border:1px solid #a16207;border-radius:999px;font-size:11px;font-weight:900;padding:1px 5px;white-space:nowrap;z-index:2;box-shadow:0 1px 3px #000a}
 .tdtap{position:absolute;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;border:3px solid #22c55e;background:#22c55e2e;z-index:4;cursor:pointer;animation:tdpulse 1.2s ease-in-out infinite}
 @keyframes tdpulse{0%,100%{box-shadow:0 0 0 0 #22c55e88}50%{box-shadow:0 0 0 7px #22c55e00}}

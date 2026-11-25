@@ -118,46 +118,63 @@ function tdDieFace(ch, value) {
 // top half = first seat, bottom half = second). Marker positions are
 // image pixels on the half-board, measured off the BGA art:
 // culture dots on the Artist track, commerce on the gold row, temple
-// lanterns (3x3), garden circles (x1-x6), painting slots (5x2).
+// lanterns (3x3), garden circles (x1-x6), painting slots (the numbered
+// boxes on the Artist track, see TD_PAINT_SLOT below).
 // FB-0051: the gold-row x values were re-measured — the FB-0034 ones
 // used a 55px pitch while the printed numerals sit on a ~47px pitch,
 // so the marker drifted up to 52px right of its numeral (the slab at
-// commerce 18 floated between 11 and 18). The new values are the
+// commerce 18 floated between 11 and 18). The new x values are the
 // measured centres of the printed numerals 5/11/18/26/35/45 (0 is one
-// pitch left of 5).
+// pitch left of 5); y=196 puts the slab on the gold scallop below its
+// numeral, where the numerals stay readable (at y=168 the 20px slab
+// covered its numeral).
 const TD_CULTURE_POS = {0: [35, 58], 2: [62, 58], 4: [112, 58], 7: [165, 58],
   10: [30, 118], 14: [80, 118], 18: [135, 118], 23: [185, 118],
   28: [55, 180], 34: [110, 180], 40: [160, 180]};
-const TD_GOLD_POS = {0: [266, 168], 5: [313, 168], 11: [361, 168], 18: [406, 168],
-  26: [453, 168], 35: [501, 168], 45: [546, 168]};
+const TD_GOLD_POS = {0: [266, 196], 5: [313, 196], 11: [361, 196], 18: [406, 196],
+  26: [453, 196], 35: [501, 196], 45: [546, 196]};
 const TD_LANTERN_X = [602, 645, 687], TD_LANTERN_Y = [58, 118, 178];
 const TD_GARDEN_X = 735, TD_GARDEN_Y = [28, 60, 92, 123, 155, 185];
-const TD_PAINT_X = [278, 333, 388, 443, 498], TD_PAINT_Y = [32, 88];
+// FB-0049: the painting slots ARE the numbered boxes on the Artist
+// track — verified against live BGA tables. The 10 slots read left to
+// right, top to bottom as 2/4/7, 10/14/18/23, 28/34/40 (3-4-3): the
+// same centres as the culture dots, since the culture score is the
+// value of the highest gifted painting. The grey squares with the
+// bundle icon in the middle of the board are NOT painting slots —
+// they are the Merchant's ware slots (see TD_WARE_SLOT_* below).
+// FB-0034's TD_PAINT_X/Y (a 5x2 grid in the middle of the board)
+// put the paintings ~50px left of their slots, floating in the
+// Merchant's part of the board — that is what Annalisa reported.
+const TD_PAINT_SLOT = [2, 4, 7, 10, 14, 18, 23, 28, 34, 40]
+  .map(v => TD_CULTURE_POS[v]);
 function tdMark(x, y, col, title) {
   return '<span class="tdmark td' + col + '" style="left:' + (x / 862 * 100).toFixed(1) +
     '%;top:' + (y / 213 * 100).toFixed(1) + '%;" title="' + escapeHtml(title) + '"></span>';
 }
 // FB-0048: the coin tokens on the player's own board — the real BGA
 // 1-coin art from spritePieces.png (tokaidoduo-pieces.webp, panel 1, as
-// tdCoin() uses inline), laid out in the free band of the Merchant
-// section, above the printed "10 coin -> gold" conversion (painting
-// slots end at y~113, the printed icons start at y~148), up to 8 per
-// row. The gold slabs are NOT in this pile: per FB-0051 a slab marks
-// the player's position on the Merchant's score tracker (the gold row,
-// see tdSeatBoard). The pile starts at x=278, not at the band's left
-// edge, so the second row clears the Artist's robe (measured off the
-// board art: its right edge reaches x~263 at y~140) instead of sitting
-// on the character. tdSeatBoard already receives the player's coins
-// and gold, and the summary line under the board keeps the exact
-// numbers.
-const TD_COIN_X0 = 278, TD_COIN_Y0 = 118, TD_COIN_D = 22, TD_COIN_PER_ROW = 8;
+// tdCoin() uses inline), in a single row in the free band between the
+// Merchant's ware slots (their row 2 ends at y~118) and the printed
+// "10 coin -> gold" conversion (starts at y~148): y=136, up to 9 coins
+// in the row (10 auto-convert to a slab, so a second row only happens
+// past the gold cap). The gold slabs are NOT in this pile: per FB-0051
+// a slab marks the player's position on the Merchant's score tracker
+// (the gold row, see tdSeatBoard). The row starts at x=278, so it
+// clears the Artist's robe (measured off the board art: its right edge
+// reaches x~263 at y~140) instead of sitting on the character.
+// tdSeatBoard already receives the player's coins and gold, and the
+// summary line under the board keeps the exact numbers.
+const TD_COIN_X0 = 278, TD_COIN_Y0 = 136, TD_COIN_D = 20, TD_COIN_PER_ROW = 9;
 // FB-0050: the merchandise tokens (spriteJetonsMarchandise.jpg,
 // tokaidoduo-marchandise.webp): 4 panels, left to right — pottery
-// (sake bottle), doll, fan, kimono. Shown in a row above the Merchant
-// character for each Ware in the player's inventory; the cart's bar
-// starts at y~42 and the red badge at x~591, so the row sits at y=26.
+// (sake bottle), doll, fan, kimono. They sit in the Merchant's 6
+// printed ware slots — the light-grey octagonal squares with the
+// bundle icon at the top-left of the Merchant section (3 columns x 2
+// rows, centres measured off the BGA art) — in inventory order, top
+// row first. The row above the Merchant character used before was
+// wrong: those slots are the wares' home on BGA.
 const TD_MARCH_IDX = {pottery: 0, doll: 1, fan: 2, kimono: 3};
-const TD_WARE_X0 = 458, TD_WARE_Y0 = 26, TD_WARE_D = 21;
+const TD_WARE_SLOT_X = [329, 384, 439], TD_WARE_SLOT_Y = [45, 98];
 function tdBoardCoin(idx, x, y, title) {
   return '<span class="tdboardcoin" style="left:' + (x / 862 * 100).toFixed(1) +
     '%;top:' + (y / 213 * 100).toFixed(1) +
@@ -183,9 +200,17 @@ function tdSeatBoard(g, p, col) {
   for (let gd = 1; gd <= Math.min(p.garden, 6); gd++) {
     s += tdMark(TD_GARDEN_X, TD_GARDEN_Y[gd - 1], col, 'Garden x' + gd);
   }
+  // FB-0049: the paintings sit in the numbered boxes of the Artist
+  // track (TD_PAINT_SLOT, reading order = the order the tiles are
+  // revealed and gifted). A gifted painting leaves the board on BGA —
+  // its slot shows its number again — so gifted tiles are not drawn:
+  // that also keeps the culture dot (which marks the highest gifted
+  // slot, or 0) from ever landing on a tile.
   p.paintings.forEach((t, idx) => {
-    if (idx >= 10) return;
-    s += tdPaintSlot(col, t, TD_PAINT_X[idx % 5], TD_PAINT_Y[Math.floor(idx / 5)]);
+    if (idx >= 10 || t.gifted) return;
+    const slot = TD_PAINT_SLOT[idx];
+    if (!slot) return;
+    s += tdPaintSlot(col, t, slot[0], slot[1]);
   });
   let ci = 0;
   const coins = Math.max(0, p.coins || 0);
@@ -197,15 +222,15 @@ function tdSeatBoard(g, p, col) {
   // FB-0050: the Wares the player holds, as the real BGA merchandise
   // tokens from spriteJetonsMarchandise.jpg
   // (tokaidoduo-marchandise.webp: 4 panels — pottery, doll, fan,
-  // kimono), in a row above the Merchant character: the top of her
-  // section is free there (the cart's bar starts at y~42, the red
-  // badge at x~591), one token per Ware in the inventory.
+  // kimono), in the Merchant's 6 printed ware slots (3x2, top row
+  // first), one token per Ware in the inventory.
   (p.wares || []).forEach((w, idx) => {
+    if (idx >= 6) return;
     const mi = TD_MARCH_IDX[w];
     if (mi === undefined) return;
-    s += '<span class="tdwaretok" style="left:' +
-      ((TD_WARE_X0 + idx * TD_WARE_D) / 862 * 100).toFixed(1) +
-      '%;top:' + (TD_WARE_Y0 / 213 * 100).toFixed(1) +
+    s += '<span class="tdwareslot" style="left:' +
+      (TD_WARE_SLOT_X[idx % 3] / 862 * 100).toFixed(1) +
+      '%;top:' + (TD_WARE_SLOT_Y[Math.floor(idx / 3)] / 213 * 100).toFixed(1) +
       '%;background-position-x:' + (mi * 100 / 3).toFixed(2) +
       '%;" title="' + escapeHtml(w) + '"></span>';
   });
@@ -216,20 +241,24 @@ function tdSeatBoard(g, p, col) {
 // player colour x (brush back + 4 icons), left to right — purple brush,
 // bamboo, moon, mountain, waterfall, then the same five in green.
 // A revealed tile shows its icon in the player's colour, an unrevealed
-// one shows the brush back, a gifted one keeps the art with a ✓ badge.
+// one shows the brush back. (A gifted tile leaves the board on BGA —
+// see FB-0049 — so there is no gifted rendering here.)
 const TD_PAINT_IDX = {purple: {bamboo: 1, moon: 2, mountain: 3, waterfall: 4},
   green: {bamboo: 6, moon: 7, mountain: 8, waterfall: 9}};
 const TD_PAINT_BACK = {purple: 0, green: 5};
 function tdPaintSlot(col, t, sx, sy) {
-  const idx = (t.revealed || t.gifted) ? (TD_PAINT_IDX[col] || {})[t.icon]
+  // FB-0049: a gifted painting leaves the board on BGA (its slot shows
+  // its number again), so tdSeatBoard never calls this for one — no
+  // gifted branch here. A revealed tile shows its icon in the
+  // player's colour, an unrevealed one shows the brush back.
+  const idx = t.revealed ? (TD_PAINT_IDX[col] || {})[t.icon]
     : TD_PAINT_BACK[col];
   if (idx === undefined) return '';
-  const title = t.gifted ? 'gifted ' + (t.icon || '')
-    : (t.revealed ? t.icon : 'painting (face down)');
-  return '<span class="tdpaintslot' + (t.gifted ? ' gifted' : '') +
+  const title = t.revealed ? t.icon : 'painting (face down)';
+  return '<span class="tdpaintslot' +
     '" style="left:' + (sx / 862 * 100).toFixed(1) + '%;top:' + (sy / 213 * 100).toFixed(1) +
     '%;background-position-x:' + (idx * 100 / 9).toFixed(2) +
-    '%;" title="' + escapeHtml(title) + '">' + (t.gifted ? '<b class="tdgift">✓</b>' : '') + '</span>';
+    '%;" title="' + escapeHtml(title) + '"></span>';
 }
 // Index of each Wave side in the tokaidoduo-waves.webp sprite strip
 // (spriteVagues.jpg, left to right): pilgrim hasty/tranquil, merchant

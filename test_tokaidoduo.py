@@ -785,10 +785,11 @@ def test_player_seats_use_bga_player_boards():
 
 def test_player_board_shows_coin_tokens():
     # FB-0048: the player's own board (plancia del singolo giocatore)
-    # must show the coin tokens too — the real BGA 1-coin and gold-slab
-    # art from spritePieces.png (tokaidoduo-pieces.webp, panels 1 and
-    # 2), laid out in the free band of the Merchant section, above the
-    # printed "10 coin -> gold" conversion: coins first, then slabs.
+    # must show the coin tokens too — the real BGA 1-coin art from
+    # spritePieces.png (tokaidoduo-pieces.webp, panel 1), laid out in
+    # the free band of the Merchant section, above the printed
+    # "10 coin -> gold" conversion. The gold slabs are NOT in this
+    # pile: per FB-0051 a slab marks the commerce tracker instead.
     # The board JSON already carries coins/gold per player.
     import re
     js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
@@ -796,21 +797,21 @@ def test_player_board_shows_coin_tokens():
     assert '"coins": p["coins"], "gold": p["gold"]' in open(
         os.path.join(os.path.dirname(__file__), "bot.py"),
         encoding="utf-8").read()
-    assert "const coins = Math.max(0, p.coins || 0), slabs = Math.max(0, p.gold || 0);" in js
+    assert "const coins = Math.max(0, p.coins || 0);" in js
     assert "tdBoardCoin(1, TD_COIN_X0" in js  # 1-coin art, panel 1
-    assert "tdBoardCoin(2, TD_COIN_X0" in js  # gold slab, panel 2
+    assert "tdBoardCoin(2, TD_COIN_X0" not in js  # no slabs in the pile
     assert "background-position-x:' + (idx * 50)" in js
     m = re.search(r"const TD_COIN_X0 = (\d+), TD_COIN_Y0 = (\d+), "
                   r"TD_COIN_D = (\d+), TD_COIN_PER_ROW = (\d+);", js)
     assert m, "coin grid constants"
     x0, y0, d, per_row = (int(v) for v in m.groups())
-    # worst case on the board: 9 coins (10 auto-convert to a slab)
-    # + 6 gold slabs — every token centre stays on the 862x213 board
-    # with its 10px half-size inside. The pile starts right of the
-    # Artist's robe (right edge x~263 at y~140, measured off the board
-    # art) so no token sits on the character, and its second row ends
-    # above the commerce markers on the gold row (y=168).
-    for i in range(9 + 6):
+    # worst case on the board: 9 coins (10 auto-convert to a slab) —
+    # every token centre stays on the 862x213 board with its 10px
+    # half-size inside. The pile starts right of the Artist's robe
+    # (right edge x~263 at y~140, measured off the board art) so no
+    # token sits on the character, and its second row ends above the
+    # commerce markers on the gold row (y=168).
+    for i in range(9):
         x = x0 + (i % per_row) * d
         y = y0 + (i // per_row) * d
         assert 10 <= x <= 862 - 10 and 10 <= y <= 213 - 10, (i, x, y)
@@ -820,6 +821,30 @@ def test_player_board_shows_coin_tokens():
                 encoding="utf-8").read()
     assert ".tdboardcoin{position:absolute;width:20px;height:20px;" in html
     assert "background-image:url(tokaidoduo-pieces.webp);background-size:300% 100%;" in html
+
+
+def test_gold_slab_marks_commerce_tracker():
+    # FB-0051: the 10-coin token (gold slab) must sit at the Merchant's
+    # score tracker — the gold row. The commerce score is exactly the
+    # gold-slab count mapped to points, so the slab token replaces the
+    # plain dot as the marker on the gold row.
+    import ast
+    import re
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    assert "s += tdBoardCoin(2, go[0], go[1], 'Commerce ' + p.commerce" in js
+    assert "tdMark(go[0], go[1]" not in js  # the dot is gone here
+    m = re.search(r"const TD_GOLD_POS = (\{[^}]*\})", js)
+    assert m, "gold row positions"
+    assert sorted(ast.literal_eval(m.group(1))) == [0, 5, 11, 18, 26, 35, 45]
+    assert sorted(TD.GOLD_POINTS) == [0, 5, 11, 18, 26, 35, 45]
+    # the positions are the measured centres of the printed numerals
+    # on the gold row (FB-0034's 55px pitch drifted up to 52px right
+    # of the numeral — the slab at commerce 18 floated between 11
+    # and 18); 0 is one ~47px pitch left of 5.
+    assert ast.literal_eval(m.group(1)) == {
+        0: [266, 168], 5: [313, 168], 11: [361, 168], 18: [406, 168],
+        26: [453, 168], 35: [501, 168], 45: [546, 168]}
 
 
 def test_player_board_shows_ware_tokens():

@@ -119,11 +119,17 @@ function tdDieFace(ch, value) {
 // image pixels on the half-board, measured off the BGA art:
 // culture dots on the Artist track, commerce on the gold row, temple
 // lanterns (3x3), garden circles (x1-x6), painting slots (5x2).
+// FB-0051: the gold-row x values were re-measured — the FB-0034 ones
+// used a 55px pitch while the printed numerals sit on a ~47px pitch,
+// so the marker drifted up to 52px right of its numeral (the slab at
+// commerce 18 floated between 11 and 18). The new values are the
+// measured centres of the printed numerals 5/11/18/26/35/45 (0 is one
+// pitch left of 5).
 const TD_CULTURE_POS = {0: [35, 58], 2: [62, 58], 4: [112, 58], 7: [165, 58],
   10: [30, 118], 14: [80, 118], 18: [135, 118], 23: [185, 118],
   28: [55, 180], 34: [110, 180], 40: [160, 180]};
-const TD_GOLD_POS = {0: [223, 168], 5: [278, 168], 11: [333, 168], 18: [388, 168],
-  26: [443, 168], 35: [498, 168], 45: [553, 168]};
+const TD_GOLD_POS = {0: [266, 168], 5: [313, 168], 11: [361, 168], 18: [406, 168],
+  26: [453, 168], 35: [501, 168], 45: [546, 168]};
 const TD_LANTERN_X = [602, 645, 687], TD_LANTERN_Y = [58, 118, 178];
 const TD_GARDEN_X = 735, TD_GARDEN_Y = [28, 60, 92, 123, 155, 185];
 const TD_PAINT_X = [278, 333, 388, 443, 498], TD_PAINT_Y = [32, 88];
@@ -132,14 +138,18 @@ function tdMark(x, y, col, title) {
     '%;top:' + (y / 213 * 100).toFixed(1) + '%;" title="' + escapeHtml(title) + '"></span>';
 }
 // FB-0048: the coin tokens on the player's own board — the real BGA
-// 1-coin and gold-slab art from spritePieces.png (tokaidoduo-pieces.webp,
-// panels 1 and 2, as tdCoin()/tdGold() use inline), laid out in the free
-// band of the Merchant section, above the printed "10 coin -> gold"
-// conversion (painting slots end at y~113, the printed icons start at
-// y~148): coins first, then gold slabs, up to 8 per row. The pile starts
-// at x=278, not at the band's left edge, so the second row clears the
-// Artist's robe (measured off the board art: its right edge reaches
-// x~263 at y~140) instead of sitting on the character.
+// 1-coin art from spritePieces.png (tokaidoduo-pieces.webp, panel 1, as
+// tdCoin() uses inline), laid out in the free band of the Merchant
+// section, above the printed "10 coin -> gold" conversion (painting
+// slots end at y~113, the printed icons start at y~148), up to 8 per
+// row. The gold slabs are NOT in this pile: per FB-0051 a slab marks
+// the player's position on the Merchant's score tracker (the gold row,
+// see tdSeatBoard). The pile starts at x=278, not at the band's left
+// edge, so the second row clears the Artist's robe (measured off the
+// board art: its right edge reaches x~263 at y~140) instead of sitting
+// on the character. tdSeatBoard already receives the player's coins
+// and gold, and the summary line under the board keeps the exact
+// numbers.
 const TD_COIN_X0 = 278, TD_COIN_Y0 = 118, TD_COIN_D = 22, TD_COIN_PER_ROW = 8;
 // FB-0050: the merchandise tokens (spriteJetonsMarchandise.jpg,
 // tokaidoduo-marchandise.webp): 4 panels, left to right — pottery
@@ -158,8 +168,14 @@ function tdSeatBoard(g, p, col) {
   let s = '';
   const cu = TD_CULTURE_POS[p.culture];
   if (cu) s += tdMark(cu[0], cu[1], col, 'Culture ' + p.culture);
+  // FB-0051: the 10-coin token (gold slab) marks the position on the
+  // Merchant's score tracker — the gold row. The commerce score is
+  // exactly the gold-slab count mapped to points (0/5/11/18/26/35/45),
+  // so the slab token replaces the plain dot here; the culture dot
+  // above stays as it is.
   const go = TD_GOLD_POS[p.commerce];
-  if (go) s += tdMark(go[0], go[1], col, 'Commerce ' + p.commerce);
+  if (go) s += tdBoardCoin(2, go[0], go[1], 'Commerce ' + p.commerce +
+    ' — ' + (p.gold || 0) + ' gold slab' + ((p.gold || 0) === 1 ? '' : 's'));
   for (let t = 1; t <= Math.min(p.temple, 9); t++) {
     s += tdMark(TD_LANTERN_X[(t - 1) % 3], TD_LANTERN_Y[Math.floor((t - 1) / 3)],
       col, 'Temple ' + t + '/9');
@@ -172,16 +188,11 @@ function tdSeatBoard(g, p, col) {
     s += tdPaintSlot(col, t, TD_PAINT_X[idx % 5], TD_PAINT_Y[Math.floor(idx / 5)]);
   });
   let ci = 0;
-  const coins = Math.max(0, p.coins || 0), slabs = Math.max(0, p.gold || 0);
+  const coins = Math.max(0, p.coins || 0);
   for (let k = 0; k < coins; k++, ci++) {
     s += tdBoardCoin(1, TD_COIN_X0 + (ci % TD_COIN_PER_ROW) * TD_COIN_D,
       TD_COIN_Y0 + Math.floor(ci / TD_COIN_PER_ROW) * TD_COIN_D,
       'Coin ' + (k + 1) + ' of ' + coins);
-  }
-  for (let k = 0; k < slabs; k++, ci++) {
-    s += tdBoardCoin(2, TD_COIN_X0 + (ci % TD_COIN_PER_ROW) * TD_COIN_D,
-      TD_COIN_Y0 + Math.floor(ci / TD_COIN_PER_ROW) * TD_COIN_D,
-      'Gold slab ' + (k + 1) + ' of ' + slabs + ' (10 coins each)');
   }
   // FB-0050: the Wares the player holds, as the real BGA merchandise
   // tokens from spriteJetonsMarchandise.jpg

@@ -22,18 +22,21 @@ SWORD_CHIPS = (2, 1)  # 2 players: the 3- and 4-sword chips are removed
 KYO = 4
 
 REGIONS = (
-    {"name": "Tokuyama", "title": "徳山館", "x": 82, "y": 12, "land": (), "sea": (1,)},
-    {"name": "Yonezawa", "title": "米沢城", "x": 66, "y": 25, "land": (2,), "sea": (0,)},
-    {"name": "Kasugayama", "title": "春日山城", "x": 57, "y": 34, "land": (1, 3), "sea": ()},
-    {"name": "Odawara", "title": "小田原城", "x": 49, "y": 43, "land": (2, 4), "sea": (8,)},
-    {"name": "Kyo", "title": "京", "x": 43, "y": 50, "land": (3, 5, 6), "sea": ()},
-    {"name": "Inabayama", "title": "稲葉山城", "x": 35, "y": 57, "land": (4, 6, 7), "sea": ()},
-    {"name": "Kiyosu", "title": "清洲城", "x": 28, "y": 64, "land": (5, 7), "sea": ()},
-    {"name": "Yoshida Koriyama", "title": "吉田郡山城", "x": 21, "y": 72,
+    # x/y are the centres of the white hexagons printed on the board art
+    # (measured off rumblenation-board.webp, 2000x1480) - the castle
+    # number tokens sit on those hexes.
+    {"name": "Tokuyama", "title": "徳山館", "x": 79.7, "y": 15.7, "land": (), "sea": (1,)},
+    {"name": "Yonezawa", "title": "米沢城", "x": 79.2, "y": 44.5, "land": (2,), "sea": (0,)},
+    {"name": "Kasugayama", "title": "春日山城", "x": 63.9, "y": 39.8, "land": (1, 3), "sea": ()},
+    {"name": "Odawara", "title": "小田原城", "x": 67.7, "y": 79.8, "land": (2, 4), "sea": (8,)},
+    {"name": "Kyo", "title": "京", "x": 42.4, "y": 44.5, "land": (3, 5, 6), "sea": ()},
+    {"name": "Inabayama", "title": "稲葉山城", "x": 62.2, "y": 70.0, "land": (4, 6, 7), "sea": ()},
+    {"name": "Kiyosu", "title": "清洲城", "x": 45.8, "y": 71.3, "land": (5, 7), "sea": ()},
+    {"name": "Yoshida Koriyama", "title": "吉田郡山城", "x": 33.8, "y": 35.3,
      "land": (5, 6), "sea": (3, 8, 9)},
-    {"name": "Okou", "title": "岡豊城", "x": 16, "y": 81, "land": (), "sea": (7, 9)},
-    {"name": "Usuki", "title": "臼杵城", "x": 8, "y": 87, "land": (), "sea": (7, 8, 10)},
-    {"name": "Shuri", "title": "首里城", "x": 13, "y": 96, "land": (), "sea": (9,)},
+    {"name": "Okou", "title": "岡豊城", "x": 19.3, "y": 60.3, "land": (), "sea": (7, 9)},
+    {"name": "Usuki", "title": "臼杵城", "x": 17.8, "y": 33.3, "land": (), "sea": (7, 8, 10)},
+    {"name": "Shuri", "title": "首里城", "x": 12.5, "y": 89.1, "land": (), "sea": (9,)},
 )
 
 CASTLE_VALUES = tuple(range(2, 13))

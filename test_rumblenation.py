@@ -1,3 +1,5 @@
+import os
+import re
 import unittest
 
 import rumblenation as RN
@@ -220,6 +222,36 @@ class ViewTests(unittest.TestCase):
     def test_lobby_board_lines(self):
         g = RN.new_game(7, 1, "Alice")
         self.assertTrue(any("lobby" in line for line in RN.board_lines(g)))
+
+    def test_region_positions_are_on_the_printed_hexes(self):
+        # FB-0061: the old coordinates were a guessed diagonal - the tokens
+        # floated in the sea and bunched up in the middle instead of sitting
+        # on the white hexagons printed on the board art.  Positions must
+        # stay inside the map area and well apart from each other.
+        for r in RN.REGIONS:
+            self.assertGreater(r["x"], 5, r["name"])
+            self.assertLess(r["x"], 95, r["name"])
+            self.assertGreater(r["y"], 5, r["y"])
+            self.assertLess(r["y"], 95, r["name"])
+        for i, a in enumerate(RN.REGIONS):
+            for b in RN.REGIONS[i + 1:]:
+                dist = ((a["x"] - b["x"]) ** 2 + (a["y"] - b["y"]) ** 2) ** 0.5
+                self.assertGreaterEqual(dist, 10, (a["name"], b["name"]))
+
+    def test_castle_token_sprites_match_their_numbers(self):
+        # FB-0061: castle 7 and 11 were swapped in web/rumblenation.js, so
+        # the token face did not match the castle value in the rules.
+        js = (os.path.dirname(__file__) + "/web/rumblenation.js")
+        with open(js) as f:
+            src = f.read()
+        m = re.search(r"RN_CASTLE_POS = \{([^}]+)\}", src)
+        self.assertIsNotNone(m)
+        found = {int(k): [int(v) for v in vals.split(",")]
+                 for k, vals in re.findall(r"(\d+): \[([0-9, ]+)\]", m.group(1))}
+        self.assertEqual(set(found), set(range(2, 13)))
+        self.assertEqual(len({tuple(v) for v in found.values()}), 11)
+        self.assertEqual(found[7], [218, 489])
+        self.assertEqual(found[11], [2, 489])
 
 
 if __name__ == "__main__":

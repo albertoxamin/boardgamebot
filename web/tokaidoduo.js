@@ -190,6 +190,19 @@ function tdWare(ware, price) {
 }
 const TD_WAVE_IDX = {pilgrim: {hasty: 0, tranquil: 1}, merchant: {crafty: 2, robust: 3},
   artist: {proficient: 4, inspired: 5}};
+// FB-0046: the Hot Spring token, the 1 coin and the 10-coin gold slab
+// are the real BGA art from spritePieces.png (tokaidoduo-pieces.webp):
+// 3 panels, left to right — hot spring, 1 coin, gold slab. tdCoin()
+// replaces the coin emoji wherever a coin amount appears in the Mini
+// App, tdGold() the money-bag emoji for gold slabs (10 coins each); the Hot Spring
+// token on the board uses panel 0 via .tdhotspring in flip7.html.
+// Telegram text keeps the emoji.
+function tdPiece(idx, title) {
+  return '<span class="tdpiece" style="background-position-x:' + (idx * 50) +
+    '%;" title="' + escapeHtml(title || '') + '"></span>';
+}
+function tdCoin() { return tdPiece(1, 'coin'); }
+function tdGold() { return tdPiece(2, 'gold slab (10 coins)'); }
 // Pending kinds where the meeple has not moved yet, so the die pick
 // can still be cancelled (FB-0030).
 const TD_CANCELLABLE = ['pilgrim_wave', 'merchant_dest', 'artist_dest'];
@@ -209,7 +222,7 @@ function tdSellLines(g, p) {
     const offers = Object.entries(g.boutiques || {}).filter(([, b]) => b.ware === w)
       .map(([t, b]) => {
         let per = b.price + (p.waves.merchant === 'crafty' ? 1 : 0);
-        return t + ' ' + per + '🪙' + (p.merchant_pos === t ? ' ★ here' : '');
+        return t + ' ' + per + ' ' + tdCoin() + (p.merchant_pos === t ? ' ★ here' : '');
       });
     return tdWare(w) + w + (n > 1 ? ' ×' + n : '') + ' → ' + offers.join(' / ');
   });
@@ -271,6 +284,9 @@ function tdRender() {
   // hot-spring circle at the bottom-left of the board art
   // (board 789x1600: centre ~x=105, y=1303 -> 13.3%, 81.4%), not in
   // the middle of the board — Annalisa asked for it exactly there.
+  // FB-0046: the token is the real BGA art from spritePieces.png
+  // (tokaidoduo-pieces.webp, panel 0) via .tdhotspring in flip7.html,
+  // not the hotspring.jpg art used before.
   // Grey ring while unclaimed ('nobody holds it yet'), holder's
   // colour ring once a Pilgrim visits a Hot Spring and takes it.
   const hp = (g.hot_spring !== null && g.hot_spring !== undefined)
@@ -299,7 +315,7 @@ function tdRender() {
     if (!pp) return;
     html += '<span class="tdbout" style="top:' + pp[1].toFixed(1) + '%;left:' + pp[0].toFixed(1) +
       '%;" title="Boutique ' + t + ': ' + b.ware + ' · ' + b.price + ' coins">' +
-      tdWare(b.ware, b.price) + b.price + '🪙</span>';
+      tdWare(b.ware, b.price) + b.price + ' ' + tdCoin() + '</span>';
   });
   // FB-0015: tap the board to move — when a move choice is pending,
   // highlight every legal destination on the board (station, town or
@@ -322,7 +338,7 @@ function tdRender() {
   const bouts = Object.entries(g.boutiques || {}).map(([t, b]) => {
     const here = g.players.filter(pp => pp.merchant_pos === t).map(pp => pp.name);
     return '<b>' + t + '</b> (' + (TD_TOWN_WHERE[t] || t) + ') ' +
-      tdWare(b.ware, b.price) + b.ware + ' · ' + b.price + '🪙' +
+      tdWare(b.ware, b.price) + b.ware + ' · ' + b.price + ' ' + tdCoin() +
       (here.length ? ' — ' + here.map(escapeHtml).join(', ') + ' here' : '');
   }).join('<br>');
   const wavesOnBoard = (g.waves_board || []).map(w =>
@@ -353,9 +369,9 @@ function tdRender() {
       (p.faith + p.commerce + p.culture) + ' pts</span></div>' +
       '<div class="tdpboard' + (i === 1 ? ' pb1' : '') + '">' + tdSeatBoard(g, p, col) + '</div>' +
       '<div class="small">⛩️ ' + p.temple + '×🌳 ' + p.garden + ' = ' + p.faith +
-      ' · 💰 ' + p.gold + ' slabs = ' + p.commerce +
+      ' · ' + tdGold() + ' ' + p.gold + ' slabs = ' + p.commerce +
       ' · 🎨 ' + p.gifted + '/10 = ' + p.culture +
-      ' · 🪙 ' + p.coins + '</div>' +
+      ' · ' + tdCoin() + ' ' + p.coins + '</div>' +
       '<div class="small">🎒 ' + waresTxt + '</div>' +
       '<div class="small">🛍️ Sell:<br>' + sellTxt + '</div>' +
       '<div class="small">🌊 Waves: ' + ['pilgrim', 'merchant', 'artist'].map(ch =>

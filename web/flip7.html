@@ -357,7 +357,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .tdboard{position:relative;width:min(100%,420px);aspect-ratio:789/1600;margin:8px auto;background:#f5efe0 url(tokaidoduo-board.webp?v=1) center/100% 100% no-repeat;border:2px solid #475569;border-radius:8px}
 .tdmeeple{position:absolute;width:24px;height:30px;margin:-15px 0 0 -12px;background-image:url(tokaidoduo-meeples.webp);background-size:300% 200%;background-repeat:no-repeat;border:3px solid #fff;box-shadow:0 1px 4px #000a;z-index:3}
 .tdmeeple.tdpurple{border-color:#7c3aed;box-shadow:0 0 0 2px #7c3aedcc,0 1px 4px #000a}.tdmeeple.tdgreen{border-color:#059669;box-shadow:0 0 0 2px #059669cc,0 1px 4px #000a}
-.tdhotspring{position:absolute;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;background:url(tokaidoduo-hotspring.webp) center/cover;border:3px solid #fff;box-shadow:0 1px 4px #000a;z-index:3}
+.tdhotspring{position:absolute;width:40px;height:40px;margin:-20px 0 0 -20px;border-radius:50%;background-image:url(tokaidoduo-pieces.webp);background-size:300% 100%;background-repeat:no-repeat;background-position:0% 0;border:3px solid #fff;box-shadow:0 1px 4px #000a;z-index:3}
 .tdhotspring.tdpurple{border-color:#7c3aed;box-shadow:0 0 0 2px #7c3aedcc,0 1px 4px #000a}.tdhotspring.tdgreen{border-color:#059669;box-shadow:0 0 0 2px #059669cc,0 1px 4px #000a}.tdhotspring.tdnone{border-color:#64748b;box-shadow:0 0 0 2px #64748bcc,0 1px 4px #000a}
 .tdmeeple.tdpilgrim{background-position-x:0%}.tdmeeple.tdmerchant{background-position-x:50%}.tdmeeple.tdartist{background-position-x:100%}
 .tdmeeple.tdpurple{background-position-y:0%}.tdmeeple.tdgreen{background-position-y:100%}
@@ -372,6 +372,14 @@ button:disabled{opacity:.45;cursor:not-allowed}
    appears instead of the emoji. The panel index is set inline by
    tdWare() in tokaidoduo.js as background-position-x (idx * 20%). */
 .tdware{display:inline-block;width:24px;height:24px;background-image:url(tokaidoduo-commerce.webp);background-size:600% 100%;background-repeat:no-repeat;vertical-align:-6px;margin-right:3px;border-radius:4px;box-shadow:0 1px 3px #000a}
+/* FB-0046: the Hot Spring token, 1 coin and 10-coin gold slab
+   (tokaidoduo-pieces.webp, spritePieces.png: 3 panels — hot spring,
+   1 coin, gold slab), shown instead of the coin emoji wherever a coin
+   amount appears (boutique pills, sell lines, seat summary). The panel
+   index is set inline by tdPiece() in tokaidoduo.js as
+   background-position-x (idx * 50%). The Hot Spring token on the board
+   (.tdhotspring above) uses panel 0 of the same strip. */
+.tdpiece{display:inline-block;width:20px;height:20px;background-image:url(tokaidoduo-pieces.webp);background-size:300% 100%;background-repeat:no-repeat;vertical-align:-5px;margin:0 1px;border-radius:4px;box-shadow:0 1px 3px #000a}
 .tdpboard{position:relative;aspect-ratio:862/213;background-image:url(tokaidoduo-pboards.webp);background-size:100% 200%;background-repeat:no-repeat;border-radius:8px;margin:6px 0;border:1px solid #475569}
 .tdpboard.pb1{background-position-y:100%}
 .tdmark{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px #000a;z-index:2}

@@ -190,6 +190,48 @@ def test_painting_tokens_use_bga_art():
     assert '"/tokaidoduo-commerce.webp"' in bot
 
 
+def test_pieces_tokens_use_bga_art():
+    # FB-0046: the Hot Spring token, the 1 coin and the 10-coin gold
+    # slab were emoji / the hotspring.jpg art — Annalisa asked for the
+    # real BGA art from spritePieces.png. The webp is the 3-panel strip
+    # (hot spring, 1 coin, gold slab), each token cropped tight and
+    # centred in its 72x91 panel; tdCoin()/tdGold() replace the coin
+    # emoji wherever an amount appears in the Mini App, and
+    # .tdhotspring uses panel 0 for the token on the board. Telegram
+    # text keeps the emoji.
+    import re
+    from PIL import Image
+    webp = os.path.join(os.path.dirname(__file__), "web",
+                        "tokaidoduo-pieces.webp")
+    assert os.path.isfile(webp) and os.path.getsize(webp) > 5000
+    assert Image.open(webp).size == (216, 91)
+    src = os.path.join(os.path.dirname(__file__), "sources", "tokaidoduo",
+                       "bga", "spritePieces.png")
+    assert os.path.isfile(src)
+    assert Image.open(src).size == (186, 91)
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    assert "function tdPiece(idx, title)" in js
+    assert "function tdCoin() { return tdPiece(1, 'coin'); }" in js
+    assert "function tdGold() { return tdPiece(2, 'gold slab (10 coins)'); }" in js
+    # no coin emoji left in the Mini App: boutique pills, boutiques
+    # card, sell lines and seat summary all use the art now
+    assert "🪙" not in js
+    assert "💰" not in js
+    assert "tdCoin()" in js and "tdGold()" in js
+    html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
+                encoding="utf-8").read()
+    assert "tokaidoduo-pieces.webp" in html
+    assert ".tdpiece{" in html
+    assert "background-size:300% 100%" in html
+    assert "tokaidoduo-hotspring.webp" not in html
+    # FB-0039: a referenced webp that is not in bot.py's static
+    # allowlist answers 404 and renders invisible.
+    bot = open(os.path.join(os.path.dirname(__file__), "bot.py"),
+               encoding="utf-8").read()
+    assert '"/tokaidoduo-pieces.webp"' in bot
+
+
 def test_zone_graph_and_spaces():
     assert len(TD.ZONES) == 8
     # adjacency is symmetric, 11 trade routes
@@ -701,18 +743,20 @@ def test_player_seats_use_bga_player_boards():
 
 
 def test_hot_spring_token_shows_on_board():
-    # FB-0028 / FB-0040 / FB-0041: the Hot Spring token (BGA art from
-    # sources/tokaidoduo/bga/hotspring.jpg) must be visible ON the board
-    # always — not only while a player holds it. It sits on its drawn
-    # place: the large dashed hot-spring circle at the bottom-left of
-    # the board art (board 789x1600, centre ~x=105, y=1303), with the
-    # holder's colour ring, like the character tokens; while nobody
-    # holds it (every fresh game) it shows with a grey ring, so it
-    # never looks missing.
+    # FB-0028 / FB-0040 / FB-0041: the Hot Spring token must be visible
+    # ON the board always — not only while a player holds it. It sits
+    # on its drawn place: the large dashed hot-spring circle at the
+    # bottom-left of the board art (board 789x1600, centre ~x=105,
+    # y=1303), with the holder's colour ring, like the character
+    # tokens; while nobody holds it (every fresh game) it shows with
+    # a grey ring, so it never looks missing.
+    # FB-0046: the token art is the real BGA art from
+    # sources/tokaidoduo/bga/spritePieces.png (panel 0 of
+    # tokaidoduo-pieces.webp), not the hotspring.jpg art used before.
     from PIL import Image
     tok = Image.open(os.path.join(os.path.dirname(__file__), "web",
-                                  "tokaidoduo-hotspring.webp"))
-    assert tok.size == (288, 288), tok.size  # tight crop of the round token
+                                  "tokaidoduo-pieces.webp"))
+    assert tok.size == (216, 91), tok.size  # 3 panels: hot spring, coin, gold
     js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
               encoding="utf-8").read()
     start = js.index("let html = '<div class=\"tdboard\">'")
@@ -736,7 +780,7 @@ def test_hot_spring_token_shows_on_board():
     html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
                 encoding="utf-8").read()
     assert ".tdhotspring{position:absolute;width:40px;height:40px;" in html
-    assert "background:url(tokaidoduo-hotspring.webp) center/cover;" in html
+    assert "background-image:url(tokaidoduo-pieces.webp);background-size:300% 100%;" in html
     assert ".tdhotspring.tdpurple{border-color:#7c3aed" in html
     assert ".tdhotspring.tdgreen{border-color:#059669" in html
     # Unclaimed it gets a grey ring (tdnone) so it reads on the light

@@ -131,6 +131,22 @@ function tdMark(x, y, col, title) {
   return '<span class="tdmark td' + col + '" style="left:' + (x / 862 * 100).toFixed(1) +
     '%;top:' + (y / 213 * 100).toFixed(1) + '%;" title="' + escapeHtml(title) + '"></span>';
 }
+// FB-0048: the coin tokens on the player's own board — the real BGA
+// 1-coin and gold-slab art from spritePieces.png (tokaidoduo-pieces.webp,
+// panels 1 and 2, as tdCoin()/tdGold() use inline), laid out in the free
+// band of the Merchant section, above the printed "10 coin -> gold"
+// conversion (painting slots end at y~113, the printed icons start at
+// y~148): coins first, then gold slabs, up to 8 per row. The pile starts
+// at x=278, not at the band's left edge, so the second row clears the
+// Artist's robe (measured off the board art: its right edge reaches
+// x~263 at y~140) instead of sitting on the character.
+const TD_COIN_X0 = 278, TD_COIN_Y0 = 118, TD_COIN_D = 22, TD_COIN_PER_ROW = 8;
+function tdBoardCoin(idx, x, y, title) {
+  return '<span class="tdboardcoin" style="left:' + (x / 862 * 100).toFixed(1) +
+    '%;top:' + (y / 213 * 100).toFixed(1) +
+    '%;background-position-x:' + (idx * 50) +
+    '%;" title="' + escapeHtml(title) + '"></span>';
+}
 function tdSeatBoard(g, p, col) {
   let s = '';
   const cu = TD_CULTURE_POS[p.culture];
@@ -148,6 +164,18 @@ function tdSeatBoard(g, p, col) {
     if (idx >= 10) return;
     s += tdPaintSlot(col, t, TD_PAINT_X[idx % 5], TD_PAINT_Y[Math.floor(idx / 5)]);
   });
+  let ci = 0;
+  const coins = Math.max(0, p.coins || 0), slabs = Math.max(0, p.gold || 0);
+  for (let k = 0; k < coins; k++, ci++) {
+    s += tdBoardCoin(1, TD_COIN_X0 + (ci % TD_COIN_PER_ROW) * TD_COIN_D,
+      TD_COIN_Y0 + Math.floor(ci / TD_COIN_PER_ROW) * TD_COIN_D,
+      'Coin ' + (k + 1) + ' of ' + coins);
+  }
+  for (let k = 0; k < slabs; k++, ci++) {
+    s += tdBoardCoin(2, TD_COIN_X0 + (ci % TD_COIN_PER_ROW) * TD_COIN_D,
+      TD_COIN_Y0 + Math.floor(ci / TD_COIN_PER_ROW) * TD_COIN_D,
+      'Gold slab ' + (k + 1) + ' of ' + slabs + ' (10 coins each)');
+  }
   return s;
 }
 // FB-0045: the painting tokens are the real BGA art from

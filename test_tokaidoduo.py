@@ -783,6 +783,45 @@ def test_player_seats_use_bga_player_boards():
     assert ".tdpaintslot{position:absolute;width:4.6%;height:23.5%;transform:translate(-50%,-50%);background-image:url(tokaidoduo-paintings.webp);background-size:1000% 100%;" in html
 
 
+def test_player_board_shows_coin_tokens():
+    # FB-0048: the player's own board (plancia del singolo giocatore)
+    # must show the coin tokens too — the real BGA 1-coin and gold-slab
+    # art from spritePieces.png (tokaidoduo-pieces.webp, panels 1 and
+    # 2), laid out in the free band of the Merchant section, above the
+    # printed "10 coin -> gold" conversion: coins first, then slabs.
+    # The board JSON already carries coins/gold per player.
+    import re
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    assert '"coins": p["coins"], "gold": p["gold"]' in open(
+        os.path.join(os.path.dirname(__file__), "bot.py"),
+        encoding="utf-8").read()
+    assert "const coins = Math.max(0, p.coins || 0), slabs = Math.max(0, p.gold || 0);" in js
+    assert "tdBoardCoin(1, TD_COIN_X0" in js  # 1-coin art, panel 1
+    assert "tdBoardCoin(2, TD_COIN_X0" in js  # gold slab, panel 2
+    assert "background-position-x:' + (idx * 50)" in js
+    m = re.search(r"const TD_COIN_X0 = (\d+), TD_COIN_Y0 = (\d+), "
+                  r"TD_COIN_D = (\d+), TD_COIN_PER_ROW = (\d+);", js)
+    assert m, "coin grid constants"
+    x0, y0, d, per_row = (int(v) for v in m.groups())
+    # worst case on the board: 9 coins (10 auto-convert to a slab)
+    # + 6 gold slabs — every token centre stays on the 862x213 board
+    # with its 10px half-size inside. The pile starts right of the
+    # Artist's robe (right edge x~263 at y~140, measured off the board
+    # art) so no token sits on the character, and its second row ends
+    # above the commerce markers on the gold row (y=168).
+    for i in range(9 + 6):
+        x = x0 + (i % per_row) * d
+        y = y0 + (i // per_row) * d
+        assert 10 <= x <= 862 - 10 and 10 <= y <= 213 - 10, (i, x, y)
+    assert x0 - 10 > 263, x0  # clears the Artist's robe
+    assert y0 + d + 10 < 168, (y0, d)  # second row above the gold row
+    html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
+                encoding="utf-8").read()
+    assert ".tdboardcoin{position:absolute;width:20px;height:20px;" in html
+    assert "background-image:url(tokaidoduo-pieces.webp);background-size:300% 100%;" in html
+
+
 def test_hot_spring_token_shows_on_board():
     # FB-0028 / FB-0040 / FB-0041: the Hot Spring token must be visible
     # ON the board always — not only while a player holds it. It sits

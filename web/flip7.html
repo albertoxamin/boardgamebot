@@ -380,6 +380,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
    background-position-x (idx * 50%). The Hot Spring token on the board
    (.tdhotspring above) uses panel 0 of the same strip. */
 .tdpiece{display:inline-block;width:20px;height:20px;background-image:url(tokaidoduo-pieces.webp);background-size:300% 100%;background-repeat:no-repeat;vertical-align:-5px;margin:0 1px;border-radius:4px;box-shadow:0 1px 3px #000a}
+/* FB-0048: the coin tokens on the player's own board (tokaidoduo-pieces.webp,
+   panel 1 = 1 coin, panel 2 = gold slab — index set inline by tdBoardCoin()
+   in tokaidoduo.js as background-position-x (idx * 50%), same strip as
+   .tdpiece). 20x20px, centred on the TD_COIN_* grid in tdSeatBoard(). */
+.tdboardcoin{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;background-image:url(tokaidoduo-pieces.webp);background-size:300% 100%;background-repeat:no-repeat;border-radius:4px;box-shadow:0 1px 3px #000a;z-index:2}
 .tdpboard{position:relative;aspect-ratio:862/213;background-image:url(tokaidoduo-pboards.webp);background-size:100% 200%;background-repeat:no-repeat;border-radius:8px;margin:6px 0;border:1px solid #475569}
 .tdpboard.pb1{background-position-y:100%}
 .tdmark{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px #000a;z-index:2}

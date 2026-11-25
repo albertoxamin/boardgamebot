@@ -762,11 +762,12 @@ def test_player_board_shows_coin_tokens():
     # FB-0048: the player's own board (plancia del singolo giocatore)
     # must show the coin tokens too — the real BGA 1-coin art from
     # spritePieces.png (tokaidoduo-pieces.webp, panel 1), in a single
-    # row in the free band between the Merchant's ware slots (their
-    # row 2 ends at y~118) and the printed "10 coin -> gold"
-    # conversion (starts at y~148). The gold slabs are NOT in this
-    # pile: per FB-0051 a slab marks the commerce tracker instead.
-    # The board JSON already carries coins/gold per player.
+    # row on the printed "10 coin -> gold" conversion. FB-0054
+    # (invoke): the coins are 28px with an 18px pitch, after Annalisa
+    # reported the 20px ones too small on her phone. The gold slabs
+    # are NOT in this pile: per FB-0051 a slab marks the commerce
+    # tracker instead. The board JSON already carries coins/gold per
+    # player.
     import re
     js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
               encoding="utf-8").read()
@@ -774,41 +775,53 @@ def test_player_board_shows_coin_tokens():
         os.path.join(os.path.dirname(__file__), "bot.py"),
         encoding="utf-8").read()
     assert "const coins = Math.max(0, p.coins || 0);" in js
-    assert "tdBoardCoin(1, TD_COIN_X0" in js  # 1-coin art, panel 1
+    assert 'tdBoardCoin(1, TD_COIN_X0 + (ci % TD_COIN_PER_ROW) * TD_COIN_PITCH,' in js
     assert "tdBoardCoin(2, TD_COIN_X0" not in js  # no slabs in the pile
     assert "background-position-x:' + (idx * 50)" in js
     m = re.search(r"const TD_COIN_X0 = (\d+), TD_COIN_Y0 = (\d+), "
-                  r"TD_COIN_D = (\d+), TD_COIN_PER_ROW = (\d+);", js)
+                  r"TD_COIN_D = (\d+), TD_COIN_PITCH = (\d+), TD_COIN_PER_ROW = (\d+);", js)
     assert m, "coin grid constants"
-    x0, y0, d, per_row = (int(v) for v in m.groups())
+    x0, y0, d, pitch, per_row = (int(v) for v in m.groups())
     # worst case on the board: 9 coins (10 auto-convert to a slab),
     # all in one row — every token centre stays on the 862x213 board
-    # with its 10px half-size inside. The row starts right of the
-    # Artist's robe (right edge x~263 at y~140, measured off the board
-    # art) so no token sits on the character, it clears the ware
-    # slots above (row 2 ends y~118) and the printed coin icons
-    # below (start y~148), and it ends above the gold row (y=196).
+    # with its half-size inside. Measured off the board art: the row
+    # sits on the printed "10 coin -> gold" conversion (icons y 125-155)
+    # so the pile covers the printed coin/arrow and the gold pill peeks
+    # out above it; it ends at x0 + 8*pitch + d/2, clear of "The"
+    # (starts x~437), "Merchant" below stays readable, and it ends
+    # above the gold numerals (tops y 168) and below the ware slots
+    # (row 2 ends y~118). The first coin's left edge just touches the
+    # Artist's robe (right edge x~263 at y~140) — verified by render.
     assert per_row >= 9, per_row
     for i in range(9):
-        x = x0 + (i % per_row) * d
+        x = x0 + (i % per_row) * pitch
         y = y0 + (i // per_row) * d
-        assert 10 <= x <= 862 - 10 and 10 <= y <= 213 - 10, (i, x, y)
-    assert x0 - 10 > 263, x0  # clears the Artist's robe
-    assert y0 - 10 > 118, y0  # below the ware slots
-    assert y0 + 10 < 148, y0  # above the printed coin icons
+        assert d // 2 <= x <= 862 - d // 2 and d // 2 <= y <= 213 - d // 2, (i, x, y)
+    assert x0 - d // 2 >= 250, x0  # just touches the Artist's robe
+    assert y0 - d // 2 > 118, y0  # below the ware slots
+    assert y0 + d // 2 < 168, y0  # above the gold numerals
+    assert x0 + 8 * pitch + d // 2 <= 437, (x0, pitch)  # clear of "The"
     html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
                 encoding="utf-8").read()
     # FB-0053 follow-up (Albert approved): the coin token (and the gold slab, same class via
     # tdBoardCoin panel 2) is %-sized to the 862x213 board — the same
     # 20x20px token, not a fixed 20px, which at phone width rendered
     # as ~50 board px (board ~346px wide) and overlapped the 20px
-    # coin pitch two and a half times over.
+    # coin pitch two and a half times over. FB-0054 (invoke): the pile
+    # is now 28px (.tdpile) after Annalisa reported the 20px coins too
+    # small on her phone, while the gold slab stays 20px so it does
+    # not cover its numeral on the gold row.
     m = re.search(r"\.tdboardcoin\{position:absolute;width:([\d.]+)%"
                   r";height:([\d.]+)%;transform:translate\(-50%,-50%\);", html)
     assert m, "board coin token is %-sized"
     w_pct, h_pct = float(m.group(1)), float(m.group(2))
     assert abs(w_pct / 100 * 862 - 20) < 1, w_pct
     assert abs(h_pct / 100 * 213 - 20) < 1, h_pct
+    m = re.search(r"\.tdboardcoin\.tdpile\{width:([\d.]+)%;height:([\d.]+)%\}", html)
+    assert m, "coin pile is %-sized bigger than the slab"
+    w_pct, h_pct = float(m.group(1)), float(m.group(2))
+    assert abs(w_pct / 100 * 862 - 28) < 1, w_pct
+    assert abs(h_pct / 100 * 213 - 28) < 1, h_pct
     assert "background-image:url(tokaidoduo-pieces.webp);background-size:300% 100%;" in html
 
 

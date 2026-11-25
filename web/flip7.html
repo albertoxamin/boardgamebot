@@ -383,15 +383,20 @@ button:disabled{opacity:.45;cursor:not-allowed}
 /* FB-0048: the coin tokens on the player's own board (tokaidoduo-pieces.webp,
    panel 1 = 1 coin, panel 2 = gold slab — index set inline by tdBoardCoin()
    in tokaidoduo.js as background-position-x (idx * 50%), same strip as
-   .tdpiece). The coin pile (panel 1) and the gold slab on the gold row
-   (panel 2, FB-0051) both go through tdBoardCoin, so both are fixed here.
-   FB-0053 follow-up (Albert approved): %-sized like .tdwareslot — 2.3% x 9.4% is the same 20x20px
-   token on the 862x213 board, centred with translate(-50%,-50%). The
-   fixed 20px it had before was only right at full board width: on a
-   phone the board is ~346px wide, so 20px rendered as ~50 board px —
-   two and a half times the 20px coin pitch — and the coins overlapped
-   each other and spilled over the row. */
+   .tdpiece). The gold slab on the gold row (panel 2, FB-0051) stays
+   2.3% x 9.4% (20x20px on the 862x213 board): a bigger slab would
+   cover its numeral. FB-0054 (invoke): the coin pile (panel 1) is
+   bigger — .tdpile is 3.25% x 13.1%, i.e. 28x28px, after Annalisa
+   reported the 20px coins were too small to see on her phone
+   ("solo i soldi troppo piccolo"). The pile's tight 18px pitch
+   (TD_COIN_PITCH in tokaidoduo.js) makes the 28px coins overlap
+   slightly and read as a pile. FB-0053 follow-up (Albert approved):
+   %-sized like .tdwareslot — the fixed 20px it had before was only
+   right at full board width: on a phone the board is ~346px wide, so
+   20px rendered as ~50 board px — two and a half times the 20px coin
+   pitch — and the coins overlapped each other and spilled over the row. */
 .tdboardcoin{position:absolute;width:2.3%;height:9.4%;transform:translate(-50%,-50%);background-image:url(tokaidoduo-pieces.webp);background-size:300% 100%;background-repeat:no-repeat;border-radius:4px;box-shadow:0 1px 3px #000a;z-index:2}
+.tdboardcoin.tdpile{width:3.25%;height:13.1%}
 /* FB-0050: the Ware tokens the player holds (tokaidoduo-marchandise.webp,
    spriteJetonsMarchandise.jpg: 4 panels — pottery, doll, fan, kimono),
    shown in the Merchant's 6 printed ware slots on the player's own

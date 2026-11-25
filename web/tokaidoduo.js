@@ -153,18 +153,31 @@ function tdMark(x, y, col, title) {
 }
 // FB-0048: the coin tokens on the player's own board — the real BGA
 // 1-coin art from spritePieces.png (tokaidoduo-pieces.webp, panel 1, as
-// tdCoin() uses inline), in a single row in the free band between the
-// Merchant's ware slots (their row 2 ends at y~118) and the printed
-// "10 coin -> gold" conversion (starts at y~148): y=136, up to 9 coins
-// in the row (10 auto-convert to a slab, so a second row only happens
-// past the gold cap). The gold slabs are NOT in this pile: per FB-0051
-// a slab marks the player's position on the Merchant's score tracker
-// (the gold row, see tdSeatBoard). The row starts at x=278, so it
-// clears the Artist's robe (measured off the board art: its right edge
-// reaches x~263 at y~140) instead of sitting on the character.
-// tdSeatBoard already receives the player's coins and gold, and the
-// summary line under the board keeps the exact numbers.
-const TD_COIN_X0 = 278, TD_COIN_Y0 = 136, TD_COIN_D = 20, TD_COIN_PER_ROW = 9;
+// tdCoin() uses inline). FB-0054 (invoke): Annalisa reported the coins
+// were too small ("solo i soldi troppo piccolo") — the 20px tokens
+// rendered as ~8px on a phone. They are now 28px (TD_COIN_D), in a
+// tight row with an 18px pitch (TD_COIN_PITCH), so the
+// coins overlap slightly and read as a pile, like the coin piles on
+// the main board. Measured off the board art: the row sits at y=136
+// on the printed "10 coin -> gold" conversion (icons y 125-155,
+// x 278-385) — the pile covers the printed coin/arrow and the gold
+// pill peeks out above it, which is how a pile of real coins would
+// sit there; the conversion rule is also in the bot's help text.
+// The row runs x 272-416 + 14px half-size = ends x 430, so it stays
+// clear of "The" (starts x~437) and "Merchant" below it stays fully
+// readable, and it ends above the gold numerals (tops y 168). The
+// first coin's left edge (x 258) just touches the Artist's robe
+// (right edge x~263 at y~140) — verified by render, it reads as the
+// coin in front of the robe. The gold slabs are NOT in this pile:
+// per FB-0051 a slab marks the player's position on the Merchant's
+// score tracker (the gold row, see tdSeatBoard) and stays 20px, so a
+// bigger slab would not cover its numeral. tdSeatBoard already
+// receives the player's coins and gold, and the summary line under
+// the board keeps the exact numbers. Up to 9 coins in the row (10
+// auto-convert to a slab — _convert_coins runs after every coin gain
+// and the 6th slab ends the game — so a second row cannot occur in
+// a rendered game; the row offset below is defensive only).
+const TD_COIN_X0 = 272, TD_COIN_Y0 = 136, TD_COIN_D = 28, TD_COIN_PITCH = 18, TD_COIN_PER_ROW = 9;
 // FB-0050: the merchandise tokens (spriteJetonsMarchandise.jpg,
 // tokaidoduo-marchandise.webp): 4 panels, left to right — pottery
 // (sake bottle), doll, fan, kimono. They sit in the Merchant's 6
@@ -185,8 +198,8 @@ const TD_WARE_SLOT_X = [329, 384, 439], TD_WARE_SLOT_Y = [45, 98];
 // (FB-0029) — until now a held Wave only appeared as a text line
 // under the board, so Annalisa could not see it on the board.
 const TD_WAVE_SLOT = {artist: [253, 40], merchant: [539, 41], pilgrim: [827, 41]};
-function tdBoardCoin(idx, x, y, title) {
-  return '<span class="tdboardcoin" style="left:' + (x / 862 * 100).toFixed(1) +
+function tdBoardCoin(idx, x, y, title, pile) {
+  return '<span class="tdboardcoin' + (pile ? ' tdpile' : '') + '" style="left:' + (x / 862 * 100).toFixed(1) +
     '%;top:' + (y / 213 * 100).toFixed(1) +
     '%;background-position-x:' + (idx * 50) +
     '%;" title="' + escapeHtml(title) + '"></span>';
@@ -225,9 +238,9 @@ function tdSeatBoard(g, p, col) {
   let ci = 0;
   const coins = Math.max(0, p.coins || 0);
   for (let k = 0; k < coins; k++, ci++) {
-    s += tdBoardCoin(1, TD_COIN_X0 + (ci % TD_COIN_PER_ROW) * TD_COIN_D,
+    s += tdBoardCoin(1, TD_COIN_X0 + (ci % TD_COIN_PER_ROW) * TD_COIN_PITCH,
       TD_COIN_Y0 + Math.floor(ci / TD_COIN_PER_ROW) * TD_COIN_D,
-      'Coin ' + (k + 1) + ' of ' + coins);
+      'Coin ' + (k + 1) + ' of ' + coins, true);
   }
   // FB-0050: the Wares the player holds, as the real BGA merchandise
   // tokens from spriteJetonsMarchandise.jpg

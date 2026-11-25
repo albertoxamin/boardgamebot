@@ -308,7 +308,11 @@ class AltayEngineTests(unittest.TestCase):
         base = os.path.dirname(os.path.abspath(__file__))
         with open(os.path.join(base, "web", "flip7.html"), encoding="utf-8") as f:
             html = f.read()
-        self.assertIn(".atregion{position:absolute;transform:translate(-50%,-50%);width:44px;height:44px;", html)
+        # FB-0060: fixed 44px circles overlapped on the small territories
+        # at phone width, so the circle is now min(44px, 10.5%) of the
+        # board width — still 44px on a wide board, ~38px on a phone,
+        # never below the 34px FB-0021 complained about.
+        self.assertIn(".atregion{position:absolute;transform:translate(-50%,-50%);width:min(44px,10.5%);aspect-ratio:1/1;", html)
         self.assertIn(".atsettle{width:20px;height:26px;background-image:url(altay-tokens.webp);background-size:400% 100%;", html)
         self.assertIn(".atmarkerchip{position:absolute;transform:translate(-50%,-50%);width:42px;height:28px;", html)
 
@@ -429,8 +433,8 @@ class AltayEngineTests(unittest.TestCase):
         game, _ = self.new_seafarers_game()
         board = altay.board_json(game, 42)
         pos = {r["id"]: r["pos"] for r in board["regions"]}
-        # Region circles are 44px on a 390px-wide board (11.3% of the
-        # width). Distances are in % of width, with the vertical
+        # Region circles are min(44px, 10.5%) of the board width
+        # (FB-0060). Distances are in % of width, with the vertical
         # component scaled by the board aspect (1451/2048).
         aspect = 1451 / 2048
 
@@ -448,6 +452,48 @@ class AltayEngineTests(unittest.TestCase):
         base_pos = {r["id"]: r["pos"] for r in base["regions"]}
         self.assertEqual(base_pos[23], altay.REGION_POS[23])
         self.assertEqual(base_pos[24], altay.REGION_POS[24])
+
+    def test_region_circles_never_overlap_or_clip(self):
+        """FB-0060: 'on altay, the map on the mini app still looks
+        weird' — after the FB-0057 island fix, the map still showed
+        territories merged into blobs and circles cut off by the board
+        edge: 2 sat on 14 and 11 on 17 in every game, and 0/2/7 were
+        clipped at the top, 11/16 at the bottom, 12/8 at the sides.
+        Every pair of circles must clear each other (centre distance
+        above the circle diameter plus its 2px border) and every circle
+        must fit fully inside the board, in base and Seafarers games,
+        at phone widths (360/390px) and on a wide board."""
+        aspect = 1451 / 2048
+        for make in (self.new_game, self.new_seafarers_game):
+            game, _ = make()
+            board = altay.board_json(game, 42)
+            regions = board["regions"]
+            for width in (360, 390, 700):
+                height = width * aspect
+                # the CSS circle is min(44px, 10.5%) of the board width
+                diam = min(44.0, 0.105 * width)
+                need = diam + 4  # +2px border on each side
+                pts = {r["id"]: (r["pos"][0] / 100 * width,
+                                  r["pos"][1] / 100 * height)
+                       for r in regions}
+                for a in pts:
+                    for b in pts:
+                        if b <= a:
+                            continue
+                        dist = ((pts[a][0] - pts[b][0]) ** 2 +
+                                (pts[a][1] - pts[b][1]) ** 2) ** 0.5
+                        self.assertGreaterEqual(
+                            dist, need,
+                            f"regions {a} and {b} overlap at {width}px")
+                for rid, (cx, cy) in pts.items():
+                    self.assertGreaterEqual(cx - diam / 2 - 2, 0,
+                                           f"region {rid} clipped left")
+                    self.assertLessEqual(cx + diam / 2 + 2, width,
+                                        f"region {rid} clipped right")
+                    self.assertGreaterEqual(cy - diam / 2 - 2, 0,
+                                           f"region {rid} clipped top")
+                    self.assertLessEqual(cy + diam / 2 + 2, height,
+                                        f"region {rid} clipped bottom")
 
     def test_sea_badges_do_not_cover_region_circles(self):
         """FB-0057: the sea-zone badges sat on top of region circles (A

@@ -191,19 +191,30 @@ REGION_NAMES = [
     "Sacred Plateau", "Waveborn Isle", "Gull Rock",
 ]
 REGION_POS = [
-    [10.0, 6.4], [57.3, 17.7], [92.4, 6.7], [9.0, 89.1], [47.5, 81.0],
-    [94.0, 84.8], [17.0, 21.7], [67.4, 7.3], [94.6, 31.9], [18.2, 76.3],
-    [79.7, 61.2], [80.6, 92.4], [4.4, 26.3], [39.9, 12.4], [86.4, 16.8],
-    [30.7, 68.8], [36.0, 94.8], [78.1, 78.3], [10.1, 52.2], [38.3, 54.7],
-    [68.9, 30.6], [92.8, 55.5], [61.7, 90.0], [28.7, 34.8], [59.5, 53.7],
-    [30.5, 28.5], [68.0, 52.0],
+    [13.0, 9.5], [56.0, 19.5], [93.0, 9.5], [8.0, 90.5], [47.5, 81.0],
+    [93.0, 85.0], [21.0, 26.0], [68.5, 9.5], [93.0, 32.0], [18.2, 76.3],
+    [79.7, 61.2], [81.0, 91.0], [6.5, 26.3], [39.9, 12.4], [81.0, 23.0],
+    [30.7, 68.8], [36.0, 91.0], [72.0, 78.0], [10.1, 52.2], [42.0, 50.0],
+    [67.0, 34.0], [92.8, 55.5], [61.7, 90.0], [31.0, 39.0], [59.5, 53.7],
+    [33.0, 27.0], [68.0, 52.0],
 ]
+# FB-0060: the old positions were measured roughly and never checked
+# against the board at phone width — several pairs of 44px circles
+# overlapped into one blob (2 over 14, 11 over 17, in every game), and
+# several sat half off the board (0, 2, 7 at the top; 11, 16 at the
+# bottom; 12, 8 at the sides). The positions above were re-measured
+# against the board art: each circle sits on its own territory with a
+# gap to every neighbour, and fully inside the board, at 360px width
+# (see test_region_circles_never_overlap_or_clip). The circles are
+# also responsive now (min(44px, 10.5%) in the CSS), because the
+# territories on this board are too close together for fixed 44px
+# circles at phone width no matter where they sit.
 # FB-0057: in Seafarers games the two islands hold two territories each
 # (23 + 25 on the west island, 24 + 26 on the east one), and the base
 # positions put each pair on top of each other — the circles stacked into
 # one blob. With the expansion on, 23/24 move to the far end of their
 # island so both circles fit side by side; the base game is unchanged.
-SEAFARERS_REGION_POS = {23: [28.0, 46.0], 24: [56.0, 55.0]}
+SEAFARERS_REGION_POS = {23: [28.0, 46.0], 24: [55.0, 57.0]}
 REGION_TYPES = {}
 for _region in [0, 1, 3, 4, 5, 9, 23, 24, 25]:
     REGION_TYPES[_region] = "farmland"

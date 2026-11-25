@@ -798,7 +798,17 @@ def test_player_board_shows_coin_tokens():
     assert y0 + 10 < 148, y0  # above the printed coin icons
     html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
                 encoding="utf-8").read()
-    assert ".tdboardcoin{position:absolute;width:20px;height:20px;" in html
+    # FB-0053 follow-up (Albert approved): the coin token (and the gold slab, same class via
+    # tdBoardCoin panel 2) is %-sized to the 862x213 board — the same
+    # 20x20px token, not a fixed 20px, which at phone width rendered
+    # as ~50 board px (board ~346px wide) and overlapped the 20px
+    # coin pitch two and a half times over.
+    m = re.search(r"\.tdboardcoin\{position:absolute;width:([\d.]+)%"
+                  r";height:([\d.]+)%;transform:translate\(-50%,-50%\);", html)
+    assert m, "board coin token is %-sized"
+    w_pct, h_pct = float(m.group(1)), float(m.group(2))
+    assert abs(w_pct / 100 * 862 - 20) < 1, w_pct
+    assert abs(h_pct / 100 * 213 - 20) < 1, h_pct
     assert "background-image:url(tokaidoduo-pieces.webp);background-size:300% 100%;" in html
 
 

@@ -822,6 +822,43 @@ def test_player_board_shows_coin_tokens():
     assert "background-image:url(tokaidoduo-pieces.webp);background-size:300% 100%;" in html
 
 
+def test_player_board_shows_ware_tokens():
+    # FB-0050: the Merchant section of each player's own board must
+    # show the Ware tokens the player holds in inventory — the real
+    # BGA merchandise tokens from spriteJetonsMarchandise.jpg
+    # (tokaidoduo-marchandise.webp: 4 panels — pottery, doll, fan,
+    # kimono), in a row above the Merchant character.
+    import re
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    m = re.search(r"const TD_MARCH_IDX = \{([^}]*)\};", js)
+    assert m, "merchandise panel index"
+    idx = dict((k.strip(), int(v)) for k, v in
+               (kv.split(":") for kv in m.group(1).split(",")))
+    assert sorted(idx) == sorted(TD.WARE_TYPES), idx
+    assert len(set(idx.values())) == 4
+    assert "(p.wares || []).forEach((w, idx) => {" in js
+    assert "TD_MARCH_IDX[w]" in js
+    assert '"tdwaretok"' in js
+    m = re.search(r"const TD_WARE_X0 = (\d+), TD_WARE_Y0 = (\d+), "
+                  r"TD_WARE_D = (\d+);", js)
+    assert m, "ware row constants"
+    x0, y0, d = (int(v) for v in m.groups())
+    # worst case: 6 Wares (Robust wave raises the cap to 6) — the row
+    # stays on the 862x213 board, clear of the red badge (x~591,
+    # measured off the board art) and above the Merchant's cart bar
+    # (starts y~42).
+    assert x0 - 10 >= 0 and x0 + 5 * d + 10 < 591, (x0, d)
+    assert y0 - 10 >= 0 and y0 + 10 < 42, y0
+    html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
+                encoding="utf-8").read()
+    assert ".tdwaretok{position:absolute;width:20px;height:20px;" in html
+    assert "background-image:url(tokaidoduo-marchandise.webp);background-size:400% 100%;" in html
+    bot = open(os.path.join(os.path.dirname(__file__), "bot.py"),
+               encoding="utf-8").read()
+    assert '"/tokaidoduo-marchandise.webp"' in bot
+
+
 def test_hot_spring_token_shows_on_board():
     # FB-0028 / FB-0040 / FB-0041: the Hot Spring token must be visible
     # ON the board always — not only while a player holds it. It sits

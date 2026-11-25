@@ -141,6 +141,13 @@ function tdMark(x, y, col, title) {
 // Artist's robe (measured off the board art: its right edge reaches
 // x~263 at y~140) instead of sitting on the character.
 const TD_COIN_X0 = 278, TD_COIN_Y0 = 118, TD_COIN_D = 22, TD_COIN_PER_ROW = 8;
+// FB-0050: the merchandise tokens (spriteJetonsMarchandise.jpg,
+// tokaidoduo-marchandise.webp): 4 panels, left to right — pottery
+// (sake bottle), doll, fan, kimono. Shown in a row above the Merchant
+// character for each Ware in the player's inventory; the cart's bar
+// starts at y~42 and the red badge at x~591, so the row sits at y=26.
+const TD_MARCH_IDX = {pottery: 0, doll: 1, fan: 2, kimono: 3};
+const TD_WARE_X0 = 458, TD_WARE_Y0 = 26, TD_WARE_D = 21;
 function tdBoardCoin(idx, x, y, title) {
   return '<span class="tdboardcoin" style="left:' + (x / 862 * 100).toFixed(1) +
     '%;top:' + (y / 213 * 100).toFixed(1) +
@@ -176,6 +183,21 @@ function tdSeatBoard(g, p, col) {
       TD_COIN_Y0 + Math.floor(ci / TD_COIN_PER_ROW) * TD_COIN_D,
       'Gold slab ' + (k + 1) + ' of ' + slabs + ' (10 coins each)');
   }
+  // FB-0050: the Wares the player holds, as the real BGA merchandise
+  // tokens from spriteJetonsMarchandise.jpg
+  // (tokaidoduo-marchandise.webp: 4 panels — pottery, doll, fan,
+  // kimono), in a row above the Merchant character: the top of her
+  // section is free there (the cart's bar starts at y~42, the red
+  // badge at x~591), one token per Ware in the inventory.
+  (p.wares || []).forEach((w, idx) => {
+    const mi = TD_MARCH_IDX[w];
+    if (mi === undefined) return;
+    s += '<span class="tdwaretok" style="left:' +
+      ((TD_WARE_X0 + idx * TD_WARE_D) / 862 * 100).toFixed(1) +
+      '%;top:' + (TD_WARE_Y0 / 213 * 100).toFixed(1) +
+      '%;background-position-x:' + (mi * 100 / 3).toFixed(2) +
+      '%;" title="' + escapeHtml(w) + '"></span>';
+  });
   return s;
 }
 // FB-0045: the painting tokens are the real BGA art from

@@ -385,6 +385,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
    in tokaidoduo.js as background-position-x (idx * 50%), same strip as
    .tdpiece). 20x20px, centred on the TD_COIN_* grid in tdSeatBoard(). */
 .tdboardcoin{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;background-image:url(tokaidoduo-pieces.webp);background-size:300% 100%;background-repeat:no-repeat;border-radius:4px;box-shadow:0 1px 3px #000a;z-index:2}
+/* FB-0050: the Ware tokens the player holds (tokaidoduo-marchandise.webp,
+   spriteJetonsMarchandise.jpg: 4 panels — pottery, doll, fan, kimono),
+   shown in a row above the Merchant character on the player's own board.
+   The panel index is set inline by tdSeatBoard() in tokaidoduo.js as
+   background-position-x (idx * 100/3%). */
+.tdwaretok{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;background-image:url(tokaidoduo-marchandise.webp);background-size:400% 100%;background-repeat:no-repeat;border-radius:4px;box-shadow:0 1px 3px #000a;z-index:2}
 .tdpboard{position:relative;aspect-ratio:862/213;background-image:url(tokaidoduo-pboards.webp);background-size:100% 200%;background-repeat:no-repeat;border-radius:8px;margin:6px 0;border:1px solid #475569}
 .tdpboard.pb1{background-position-y:100%}
 .tdmark{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px #000a;z-index:2}

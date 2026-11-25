@@ -26,6 +26,7 @@ import tokaidoduo as TD
 import altay as AL
 import blackflag as BF
 import rumblenation as RN
+import fadenfroh as FD
 import game_registry as GR
 import web_assets
 from game_modules.leaves import LEAVES_MODULE
@@ -39,7 +40,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 70
+WEB_VER = 71
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -460,6 +461,7 @@ NPC_PLAYERS = {
     "altay": lambda uid=NPC_ID, name="🤖 NPC": {**AL.new_player(uid, name), **_npc_player(uid, name)},
     "blackflag": _blackflag_npc,
     "rumblenation": lambda uid=NPC_ID, name="🤖 NPC": {**RN.new_player(uid, name), **_npc_player(uid, name)},
+    "fadenfroh": lambda uid=NPC_ID, name="🤖 NPC": {**FD.new_player(uid, name), **_npc_player(uid, name)},
 }
 
 
@@ -4962,6 +4964,272 @@ def rumblenation_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
+FADENFROH_RULES = FD.RULES
+FF_LEN = FD.MAX_PLAYERS
+
+
+def fadenfroh_get(state, chat_id):
+    return state.setdefault("fadenfroh", {}).get(str(chat_id))
+
+
+def fadenfroh_actor_idx(g, uid):
+    actor = FD.current_index(g)
+    if actor is None:
+        return None
+    p = g["players"][actor]
+    return actor if p["user_id"] == uid or _is_npc(p) else None
+
+
+def fadenfroh_board_text(g):
+    lines = list(FD.board_lines(g))
+    pend = g.get("pending")
+    if g["phase"] == "shopping":
+        lines.append("🎮 /fadenfroh_material &lt;thread|needle|thimble&gt; or "
+                     "/fadenfroh_pass &lt;offer&gt; (or tap buttons).")
+    elif pend and pend["kind"] == "keep":
+        lines.append("🎮 /fadenfroh_keep &lt;1-3&gt; (or tap a card).")
+    elif pend and pend["kind"] == "place":
+        lines.append("🎮 /fadenfroh_place &lt;card&gt; &lt;row&gt; &lt;side&gt; "
+                     "&lt;cover&gt; [needle], /fadenfroh_discard &lt;cards&gt; "
+                     "(or tap an option).")
+    elif pend and pend["kind"] == "bonus":
+        lines.append("🎮 /fadenfroh_bonus &lt;B|C&gt; (or tap a button).")
+    return "\n".join(lines)
+
+
+def fadenfroh_keyboard(g):
+    if g["phase"] == "game_end":
+        return [[{"text": "🔄 Rematch!", "callback_data": "ff:rematch"}]]
+    ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
+    wk = web_keyboard(ct, g["chat_id"], game="fadenfroh")
+    if g["phase"] == "lobby":
+        kb = [[{"text": "🙋 Join Fadenfroh", "callback_data": "ff:join"}]]
+        if can_add_npc("fadenfroh", g):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "ff:npc"}])
+        kb.append([{"text": "▶️ Start game", "callback_data": "ff:start"}])
+        return kb + (wk or [])
+    idx = FD.current_index(g)
+    if idx is None:
+        return wk or []
+    kb = []
+    pend = g.get("pending")
+    if g["phase"] == "shopping":
+        m = g["market"]
+        row = []
+        if len(g["active"]) > 1:
+            if m["threads"]:
+                row.append({"text": f"🧵 Thread ({m['threads']})", "callback_data": "ff:m:thread"})
+            if m["needles"]:
+                row.append({"text": f"🪡 Needle ({m['needles']})", "callback_data": "ff:m:needle"})
+            if m.get("thimble"):
+                row.append({"text": "🟘 Thimble", "callback_data": "ff:m:thimble"})
+        if row:
+            kb.append(row)
+        for off, cards in enumerate(m["offers"]):
+            kb.append([{"text": f"🛒 Offer {off + 1} ({len(cards)} cards)",
+                        "callback_data": f"ff:p:{off}"}])
+    elif pend:
+        for opt in FD.pending_options(g, idx)[:30]:
+            kb.append([{"text": opt["label"][:60], "callback_data": "ff:o:" + opt["value"]}])
+    return kb + (wk or [])
+
+
+def fadenfroh_render(g, events=None):
+    lines = [html.escape(e) for e in (events or [])]
+    idx = FD.current_index(g)
+    if idx is not None:
+        p = g["players"][idx]
+        if _is_npc(p):
+            lines.append("👉 🤖 NPC's turn - anyone can play for it!")
+        else:
+            mention = (f'<a href="tg://user?id={p["user_id"]}">'
+                       f'{html.escape(p["name"])}</a>')
+            lines.append(f"👉 {mention} - your move.")
+    text = "\n".join(lines + [fadenfroh_board_text(g)])
+    r = send_board(g, "fadenfroh", text, fadenfroh_keyboard(g))
+    if r.get("ok"):
+        old = g.get("board_message_id")
+        g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=g["chat_id"], message_id=old)
+
+
+def handle_fadenfroh(state, msg, cmd, text, uid, name):
+    chat_id = msg["chat"]["id"]
+    g = fadenfroh_get(state, chat_id)
+    if cmd == "/fadenfroh_rules":
+        send(chat_id, FADENFROH_RULES)
+        return True
+    if cmd == "/fadenfroh":
+        if not g:
+            _name = msg.get("from", {}).get("first_name") or "Player"
+            g = FD.new_game(chat_id, uid, _name)
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state.setdefault("fadenfroh", {})[str(chat_id)] = g
+            fadenfroh_render(g, [f"🪡 Fadenfroh game created by {html.escape(_name)}!"])
+        else:
+            fadenfroh_render(g)
+        return True
+    if not g:
+        send(chat_id, "No Fadenfroh game here yet - send /fadenfroh to create one.")
+        return True
+    g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd == "/fadenfroh_join_npc":
+        err = add_npc("fadenfroh", g)
+        send(chat_id, err or "🤖 NPC joined - anyone can play for it!")
+        if not err:
+            fadenfroh_render(g)
+        return True
+    if cmd == "/fadenfroh_join":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p["user_id"] == uid for p in g["players"]):
+            send(chat_id, "You're already in!")
+        elif len(g["players"]) >= FF_LEN:
+            send(chat_id, "⛔ Fadenfroh is 2-4 players (full).")
+        else:
+            g["players"].append(FD.new_player(uid, name))
+            send(chat_id, f"🙋 <b>{html.escape(name)}</b> joined Fadenfroh.")
+            fadenfroh_render(g)
+        return True
+    if cmd == "/fadenfroh_start":
+        if g["phase"] != "lobby":
+            send(chat_id, "Already started.")
+        else:
+            ev = []
+            err = FD.start_game(g, ev)
+            send(chat_id, f"⛔ {err}" if err else "🪡 Fadenfroh started!")
+            if not err:
+                fadenfroh_render(g, ev)
+        return True
+    if cmd == "/fadenfroh_cancel":
+        if uid != g["created_by"]:
+            send(chat_id, "⛔ Only the creator can cancel.")
+        else:
+            del state["fadenfroh"][str(chat_id)]
+            send(chat_id, "🗑 Fadenfroh game cancelled.")
+        return True
+    if cmd == "/fadenfroh_rematch":
+        ev, err = rematch_game(state, "fadenfroh", chat_id, uid)
+        send(chat_id, f"⛔ {err}" if err else "🔄 Rematch!")
+        return True
+    parts = text.split()[1:]
+    ev = []
+    if cmd == "/fadenfroh_material":
+        idx = fadenfroh_actor_idx(g, uid)
+        err = ("Usage: /fadenfroh_material &lt;thread|needle|thimble&gt;"
+               if idx is None else FD.take_material(g, idx, " ".join(parts).lower(), ev))
+    elif cmd == "/fadenfroh_pass":
+        idx = fadenfroh_actor_idx(g, uid)
+        try:
+            offer = int(parts[0])
+        except (IndexError, ValueError):
+            offer = -1
+        err = ("Usage: /fadenfroh_pass &lt;offer&gt;" if idx is None
+               else FD.pass_offer(g, idx, offer, ev))
+    elif cmd in ("/fadenfroh_keep", "/fadenfroh_place", "/fadenfroh_discard", "/fadenfroh_bonus"):
+        pend = g.get("pending")
+        idx = fadenfroh_actor_idx(g, uid)
+        if idx is None or not pend or pend.get("by") != idx:
+            err = "⛔ You have no pending choice."
+        elif cmd == "/fadenfroh_keep":
+            try:
+                err = FD.apply_choice(g, idx, int(parts[0]) - 1, ev)
+            except (IndexError, ValueError):
+                err = "Usage: /fadenfroh_keep &lt;1-3&gt;"
+        elif cmd == "/fadenfroh_bonus":
+            err = FD.apply_choice(g, idx, parts[0].upper() if parts else "", ev)
+        elif cmd == "/fadenfroh_discard":
+            try:
+                cards = [int(x) - 1 for x in re.split(r"[,\s]+", " ".join(parts)) if x]
+            except ValueError:
+                cards = []
+            err = FD.discard_supply(g, idx, cards, ev)
+        else:
+            if len(parts) < 4 or parts[2].lower() not in ("left", "right"):
+                err = ("Usage: /fadenfroh_place &lt;card&gt; &lt;row&gt; "
+                       "&lt;left|right&gt; &lt;1|2&gt; [needle]")
+            else:
+                needle = len(parts) > 4 and parts[4].lower() in ("1", "needle", "yes", "true")
+                value = f"{int(parts[0]) - 1}:{int(parts[1]) - 1}:{parts[2].lower()}:{int(parts[3])}:{int(needle)}"
+                err = FD.apply_choice(g, idx, value, ev)
+    else:
+        return False
+    if err:
+        send(chat_id, f"⛔ {err}")
+    else:
+        fadenfroh_render(g, ev)
+    return True
+
+
+def fadenfroh_board_json(g, viewer_id=None):
+    board = FD.board_json(g, viewer_id)
+    idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == viewer_id), None)
+    actor = board["actor"]
+    board["is_player"] = idx is not None
+    board["can_act"] = idx is not None and (
+        actor is None or idx == actor or _is_npc(g["players"][actor]))
+    for i, p in enumerate(g["players"]):
+        board["players"][i]["npc"] = _is_npc(p)
+    return board
+
+
+def fadenfroh_api_move(state, chat_id, user_id, body):
+    g = fadenfroh_get(state, chat_id)
+    if not g:
+        return [], "no Fadenfroh game in that chat"
+    action = body.get("action")
+    ev = []
+    idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
+    if action == "join":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        if idx is not None:
+            return ev, None
+        if len(g["players"]) >= FF_LEN:
+            return [], "full"
+        iu_name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
+        g["players"].append(FD.new_player(user_id, iu_name))
+        ev.append("🙋 joined Fadenfroh.")
+    elif action == "join_npc":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        err = add_npc("fadenfroh", g)
+        if err:
+            return [], err
+        ev.append("🤖 NPC joined Fadenfroh.")
+    elif action == "start":
+        if g["phase"] != "lobby":
+            return [], "already started"
+        err = FD.start_game(g, ev)
+        if err:
+            return [], err
+    elif action == "rematch":
+        return rematch_game(state, "fadenfroh", chat_id, user_id)
+    else:
+        actor = fadenfroh_actor_idx(g, user_id)
+        if actor is None:
+            return [], "not in this game"
+        if action == "material":
+            err = FD.take_material(g, actor, str(body.get("kind", "")), ev)
+        elif action == "pass":
+            err = FD.pass_offer(g, actor, body.get("offer", -1), ev)
+        elif action == "choice":
+            err = FD.apply_choice(g, actor, body.get("value", ""), ev)
+        elif action == "discard":
+            cards = body.get("cards") or []
+            try:
+                err = FD.discard_supply(g, actor, [int(c) for c in cards], ev)
+            except (TypeError, ValueError):
+                return [], "bad cards"
+        else:
+            return [], "unknown action"
+        if err:
+            return [], err
+    fadenfroh_render(g, ev)
+    return ev, None
+
+
 TOKAIDODUO_RULES = """🗾 <b>Tokaido Duo rules</b> (2 players, Shikoku): each player controls a Pilgrim, a Merchant and an Artist. Score Faith + Commerce + Culture; highest total wins (tie: more coins, then shared).
 • Each round the first picker rolls 3 dice (one per character). Draft is 1-2-1: first picker takes one, the other takes one, first picker takes the last. First picker alternates each round. A chosen character <b>must</b> move the exact die value.
 • <b>Pilgrim ⛩️</b> moves clockwise around the 37-station ring. May pass occupied stations, but may not land on one - jumps to the next empty station. Coastal Town: gain the boutique coins (2-4). Temple: +1 Temple (9 ends the game). Garden: +1 Garden (6 ends the game). Hot Spring: take the token (steal it from your opponent); use it on a future pick to repeat a move. Seashore: take a Wave tile from the board (or steal one).
@@ -5890,7 +6158,8 @@ RENDERERS = {"games": render, "regicide": rg_render, "odin": odin_render,
                 "toybattle": toybattle_render,
                 "tokaidoduo": tokaidoduo_render,
                  "altay": altay_render, "blackflag": blackflag_render,
-                 "rumblenation": rumblenation_render}
+                  "rumblenation": rumblenation_render,
+                  "fadenfroh": fadenfroh_render}
 
 RULES_BY_KEY = {"games": RULES, "regicide": REGICIDE_RULES, "odin": ODIN_RULES,
                 "leaves": LEAVES_MODULE.rules(), "lsd": LSD_RULES, "spots": SPOTS_RULES,
@@ -5900,7 +6169,8 @@ RULES_BY_KEY = {"games": RULES, "regicide": REGICIDE_RULES, "odin": ODIN_RULES,
                  "azul": AZUL_RULES, "toybattle": TOYBATTLE_RULES,
                   "tokaidoduo": TOKAIDODUO_RULES,
                   "altay": ALTAY_RULES, "blackflag": BLACKFLAG_RULES,
-                  "rumblenation": RUMBLENATION_RULES}
+                   "rumblenation": RUMBLENATION_RULES,
+                   "fadenfroh": FADENFROH_RULES}
 
 
 def guide_payload(key):
@@ -5932,6 +6202,7 @@ PLAYER_MAKERS = {
     "altay": lambda u, n: AL.new_player(u, n),
     "blackflag": lambda u, n: BF.new_player(u, n),
     "rumblenation": lambda u, n: RN.new_player(u, n),
+    "fadenfroh": lambda u, n: FD.new_player(u, n),
 }
 
 GAME_MAKERS = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
@@ -5942,7 +6213,8 @@ GAME_MAKERS = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
                 "toybattle": TB.new_game,
                 "tokaidoduo": TD.new_game,
                  "altay": AL.new_game, "blackflag": BF.new_game,
-                 "rumblenation": RN.new_game}
+                  "rumblenation": RN.new_game,
+                  "fadenfroh": FD.new_game}
 
 
 def rematch_game(state, key, chat_id, uid):
@@ -6076,6 +6348,9 @@ def handle_command(state, msg):
         return
     if cmd.startswith("/rumblenation"):
         handle_rumblenation(state, msg, cmd, text, uid, name)
+        return
+    if cmd.startswith("/fadenfroh"):
+        handle_fadenfroh(state, msg, cmd, text, uid, name)
         return
     if cmd in ("/start", "/help", "/commands"):
         send(chat_id, HELP)
@@ -6485,6 +6760,60 @@ def handle_callback(state, cb):
         if not err:
             g["sel_card"] = None
             rumblenation_render(g, ev)
+        return
+    if data.startswith("ff:"):
+        g = fadenfroh_get(state, chat_id)
+        if not g:
+            return answer_cb(cb["id"], "No Fadenfroh game here.")
+        parts = data.split(":", 2)
+        action = parts[1] if len(parts) > 1 else ""
+        value = parts[2] if len(parts) > 2 else ""
+        ev = []
+        if action == "join":
+            if g["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            if any(p["user_id"] == uid for p in g["players"]):
+                return answer_cb(cb["id"], "Already joined.")
+            if len(g["players"]) >= FF_LEN:
+                return answer_cb(cb["id"], "Game is full.")
+            g["players"].append(FD.new_player(uid, cb["from"].get("first_name") or "Player"))
+            answer_cb(cb["id"], "Joined!")
+            fadenfroh_render(g, [f"🙋 {html.escape(cb['from'].get('first_name') or 'Player')} joined."])
+            return
+        if action == "npc":
+            err = add_npc("fadenfroh", g)
+            answer_cb(cb["id"], err or "🤖 NPC joined")
+            if not err:
+                fadenfroh_render(g)
+            return
+        if action == "start":
+            if g["phase"] != "lobby":
+                return answer_cb(cb["id"], "Already started.")
+            err = FD.start_game(g, ev)
+            answer_cb(cb["id"], err or "Started")
+            if not err:
+                fadenfroh_render(g, ev)
+            return
+        if action == "rematch":
+            ev, err = rematch_game(state, "fadenfroh", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
+            return
+        actor = fadenfroh_actor_idx(g, uid)
+        if actor is None:
+            return answer_cb(cb["id"], "Not your turn.")
+        if action == "m":
+            err = FD.take_material(g, actor, value, ev)
+        elif action == "p":
+            err = FD.pass_offer(g, actor, value, ev)
+        elif action == "o":
+            err = FD.apply_choice(g, actor, value, ev)
+        else:
+            return answer_cb(cb["id"], "Unknown button.")
+        answer_cb(cb["id"], err or "Done")
+        if not err:
+            fadenfroh_render(g, ev)
         return
     if data.startswith("tb:"):
         g = toybattle_get(state, chat_id)
@@ -8110,8 +8439,12 @@ def start_web_server(state):
                    "/altay-seafarers-ships.webp",
                    "/blackflag-cards.webp", "/blackflag-ships.webp",
                    "/blackflag-board.webp", "/blackflag-cardback.webp",
-                   "/rumblenation-board.webp", "/rumblenation-cards.webp",
-                   "/rumblenation-dice.webp", "/rumblenation-tokens.webp"):
+                    "/rumblenation-board.webp", "/rumblenation-cards.webp",
+                    "/rumblenation-dice.webp", "/rumblenation-tokens.webp",
+                    "/fadenfroh-fabric.webp", "/fadenfroh-starting.webp",
+                    "/fadenfroh-scoring.webp", "/fadenfroh-threads.webp",
+                    "/fadenfroh-needle.webp", "/fadenfroh-thimble.webp",
+                    "/fadenfroh-round.webp", "/fadenfroh-marker.webp"):
                 p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
                 if os.path.exists(p):
                     return self._send(200, open(p, "rb").read(), "image/webp",
@@ -8362,6 +8695,25 @@ def start_web_server(state):
                 with STATE_LOCK:
                     g = rumblenation_get(state, chat_id)
                     board = rumblenation_board_json(g, uid) if g else None
+                return self._send(200 if board else 404, {"ok": bool(board), "game": board})
+            if u.path == "/api/fadenfroh/mygames":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                with STATE_LOCK:
+                    games = [fadenfroh_board_json(g, uid) for g in state.get("fadenfroh", {}).values()
+                             if any(p["user_id"] == uid for p in g["players"])]
+                return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/fadenfroh/game":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                chat_id = q.get("chat_id", [""])[0]
+                with STATE_LOCK:
+                    g = fadenfroh_get(state, chat_id)
+                    board = fadenfroh_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/tokaidoduo/mygames":
                 q = urllib.parse.parse_qs(u.query)
@@ -9004,6 +9356,52 @@ def start_web_server(state):
                     events, err = rumblenation_api_move(state, chat_id, uid, body)
                     g = rumblenation_get(state, chat_id)
                     board = rumblenation_board_json(g, uid) if g else None
+                    save_state(state)
+                return self._send(200 if not err else 400,
+                                  {"ok": not err, "error": err, "events": events, "game": board})
+            if path in ("/api/fadenfroh/create", "/api/fadenfroh/move"):
+                try:
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                except Exception:
+                    return self._send(400, {"ok": False, "error": "bad json"})
+                iu = init_user(body.get("init_data", ""))
+                if iu is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                uid, name, start_param, chat_instance = iu
+                if path == "/api/fadenfroh/create":
+                    chat_id = None
+                    for cand in (start_param, str(body.get("chat_id") or ""), chat_instance):
+                        cand = str(cand)
+                        if cand.startswith("fadenfroh"):
+                            cand = cand[len("fadenfroh"):]
+                        try:
+                            chat_id = int(cand)
+                            break
+                        except (TypeError, ValueError):
+                            continue
+                    if not chat_id:
+                        return self._send(400, {"ok": False, "error": "open the Mini App from a chat (startapp link)"})
+                    with STATE_LOCK:
+                        g = fadenfroh_get(state, chat_id)
+                        if g and g["phase"] != "game_end":
+                            return self._send(200, {"ok": True, "game": fadenfroh_board_json(g, uid), "created": False})
+                        g = FD.new_game(chat_id, uid, name)
+                        g["chat_type"] = "supergroup" if chat_id < 0 else "private"
+                        state.setdefault("fadenfroh", {})[str(chat_id)] = g
+                        fadenfroh_render(g, [f"🪡 Fadenfroh created by {html.escape(name)} via Mini App!"])
+                        save_state(state)
+                        board = fadenfroh_board_json(g, uid)
+                    return self._send(200, {"ok": True, "game": board, "created": True})
+                chat_id = body.get("chat_id")
+                if not chat_id and str(start_param).startswith("fadenfroh"):
+                    try:
+                        chat_id = int(str(start_param)[len("fadenfroh"):])
+                    except ValueError:
+                        pass
+                with STATE_LOCK:
+                    events, err = fadenfroh_api_move(state, chat_id, uid, body)
+                    g = fadenfroh_get(state, chat_id)
+                    board = fadenfroh_board_json(g, uid) if g else None
                     save_state(state)
                 return self._send(200 if not err else 400,
                                   {"ok": not err, "error": err, "events": events, "game": board})

@@ -518,6 +518,17 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .rncard:hover,.rncard:active{transform:scale(1.15);z-index:20;position:relative;box-shadow:0 5px 14px #000a}
 .rncard.rnused{filter:grayscale(100%) brightness(.6)}
 .rnlobby{min-height:140px;background:linear-gradient(#1e293bdd,#1e293bdd),url(rumblenation-board.webp) center/cover;border:1px solid #475569;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800}
+.ffturn{font-size:18px;font-weight:800;margin:6px 0}
+.ffgoals,.ffmarket,.ffplayers,.ffactions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}
+.ffgoal{background:#1e293b;border:1px solid #475569;border-radius:999px;padding:2px 8px;font-size:12px}
+.ffcard{width:44px;height:63px;flex:none;background-image:url(fadenfroh-fabric.webp);background-size:792px 567px;border:1px solid #334155;border-radius:3px}
+.ffscore{width:78px;height:56px;flex:none;background-image:url(fadenfroh-scoring.webp);background-size:312px 223px;border:1px solid #334155;border-radius:3px}
+.ffplayer{flex:1 1 280px;background:#0f172acc;border:1px solid #475569;border-radius:9px;padding:6px;min-width:260px}
+.ffrow{position:relative;height:67px;border-bottom:1px dashed #475569}
+.ffhalf{position:absolute;width:44px;height:63px;background-image:url(fadenfroh-fabric.webp);background-size:792px 567px;border:1px solid #0008;border-radius:3px}
+.ffneedle{position:absolute;width:18px;height:63px;background:url(fadenfroh-needle.webp) center/16px 54px no-repeat;opacity:.85}
+.ffstart{position:absolute;width:44px;height:63px;border:2px solid #fbbf24;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:11px}
+.ffactions button{max-width:100%}
 </style></head><body>
 <h1>🎴 Flip 7</h1>
 <button id="guideBtn" class="guide-btn hidden" type="button" aria-label="How to play">?</button>
@@ -716,8 +727,20 @@ button:disabled{opacity:.45;cursor:not-allowed}
  <button class="primary hidden" id="rnJoin">🙋 Join</button>
  <button class="primary hidden" id="rnStart">🎮 Start game</button>
  <button class="primary hidden" id="rnRematch">🔄 Rematch!</button>
- <div class="log" id="rnLog"></div>
-</div>
+  <div class="log" id="rnLog"></div>
+ </div>
+<div id="fadenfroh" class="hidden">
+  <div id="ffTurn" class="ffturn"></div>
+  <div id="ffGoals" class="ffgoals"></div>
+  <div id="ffMarket" class="ffmarket"></div>
+  <div id="ffPlayers" class="ffplayers"></div>
+  <div id="ffActions" class="ffactions"></div>
+  <button class="primary hidden" id="ffJoin">🙋 Join</button>
+  <button class="primary hidden" id="ffNpc">🤖 Add NPC</button>
+  <button class="primary hidden" id="ffStart">🎮 Start game</button>
+  <button class="primary hidden" id="ffRematch">🔄 Rematch!</button>
+  <div class="log" id="ffLog"></div>
+ </div>
 <div id="synced">
 <div id="syncBoard"></div>
 <div id="syncTurn" style="font-size:18px;font-weight:700"></div>
@@ -796,4 +819,5 @@ window.PXSCROLL={
 <script data-cfasync="false" src="altay.js?v=6"></script>
 <script data-cfasync="false" src="blackflag.js?v=3"></script>
 <script data-cfasync="false" src="rumblenation.js?v=1"></script>
+<script data-cfasync="false" src="fadenfroh.js?v=1"></script>
 </body></html>

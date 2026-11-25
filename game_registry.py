@@ -244,6 +244,21 @@ GAME_SPECS = (
         static_assets=("rumblenation.js", "rumblenation-board.webp", "rumblenation-cards.webp",
                        "rumblenation-tokens.webp", "rumblenation-dice.webp"),
     ),
+    GameSpec(
+        key="fadenfroh", name="🪡 Fadenfroh", command="/fadenfroh", join_command="/fadenfroh_join",
+        description="market drafting, embroidery rows & rotating goals",
+        help_commands=("/fadenfroh_join", "/fadenfroh_join_npc", "/fadenfroh_start",
+                       "/fadenfroh_material", "/fadenfroh_pass", "/fadenfroh_keep",
+                       "/fadenfroh_place", "/fadenfroh_discard", "/fadenfroh_bonus",
+                       "/fadenfroh_rules", "/fadenfroh_cancel", "/fadenfroh_rematch"),
+        web_label="🎮 Play Fadenfroh (HTML)", callback_prefix="ff",
+        min_players=2, max_players=4, npc_full="⛔ Fadenfroh is 2-4 players (full).",
+        rematch_phases=("game_end",), cover="fadenfroh.png",
+        module="fadenfroh", web_module="fadenfroh",
+        static_assets=("fadenfroh.js", "fadenfroh-fabric.webp", "fadenfroh-starting.webp",
+                       "fadenfroh-scoring.webp", "fadenfroh-threads.webp", "fadenfroh-needle.webp",
+                       "fadenfroh-thimble.webp", "fadenfroh-round.webp", "fadenfroh-marker.webp"),
+    ),
 )
 
 GAMES_BY_KEY = {spec.key: spec for spec in GAME_SPECS}

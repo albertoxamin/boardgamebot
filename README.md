@@ -431,6 +431,28 @@ Board, card, dice and token art is extracted from Board Game Arena into
 (same Main Mini App, routed by `start_param`). Engine: `rumblenation.py`; tests
 in `test_rumblenation.py`.
 
+## Fadenfroh (same bot, 2-4 player embroidery drafting)
+
+A digital version of *Fadenfroh* (1 More Time Games): five rounds of drafting
+fabric from a market of offers, threads, needles and the thimble. Players trade
+three threads to draw and keep one card, stitch cards into three overlapping
+rows (covering at least one placed half), and score rotating berry, animal,
+flower and colour goals. Feather circles score for every active goal each
+round; round five adds a B/C goal choice, remaining material and hoop points.
+Ties are broken by the higher starting number. The engine resolves embroidery
+sequentially after the market for simpler bot play.
+
+Fabric, scoring, starting-card, material and token art is extracted from Board
+Game Arena into `web/fadenfroh-*.webp` (raw sheets also kept in
+`sources/fadenfroh/bga/`). Text commands: `/fadenfroh`,
+`/fadenfroh_join`, `/fadenfroh_join_npc`, `/fadenfroh_start`,
+`/fadenfroh_material <thread|needle|thimble>`, `/fadenfroh_pass <offer>`,
+`/fadenfroh_keep <1-3>`, `/fadenfroh_place <card> <row> <left|right> <1|2> [needle]`,
+`/fadenfroh_discard <cards>`, `/fadenfroh_bonus <B|C>`, `/fadenfroh_rules`,
+`/fadenfroh_cancel` (creator) and `/fadenfroh_rematch`. Mini App: board button =
+`?startapp=fadenfroh<chat>`. Engine: `fadenfroh.py`; tests in
+`test_fadenfroh.py`.
+
 ## Files
 
 - `game.py` – pure engine: deck, scoring, bust/Flip 7, actions, rounds.
@@ -439,6 +461,7 @@ in `test_rumblenation.py`.
 - `tokaidoduo.py` – pure engine: 37-station Pilgrim ring, Merchant trade routes, Artist zones, 1-2-1 dice draft, Wave tiles, Hot Spring, scoring.
 - `altay.py` – pure engine: faction decks, production, market, settlement building, combat, achievements, final scoring, Seafarers ships/crews/routes/trade.
 - `blackflag.py` – pure engine: Captains, Ships, hidden Roles, card combat, Treasure Chest, Doubloons, Hourglass and win checks.
+- `fadenfroh.py` – pure engine: market drafting, three embroidered rows, 16 scoring cards, feather/hoop bonuses and final choice.
 - `yahtzee.py` – pure engine: dice, scorecard, turns, scoring.
 - `fliptoons.py` – pure engine: deck, grid, abilities, market, final flip.
 - `tornado.py` – pure engine: boats, decks, courses, ranks, movement, Grand Prix.
@@ -457,6 +480,7 @@ in `test_rumblenation.py`.
 - `test_altay.py` – Altay engine tests: `python3 test_altay.py`
 - `test_wiring.py` – registry, bot wiring and Black Flag engine tests: `python3 test_wiring.py`
 - `test_rumblenation.py` – Rumble Nation engine tests: `python3 test_rumblenation.py`
+- `test_fadenfroh.py` – Fadenfroh engine tests: `python3 test_fadenfroh.py`
 - `web/flip7.html` – standalone HTML5 Flip 7 game (hot-seat, Mini App-ready)
 - `web/yahtzee.js` – Yahtzee Mini App view (synced)
 - `web/fliptoons.js` – Fliptoons Mini App view (synced)
@@ -476,6 +500,8 @@ in `test_rumblenation.py`.
 - `web/blackflag-cards.webp`, `web/blackflag-ships.webp`, `web/blackflag-board.webp`, `web/blackflag-cardback.webp` – TTS-extracted Black Flag art
 - `web/rumblenation.js` – Rumble Nation Mini App view (synced, real BGA sprites)
 - `web/rumblenation-board.webp`, `web/rumblenation-cards.webp`, `web/rumblenation-dice.webp`, `web/rumblenation-tokens.webp` – BGA-extracted Rumble Nation art
+- `web/fadenfroh.js` – Fadenfroh Mini App view (synced, viewer-filtered hands and BGA sprites)
+- `web/fadenfroh-*.webp` and `sources/fadenfroh/bga/` – BGA-extracted Fadenfroh fabric, scoring, starting-card and token art
 - `sources/tokaidoduo/bga/` – BGA sprite sheets for Tokaido Duo (dice, wares, waves, paintings, boutiques, character boards)
 - `web/artichokes_cards/` – BGA card art (0–9 vegetables, 10–14 Artichokes, 15 Rhubarb, 16 back)
 - `web/covers/*.jpg` – box art shown as the lobby photo for each game
@@ -497,6 +523,7 @@ python3 test_tokaidoduo.py  # Tokaido Duo engine tests
 python3 test_altay.py       # Altay engine tests
 python3 test_wiring.py      # registry, bot wiring and Black Flag tests
 python3 test_rumblenation.py # Rumble Nation engine tests
+python3 test_fadenfroh.py    # Fadenfroh engine tests
 ```
 A full 3-player game was also simulated end-to-end (hits/stays/actions/
 round rotation → a winner at 200+ in 13 rounds) with the Telegram layer

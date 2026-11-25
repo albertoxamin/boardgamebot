@@ -194,6 +194,89 @@ class AltayEngineTests(unittest.TestCase):
         self.assertEqual(altay.CARDS["miner"]["name"], "Stonecutter")
         self.assertEqual(altay.CARDS["herbalist"]["name"], "Farmer")
 
+    def test_seafarers_card_sprites_match_seafarers_sheets(self):
+        # FB-0056: in Seafarers games every card showed slices of
+        # several pictures at once. The Seafarers actions sheet is
+        # 11 cols x 19 rows (not 10 x 18): the market rows sit one row
+        # lower than on the base sheet and the sea cards are rows
+        # 16-18. The Seafarers achievements sheet is 12 cols x 3 rows
+        # (not 12 x 4). Every sprite below was checked against the
+        # real sheets: the old coords showed a Town for Explorer, a
+        # Town for Sailor, a Hunter for Shipwright, a blank cell for
+        # Astronomy and the Triumphal Arch for Lighthouse.
+        game, _ = self.new_seafarers_game()
+        board = altay.board_json(game, 42)
+        self.assertTrue(board["seafarers"])
+        expected_market = {
+            "worker": [4, 13], "stonecutter": [4, 8], "farmer": [4, 5],
+            "scholar": [4, 9], "chariot": [4, 14], "cavalry": [4, 11],
+            "architect": [4, 12], "champion": [4, 11], "merchant": [4, 10],
+            "city": [4, 15], "explorer": [4, 16], "sailor": [4, 17],
+            "shipwright": [4, 18],
+        }
+        self.assertEqual(list(altay.SEA_MARKET), list(expected_market))
+        self.assertEqual(len(board["market"]), 13)
+        for card in board["market"]:
+            self.assertEqual(card["sprite"], expected_market[card["id"]],
+                             f"seafarers market {card['id']} shows the wrong picture")
+            col, row = card["sprite"]
+            self.assertTrue(1 <= col <= 8 and 5 <= row <= 18,
+                            f"seafarers market {card['id']} sprite {card['sprite']} "
+                            "is a card back or out of range")
+        # Starter cards keep their base coords: rows 0-3 are identical
+        # in both sheets.
+        for faction, info in altay.FACTIONS.items():
+            game["players"][0]["faction"] = faction
+            for card_id in info["deck"]:
+                self.assertEqual(altay._card_sprite(game, 0, card_id),
+                                 [info["deck"].index(card_id), info["row"]])
+        expected_achievements = {"astronomy": [6, 0], "lighthouse": [11, 2]}
+        for ach in board["achievements"]:
+            col, row = ach["sprite"]
+            self.assertTrue(0 <= col <= 11 and 0 <= row <= 2,
+                            f"seafarers achievement {ach['id']} sprite {ach['sprite']} "
+                            "is out of range")
+            if ach["id"] in expected_achievements:
+                self.assertEqual(ach["sprite"], expected_achievements[ach["id"]],
+                                 f"seafarers achievement {ach['id']} shows the wrong picture")
+
+    def test_seafarers_sprite_sheet_geometry_matches_files(self):
+        # FB-0056: the Mini App sliced the Seafarers sheets with the
+        # wrong grid (10x18 actions, 12x4 achievements). The CSS
+        # background-size and the JS position divisors must match the
+        # real sheets: 11 cols x 19 rows for actions, 12 cols x 3 rows
+        # for achievements — verified here against the files on disk.
+        base = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(base, "web", "flip7.html"), encoding="utf-8") as f:
+            html = f.read()
+        self.assertIn("#altay.atseaon .atcard{background-image:url(altay-seafarers-actions.webp);"
+                      "background-size:1100% 1900%}", html)
+        self.assertIn("#altay.atseaon .atach{background-image:url(altay-seafarers-achievements.webp);"
+                      "background-size:1200% 300%}", html)
+        with open(os.path.join(base, "web", "altay.js"), encoding="utf-8") as f:
+            js = f.read()
+        self.assertIn("* 100 / (sea ? 10 : 9)", js)
+        self.assertIn("* 100 / (sea ? 18 : 14)", js)
+        self.assertIn("* 100 / (sea ? 11 : 10)", js)
+        try:
+            from PIL import Image
+        except ImportError:
+            self.skipTest("PIL not installed")
+
+        def _size(name):
+            with Image.open(os.path.join(base, "web", name)) as im:
+                return im.size
+
+        base_w, base_h = _size("altay-actions.webp")
+        sea_w, sea_h = _size("altay-seafarers-actions.webp")
+        cell_w, cell_h = base_w / 10, base_h / 15
+        self.assertEqual(sea_w, 11 * cell_w)
+        self.assertAlmostEqual(sea_h, 19 * cell_h, delta=1)
+        base_aw, base_ah = _size("altay-achievements.webp")
+        sea_aw, sea_ah = _size("altay-seafarers-achievements.webp")
+        self.assertEqual(sea_aw, 12 * (base_aw / 11))
+        self.assertEqual(sea_ah, base_ah)  # same height: still 3 rows
+
     def test_turn_order_and_wrong_player_guard(self):
         game, events = self.new_game()
         self.assertIsNotNone(altay.play_card(game, 1, 0, events))

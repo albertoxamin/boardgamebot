@@ -108,8 +108,12 @@ function atResources(p) {
 }
 function atCard(card, clickable, attrs) {
   const sea = !!(ATG.board && ATG.board.seafarers);
-  const x = Number((card.sprite || [0, 0])[0]) * 100 / 9;
-  const y = Number((card.sprite || [0, 0])[1]) * 100 / (sea ? 17 : 14);
+  // FB-0056: the Seafarers actions sheet is 11 cols x 19 rows, not
+  // 10 x 18 — the old 1000%/1800% background sliced every card across
+  // its neighbours, so several pictures showed in one card. The base
+  // sheet stays 10 x 15.
+  const x = Number((card.sprite || [0, 0])[0]) * 100 / (sea ? 10 : 9);
+  const y = Number((card.sprite || [0, 0])[1]) * 100 / (sea ? 18 : 14);
   const cls = 'atcard' + (clickable ? ' atclick' : '');
   const extra = attrs || '';
   return '<div class="' + cls + '" style="background-position:' + x + '% ' + y +
@@ -129,8 +133,11 @@ function atCardCell(card, clickable, attrs, who) {
 }
 function atAch(ach, index) {
   const sea = !!(ATG.board && ATG.board.seafarers);
+  // FB-0056: the Seafarers achievements sheet is 12 cols x 3 rows —
+  // the old 4-row divisor (400% background) sliced each achievement
+  // across two rows. Both sheets have 3 rows, so the row divisor is 2.
   const x = Number((ach.sprite || [0, 0])[0]) * 100 / (sea ? 11 : 10);
-  const y = Number((ach.sprite || [0, 0])[1]) * 100 / (sea ? 3 : 2);
+  const y = Number((ach.sprite || [0, 0])[1]) * 100 / 2;
   const done = ach.done[index];
   const active = ach.active[index];
   const clickable = ATG.board.can_act && !done && (!ach.active[0] || active);

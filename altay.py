@@ -96,33 +96,49 @@ CARDS = {
     # counterpart, so they use the closest art: Town (build) and Cavalry
     # (2 shields). Legacy ids stay as aliases so games saved before the
     # rename still load and play.
+    # "sea_sprite" is the same card's [col, row] into the Seafarers sheet
+    # web/altay-seafarers-actions.webp (FB-0056): that sheet is 11 cols
+    # x 19 rows, NOT 10 x 18 as the Seafarers code assumed — the action
+    # rows sit one row lower (rows 5-15 instead of 4-14), the new row 4
+    # holds extra starter art, and the sea cards are rows 16-18. The old
+    # coords showed slices of several cards at once in Seafarers games.
     "worker": {"name": "Worker", "kind": "produce", "resources": {"food": 1},
-               "cost": {"wood": 1}, "sprite": [4, 12], "text": "Cost 1 wood. Produce 1 food."},
+               "cost": {"wood": 1}, "sprite": [4, 12], "sea_sprite": [4, 13],
+               "text": "Cost 1 wood. Produce 1 food."},
     "stonecutter": {"name": "Stonecutter", "kind": "produce", "resources": {"stone": 2},
-                    "cost": {"wood": 1}, "sprite": [4, 7], "text": "Cost 1 wood. Produce 2 stone."},
+                    "cost": {"wood": 1}, "sprite": [4, 7], "sea_sprite": [4, 8],
+                    "text": "Cost 1 wood. Produce 2 stone."},
     "farmer": {"name": "Farmer", "kind": "produce", "resources": {"food": 2},
-               "cost": {"food": 1}, "sprite": [4, 4], "text": "Cost 1 food. Produce 2 food."},
+               "cost": {"food": 1}, "sprite": [4, 4], "sea_sprite": [4, 5],
+               "text": "Cost 1 food. Produce 2 food."},
     "scholar": {"name": "Scholar", "kind": "produce", "resources": {"culture": 2},
-                "cost": {"culture": 1}, "sprite": [4, 8], "text": "Cost 1 culture. Produce 2 culture."},
+                "cost": {"culture": 1}, "sprite": [4, 8], "sea_sprite": [4, 9],
+                "text": "Cost 1 culture. Produce 2 culture."},
     "chariot": {"name": "Chariot", "kind": "attack", "swords": 2, "cost": {"metal": 2},
-                "vp": 1, "sprite": [4, 13], "text": "Cost 2 metal. 2 swords. Worth 1 VP."},
+                "vp": 1, "sprite": [4, 13], "sea_sprite": [4, 14],
+                "text": "Cost 2 metal. 2 swords. Worth 1 VP."},
     "cavalry": {"name": "Cavalry", "kind": "attack", "swords": 2,
                 "cost": {"food": 1, "metal": 1}, "vp": 1, "sprite": [4, 10],
+                "sea_sprite": [4, 11],
                 "text": "Cost 1 food, 1 metal. 2 swords. Worth 1 VP."},
     "architect": {"name": "Architect", "kind": "build2", "cost": {"stone": 2, "wood": 1},
-                  "vp": 1, "sprite": [4, 11], "text": "Cost 2 stone, 1 wood. Two builds. Worth 1 VP."},
+                  "vp": 1, "sprite": [4, 11], "sea_sprite": [4, 12],
+                  "text": "Cost 2 stone, 1 wood. Two builds. Worth 1 VP."},
     "champion": {"name": "Champion", "kind": "attack_defense", "swords": 1, "shields": 2,
                  "cost": {"culture": 2}, "vp": 1, "sprite": [4, 10],
+                 "sea_sprite": [4, 11],
                  "text": "Cost 2 culture. 1 sword, 2 shields. Worth 1 VP."},
     "merchant": {"name": "Merchant", "kind": "produce", "resources": {"wood": 1, "culture": 1},
-                 "cost": {"food": 1}, "sprite": [4, 9], "text": "Cost 1 food. Produce 1 wood and 1 culture."},
+                 "cost": {"food": 1}, "sprite": [4, 9], "sea_sprite": [4, 10],
+                 "text": "Cost 1 food. Produce 1 wood and 1 culture."},
     "city": {"name": "City", "kind": "build2", "cost": {"stone": 2, "culture": 1},
-             "vp": 2, "sprite": [4, 14], "text": "Cost 2 stone, 1 culture. Two builds. Worth 2 VP."},
-    "explorer": {"name": "Explorer", "kind": "sea", "cost": {"culture": 1}, "sprite": [2, 12],
+             "vp": 2, "sprite": [4, 14], "sea_sprite": [4, 15],
+             "text": "Cost 2 stone, 1 culture. Two builds. Worth 2 VP."},
+    "explorer": {"name": "Explorer", "kind": "sea", "cost": {"culture": 1}, "sprite": [4, 16],
                  "text": "Cost 1 culture. Gain 3 coins, or resettle one of your settlements by sea."},
-    "sailor": {"name": "Sailor", "kind": "sea", "swords": 1, "cost": {"food": 1}, "sprite": [1, 12],
+    "sailor": {"name": "Sailor", "kind": "sea", "swords": 1, "cost": {"food": 1}, "sprite": [4, 17],
                "text": "Cost 1 food. 1 sword, or move a ship or place a crew."},
-    "shipwright": {"name": "Shipwright", "kind": "sea", "cost": {"wood": 1}, "sprite": [0, 4],
+    "shipwright": {"name": "Shipwright", "kind": "sea", "cost": {"wood": 1}, "sprite": [4, 18],
                    "text": "Cost 1 wood. Place a ship in a sea zone by one of your settlements."},
 }
 # Legacy ids (pre-FB-0018 names) for games saved before the rename.
@@ -153,11 +169,18 @@ ACHIEVEMENTS = {
              "sprite": [8, 2], "text": "Worth 4 VP."},
 }
 SEA_ACHIEVEMENTS = dict(ACHIEVEMENTS)
+# FB-0056: the Seafarers achievements sheet is 12 cols x 3 rows (same
+# rows as the base sheet, one extra column) — the old coords assumed
+# 4 rows, so Astronomy showed a blank cell and Lighthouse showed the
+# Triumphal Arch. Verified against web/altay-seafarers-achievements.webp:
+# Astronomy (level 1, "Discard 1 card to sail") is at [6, 0] and the
+# new Lighthouse is at [11, 2]; the other achievements sit at their
+# base-sheet positions in both sheets.
 SEA_ACHIEVEMENTS["astronomy"] = {"name": "Astronomy", "level": 1, "cost": {"culture": 2}, "vp": 1,
-                                  "sprite": [9, 0],
+                                  "sprite": [6, 0],
                                   "text": "Discard a card to pay for one sea crossing."}
 SEA_ACHIEVEMENTS["lighthouse"] = {"name": "Lighthouse", "level": 3, "cost": {"stone": 3, "culture": 2},
-                                   "vp": 4, "sprite": [10, 2], "text": "+1 strength in naval support."}
+                                   "vp": 4, "sprite": [11, 2], "text": "+1 strength in naval support."}
 
 REGION_NAMES = [
     "Green Vale", "Sun Fields", "Far Ridge", "South Meadow", "Lower Basin",
@@ -587,6 +610,12 @@ def _check_current(game, player_index):
 def _card_sprite(game, player_index, card_id):
     card = CARDS[card_id]
     if "sprite" in card:
+        # FB-0056: in Seafarers games the market cards live on the
+        # Seafarers sheet, where they sit one row lower — use the
+        # card's sea_sprite there. Starter cards keep their base
+        # coords: rows 0-3 are identical in both sheets.
+        if is_seafarers(game) and "sea_sprite" in card:
+            return list(card["sea_sprite"])
         return list(card["sprite"])
     # Starter cards have no fixed sprite: each faction row of
     # altay-actions.webp lists that faction's starter deck in order

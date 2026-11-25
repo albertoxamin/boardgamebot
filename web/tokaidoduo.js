@@ -175,6 +175,16 @@ const TD_COIN_X0 = 278, TD_COIN_Y0 = 136, TD_COIN_D = 20, TD_COIN_PER_ROW = 9;
 // wrong: those slots are the wares' home on BGA.
 const TD_MARCH_IDX = {pottery: 0, doll: 1, fan: 2, kimono: 3};
 const TD_WARE_SLOT_X = [329, 384, 439], TD_WARE_SLOT_Y = [45, 98];
+// FB-0052: the three dashed slots at the top of the player's own
+// board — one per character, measured off the BGA art (the same
+// centres in both halves of spritePlateauxJoueurs.png): the Artist's
+// above "The Artist" (x 236-270), the Merchant's above the stall
+// (x 522-556), the Pilgrim's above the hat (x 811-843); all y 16-64,
+// ~33x48px. A Wave a player holds sits in its character's slot, the
+// way the face-up tiles sit in the dashed slots on the main board
+// (FB-0029) — until now a held Wave only appeared as a text line
+// under the board, so Annalisa could not see it on the board.
+const TD_WAVE_SLOT = {artist: [253, 40], merchant: [539, 41], pilgrim: [827, 41]};
 function tdBoardCoin(idx, x, y, title) {
   return '<span class="tdboardcoin" style="left:' + (x / 862 * 100).toFixed(1) +
     '%;top:' + (y / 213 * 100).toFixed(1) +
@@ -233,6 +243,23 @@ function tdSeatBoard(g, p, col) {
       '%;top:' + (TD_WARE_SLOT_Y[Math.floor(idx / 3)] / 213 * 100).toFixed(1) +
       '%;background-position-x:' + (mi * 100 / 3).toFixed(2) +
       '%;" title="' + escapeHtml(w) + '"></span>';
+  });
+  // FB-0052: a held Wave token sits in its character's printed
+  // dashed slot (TD_WAVE_SLOT) on the player's own board — pilgrim /
+  // merchant / artist each above their character — using the same
+  // BGA wave art and panel index as the face-up tiles on the main
+  // board (TD_WAVE_IDX). No token while that character's Wave is
+  // not held: the empty dashed slot stays visible.
+  ['pilgrim', 'merchant', 'artist'].forEach(ch => {
+    const side = (p.waves || {})[ch];
+    if (!side) return;
+    const idx = (TD_WAVE_IDX[ch] || {})[side];
+    const slot = TD_WAVE_SLOT[ch];
+    if (idx === undefined || !slot) return;
+    s += '<span class="tdwavep tdwave' + idx + '" style="left:' +
+      (slot[0] / 862 * 100).toFixed(1) + '%;top:' +
+      (slot[1] / 213 * 100).toFixed(1) +
+      '%;" title="' + escapeHtml(ch + ': ' + tdWaveText(g, ch, side)) + '"></span>';
   });
   return s;
 }

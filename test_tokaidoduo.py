@@ -834,20 +834,90 @@ def test_player_board_shows_ware_tokens():
     xs = [int(v) for v in m.group(1).split(",")]
     ys = [int(v) for v in m.group(2).split(",")]
     assert len(xs) == 3 and len(ys) == 2, (xs, ys)
-    # every slot centre stays on the 862x213 board with the 20px
-    # half-size of the 40x40 token inside; the slots are the printed
-    # grey squares (bundle icons measured at x~328/383/437, y~45/98).
+    # every slot centre stays on the 862x213 board with the 25px
+    # half-size of the %-sized 50x50 token inside; the slots are the
+    # printed grey squares (bundle icons measured at x~328/383/437, y~45/98).
     for x in xs:
         for y in ys:
-            assert 20 <= x <= 862 - 20 and 20 <= y <= 213 - 20, (x, y)
+            assert 25 <= x <= 862 - 25 and 25 <= y <= 213 - 25, (x, y)
     assert xs == [329, 384, 439] and ys == [45, 98], (xs, ys)
     html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
                 encoding="utf-8").read()
-    assert ".tdwareslot{position:absolute;width:40px;height:40px;" in html
+    # FB-0053: the token is %-sized to the printed slot itself
+    # (~50x50px on the 862x213 board, the wrapped-package drawing
+    # inside it) — not a fixed 40px, which at phone width rendered
+    # as ~100 board px (board ~346px wide: 390px viewport less body
+    # + seat padding) and spilled over the neighbouring slots.
+    m = re.search(r"\.tdwareslot\{position:absolute;width:([\d.]+)%"
+                  r";height:([\d.]+)%;transform:translate\(-50%,-50%\);", html)
+    assert m, "ware token is %-sized to its slot"
+    w_pct, h_pct = float(m.group(1)), float(m.group(2))
+    assert abs(w_pct / 100 * 862 - 50) < 2, w_pct
+    assert abs(h_pct / 100 * 213 - 50) < 2, h_pct
+    assert w_pct / 100 * 862 < 55, "narrower than the 55px slot pitch"
     assert "background-image:url(tokaidoduo-marchandise.webp);background-size:400% 100%;" in html
     bot = open(os.path.join(os.path.dirname(__file__), "bot.py"),
                encoding="utf-8").read()
     assert '"/tokaidoduo-marchandise.webp"' in bot
+
+
+def test_player_board_shows_held_wave_tokens():
+    # FB-0052: a Wave a player holds must sit ON their own board, in
+    # the printed dashed slot for its character (Pilgrim / Merchant /
+    # Artist) — not only as a text line under the board. The three
+    # slots are the dashed rectangles at the top of the player board,
+    # measured off the BGA art (same centres in both halves of
+    # spritePlateauxJoueurs.png): the Artist's above "The Artist",
+    # the Merchant's above the stall, the Pilgrim's above the hat.
+    import ast
+    import re
+    from PIL import Image
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    m = re.search(r"const TD_WAVE_SLOT = \{([^}]*)\};", js)
+    assert m, "wave slot constants"
+    slots = dict((k, ast.literal_eval(v)) for k, v in
+                 re.findall(r"(\w+): (\[[^\]]*\])", m.group(1)))
+    assert sorted(slots) == ["artist", "merchant", "pilgrim"]
+    assert slots == {"artist": [253, 40], "merchant": [539, 41],
+                     "pilgrim": [827, 41]}, slots
+    for ch, (x, y) in slots.items():
+        # inside the 862x213 board, in the top strip, with the ~17px
+        # half-width / ~24px half-height of the 33x48 token inside
+        assert 17 <= x <= 862 - 17 and 24 <= y <= 213 - 24, (ch, x, y)
+        assert y < 70, (ch, y)
+    # one slot per character, left to right: artist, merchant, pilgrim
+    assert [slots[ch][0] for ch in ("artist", "merchant", "pilgrim")] == \
+        sorted(slots[ch][0] for ch in slots)
+    # the slots clear the other markers: the painting track ends at
+    # x~185, the ware slots sit at x 329-439 / y 45-98, the coin row
+    # at y=136 — no slot overlaps any of them.
+    assert slots["artist"][0] - 17 > 185
+    for ch, (x, y) in slots.items():
+        assert not (329 - 25 <= x <= 439 + 25 and
+                    45 - 25 <= y <= 98 + 25), (ch, x, y)
+    # the slot centres are empty white board in both halves of the
+    # sprite (the dashed outline, not a character or a track)
+    art = Image.open(os.path.join(os.path.dirname(__file__), "sources",
+                                  "tokaidoduo", "bga",
+                                  "spritePlateauxJoueurs.png")).convert("RGB")
+    for half in (0, 213):
+        for ch, (x, y) in slots.items():
+            r, g, b = art.getpixel((x, half + y))
+            assert r > 235 and g > 235 and b > 225, (half, ch, (r, g, b))
+    # tdSeatBoard renders one token per held Wave, from p.waves, with
+    # the same panel index as the face-up tiles on the main board
+    assert "['pilgrim', 'merchant', 'artist'].forEach(ch => {" in js
+    assert "(p.waves || {})[ch]" in js
+    assert "TD_WAVE_SLOT[ch]" in js
+    assert "'<span class=\"tdwavep tdwave' + idx + '\" style=\"left:'" in js
+    # the board JSON already carries the held Waves per player
+    bot = open(os.path.join(os.path.dirname(__file__), "bot.py"),
+               encoding="utf-8").read()
+    assert '"waves": dict(p["waves"])' in bot
+    html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
+                encoding="utf-8").read()
+    assert ".tdwavep{position:absolute;width:3.8%;height:22.5%;transform:translate(-50%,-50%);background-image:url(tokaidoduo-waves.webp);background-size:600% 100%;" in html
 
 
 def test_gold_slab_marks_commerce_tracker():

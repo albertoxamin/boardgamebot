@@ -388,10 +388,17 @@ button:disabled{opacity:.45;cursor:not-allowed}
 /* FB-0050: the Ware tokens the player holds (tokaidoduo-marchandise.webp,
    spriteJetonsMarchandise.jpg: 4 panels — pottery, doll, fan, kimono),
    shown in the Merchant's 6 printed ware slots on the player's own
-   board. Each slot is ~46x50px, so the token is 40x40px; the panel
-   index is set inline by tdSeatBoard() in tokaidoduo.js as
+   board. FB-0053: the token is sized in % of the board — 5.8% x 23.5%
+   is the printed slot itself (~50x50px on the 862x213 board, the
+   wrapped-package drawing inside it), the same %-sized pattern as
+   .tdpaintslot. The fixed 40x40px it had before was only right at
+   full board width: on a phone the board is ~346px wide (390px
+   viewport less body + seat padding), so 40px rendered as ~100
+   board px — twice the slot and nearly twice the 55px slot pitch —
+   and each token spilled over its neighbours. The panel index is
+   set inline by tdSeatBoard() in tokaidoduo.js as
    background-position-x (idx * 100/3%). */
-.tdwareslot{position:absolute;width:40px;height:40px;margin:-20px 0 0 -20px;background-image:url(tokaidoduo-marchandise.webp);background-size:400% 100%;background-repeat:no-repeat;border-radius:4px;box-shadow:0 1px 3px #000a;z-index:2}
+.tdwareslot{position:absolute;width:5.8%;height:23.5%;transform:translate(-50%,-50%);background-image:url(tokaidoduo-marchandise.webp);background-size:400% 100%;background-repeat:no-repeat;border-radius:4px;box-shadow:0 1px 3px #000a;z-index:2}
 .tdpboard{position:relative;aspect-ratio:862/213;background-image:url(tokaidoduo-pboards.webp);background-size:100% 200%;background-repeat:no-repeat;border-radius:8px;margin:6px 0;border:1px solid #475569}
 .tdpboard.pb1{background-position-y:100%}
 .tdmark{position:absolute;width:14px;height:14px;margin:-7px 0 0 -7px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 3px #000a;z-index:2}
@@ -407,6 +414,13 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .tdtap{position:absolute;width:36px;height:36px;margin:-18px 0 0 -18px;border-radius:50%;border:3px solid #22c55e;background:#22c55e2e;z-index:4;cursor:pointer;animation:tdpulse 1.2s ease-in-out infinite}
 @keyframes tdpulse{0%,100%{box-shadow:0 0 0 0 #22c55e88}50%{box-shadow:0 0 0 7px #22c55e00}}
 .tdwavetok{position:absolute;width:36px;height:48px;margin:-24px 0 0 -18px;background-image:url(tokaidoduo-waves.webp);background-size:600% 100%;border:2px solid #38bdf8;border-radius:4px;box-shadow:0 1px 4px #000a;z-index:2}
+/* FB-0052: a held Wave token on the player's own board
+   (tokaidoduo-waves.webp, same strip and .tdwaveN panel classes as
+   the face-up tiles on the main board above). %-sized to the printed
+   dashed slot (TD_WAVE_SLOT in tokaidoduo.js, ~33x48px on the 862x213
+   board), so it fills the slot at any board width; the 1px border is
+   the same blue ring as .tdwavetok, thinned for the smaller token. */
+.tdwavep{position:absolute;width:3.8%;height:22.5%;transform:translate(-50%,-50%);background-image:url(tokaidoduo-waves.webp);background-size:600% 100%;background-repeat:no-repeat;border:1px solid #38bdf8;border-radius:3px;box-shadow:0 1px 3px #000a;z-index:2}
 .tdwave0{background-position:0% 0}.tdwave1{background-position:20% 0}.tdwave2{background-position:40% 0}.tdwave3{background-position:60% 0}.tdwave4{background-position:80% 0}.tdwave5{background-position:100% 0}
 .tdlobby{min-height:120px;background:linear-gradient(#0f172ae8,#0f172ae8),url(tokaidoduo-bg.webp?v=1) center/cover;border:1px solid #475569;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800;text-align:center;padding:12px}
 /* Board art is cached 24h by the WebView: bump ?v= above whenever tokaidoduo-board.webp changes, or clients keep seeing the old image. */

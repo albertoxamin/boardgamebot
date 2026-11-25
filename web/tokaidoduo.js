@@ -267,17 +267,23 @@ function tdRender() {
   // at that town's boutique, so it uses the same symbol. If one
   // player's Merchant and Pilgrim share a boutique, split them sideways
   // so both markers stay visible on the boutique symbol.
+  // FB-0047: two Artists may share a zone (artist_destinations has no
+  // exclusion, unlike Pilgrim/Merchant) — without an offset the second
+  // meeple lands exactly on the first and one artist disappears.
+  // Split them sideways too, so both stay visible in the zone.
   g.players.forEach((p, i) => {
     const col = p.color === 'purple' ? 'purple' : 'green';
     const mTown = (g.town_pos || {})[p.merchant_pos];
     const pTownName = 'c_' + p.pilgrim_pos;
     const pTown = (g.town_pos || {})[pTownName];
     const together = !!(mTown && pTown && p.merchant_pos === pTownName);
+    const sameZone = g.players.length > 1 && g.players[1 - i] &&
+      g.players[1 - i].artist_zone === p.artist_zone;
     const [sx, sy] = pTown || tdStationPos(g, p.pilgrim_pos);
     html += tdMeeple(sx + (together ? 3 : 0), sy, col, 'pilgrim', p.name + ' Pilgrim @ station ' + p.pilgrim_pos + ' (' + (g.stations[p.pilgrim_pos] || '') + ')');
     if (mTown) html += tdMeeple(mTown[0] - (together ? 3 : 0), mTown[1], col, 'merchant', p.name + ' Merchant @ ' + p.merchant_pos);
     const zp = (g.zone_pos || [])[p.artist_zone];
-    if (zp) html += tdMeeple(zp[0], zp[1] + 3, col, 'artist', p.name + ' Artist @ ' + ((g.zones[p.artist_zone] || {}).name || ''));
+    if (zp) html += tdMeeple(zp[0] + (sameZone ? (i === 0 ? -2 : 2) : 0), zp[1] + 3, col, 'artist', p.name + ' Artist @ ' + ((g.zones[p.artist_zone] || {}).name || ''));
   });
   // FB-0028 / FB-0040 / FB-0041: the Hot Spring token itself, on the
   // board — always. It sits on its drawn place: the large dashed

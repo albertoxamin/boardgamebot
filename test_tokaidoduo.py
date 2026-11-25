@@ -232,6 +232,47 @@ def test_pieces_tokens_use_bga_art():
     assert '"/tokaidoduo-pieces.webp"' in bot
 
 
+def test_two_artists_same_zone_both_visible():
+    # FB-0047: when both Artists moved into the same zone, one meeple
+    # vanished — both markers landed on the exact same zone spot and
+    # the second covered the first. The engine allows sharing a zone
+    # (artist_destinations has no exclusion, unlike Pilgrim/Merchant),
+    # so the Mini App must split the two markers sideways.
+    g = mk()
+    for pid in (0, 1):
+        g["players"][pid]["artist_zone"] = 7
+    _set_dice(g, {"pilgrim": 1, "merchant": 2, "artist": 1})
+    _pick(g, 0, "artist")
+    assert g["pending"]["kind"] == "artist_dest"
+    ev = []
+    assert TD.choose(g, 0, "dest:0", ev) is None
+    while g["pending"]:
+        assert TD.choose(g, 0, TD.pending_options(g, 0)[0]["value"], ev) is None
+    assert g["players"][0]["artist_zone"] == 0
+    # player 1 may move into the SAME zone — no exclusion
+    assert 0 in TD.artist_destinations(g, 1, 1)
+    g["round"] = 2
+    _set_dice(g, {"pilgrim": 1, "merchant": 2, "artist": 1})
+    g["first_picker"] = 1  # _set_dice resets it to 0; player 1 rolls first
+    _pick(g, 1, "artist")
+    assert g["pending"]["kind"] == "artist_dest"
+    assert TD.choose(g, 1, "dest:0", ev) is None
+    while g["pending"]:
+        assert TD.choose(g, 1, TD.pending_options(g, 1)[0]["value"], ev) is None
+    assert g["players"][1]["artist_zone"] == 0
+    # the Mini App offsets the two artist markers sideways (±2 board-%,
+    # ~17px apart on a 420px board for 24px meeples) so both stay
+    # visible in the shared zone instead of one covering the other.
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    start = js.index("g.players.forEach((p, i) => {")
+    end = js.index("});", start)
+    loop = js[start:end]
+    assert "sameZone" in loop
+    assert "g.players[1 - i].artist_zone === p.artist_zone" in loop
+    assert "zp[0] + (sameZone ? (i === 0 ? -2 : 2) : 0)" in loop
+
+
 def test_zone_graph_and_spaces():
     assert len(TD.ZONES) == 8
     # adjacency is symmetric, 11 trade routes

@@ -146,13 +146,29 @@ function tdSeatBoard(g, p, col) {
   }
   p.paintings.forEach((t, idx) => {
     if (idx >= 10) return;
-    const sx = TD_PAINT_X[idx % 5], sy = TD_PAINT_Y[Math.floor(idx / 5)];
-    const em = (g.zone_icon_emoji || {})[t.icon] || t.icon;
-    s += '<span class="tdpaintslot' + (t.gifted ? ' gifted' : (!t.revealed ? ' back' : '')) +
-      '" style="left:' + (sx / 862 * 100).toFixed(1) + '%;top:' + (sy / 213 * 100).toFixed(1) +
-      '%;" title="' + escapeHtml(t.icon) + '">' + (t.gifted ? '✓' : (!t.revealed ? '?' : em)) + '</span>';
+    s += tdPaintSlot(col, t, TD_PAINT_X[idx % 5], TD_PAINT_Y[Math.floor(idx / 5)]);
   });
   return s;
+}
+// FB-0045: the painting tokens are the real BGA art from
+// spriteOeuvres.jpg (tokaidoduo-paintings.webp): 10 panels, one per
+// player colour x (brush back + 4 icons), left to right — purple brush,
+// bamboo, moon, mountain, waterfall, then the same five in green.
+// A revealed tile shows its icon in the player's colour, an unrevealed
+// one shows the brush back, a gifted one keeps the art with a ✓ badge.
+const TD_PAINT_IDX = {purple: {bamboo: 1, moon: 2, mountain: 3, waterfall: 4},
+  green: {bamboo: 6, moon: 7, mountain: 8, waterfall: 9}};
+const TD_PAINT_BACK = {purple: 0, green: 5};
+function tdPaintSlot(col, t, sx, sy) {
+  const idx = (t.revealed || t.gifted) ? (TD_PAINT_IDX[col] || {})[t.icon]
+    : TD_PAINT_BACK[col];
+  if (idx === undefined) return '';
+  const title = t.gifted ? 'gifted ' + (t.icon || '')
+    : (t.revealed ? t.icon : 'painting (face down)');
+  return '<span class="tdpaintslot' + (t.gifted ? ' gifted' : '') +
+    '" style="left:' + (sx / 862 * 100).toFixed(1) + '%;top:' + (sy / 213 * 100).toFixed(1) +
+    '%;background-position-x:' + (idx * 100 / 9).toFixed(2) +
+    '%;" title="' + escapeHtml(title) + '">' + (t.gifted ? '<b class="tdgift">✓</b>' : '') + '</span>';
 }
 // Index of each Wave side in the tokaidoduo-waves.webp sprite strip
 // (spriteVagues.jpg, left to right): pilgrim hasty/tranquil, merchant

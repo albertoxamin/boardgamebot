@@ -38,7 +38,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 55
+WEB_VER = 56
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -4956,7 +4956,6 @@ def tokaidoduo_board_json(g, viewer_id=None):
         "mountain_draw": TD.MOUNTAIN_DRAW,
         "gold_points": TD.GOLD_POINTS, "culture_points": TD.CULTURE_POINTS,
         "ware_emoji": TD.WARE_EMOJI, "char_emoji": TD.CHAR_EMOJI,
-        "zone_icon_emoji": TD.ZONE_ICON_EMOJI,
         "legal": {}, "options": [], "pending": None,
     }
     if can_act:
@@ -7783,7 +7782,7 @@ def start_web_server(state):
                   "/tokaidoduo-meeples.webp", "/tokaidoduo-dice.webp",
                   "/tokaidoduo-pboards.webp", "/tokaidoduo-bg.webp",
                   "/tokaidoduo-hotspring.webp", "/tokaidoduo-waves.webp",
-                  "/tokaidoduo-commerce.webp",
+                  "/tokaidoduo-commerce.webp", "/tokaidoduo-paintings.webp",
                   "/altay-board.webp", "/altay-actions.webp",
                   "/altay-achievements.webp", "/altay-markers.webp",
                    "/altay-tokens.webp", "/altay-seafarers-actions.webp",

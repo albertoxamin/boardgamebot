@@ -137,6 +137,50 @@ def test_commerce_tokens_use_bga_art():
     html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
                 encoding="utf-8").read()
     assert "tokaidoduo-commerce.webp" in html
+
+
+def test_painting_tokens_use_bga_art():
+    # FB-0045: the painting tokens (dipinto) were emoji — Annalisa
+    # asked for the real BGA art from spriteOeuvres.jpg. The webp is
+    # the 10-panel strip (brush back + 4 icons per player colour) and
+    # tdPaintSlot() picks the panel by (colour, icon, revealed/gifted)
+    # for the printed painting slots on the player board, so the emoji
+    # and the '?'/'✓' text are gone from the Mini App (Telegram text
+    # keeps the emoji).
+    import re
+    from PIL import Image
+    webp = os.path.join(os.path.dirname(__file__), "web",
+                        "tokaidoduo-paintings.webp")
+    assert os.path.isfile(webp) and os.path.getsize(webp) > 10000
+    assert Image.open(webp).size == (2480, 307)
+    src = os.path.join(os.path.dirname(__file__), "sources", "tokaidoduo",
+                       "bga", "spriteOeuvres.jpg")
+    assert os.path.isfile(src)
+    js = open(os.path.join(os.path.dirname(__file__), "web", "tokaidoduo.js"),
+              encoding="utf-8").read()
+    assert "zone_icon_emoji" not in js
+    assert "function tdPaintSlot(col, t, sx, sy)" in js
+    assert "tdPaintSlot(col, t, TD_PAINT_X[idx % 5], TD_PAINT_Y[Math.floor(idx / 5)])" in js
+    # every painting icon has a panel in each player's colour, the
+    # brush back is a different panel per colour, and no panel is unused
+    assert "purple: {bamboo: 1, moon: 2, mountain: 3, waterfall: 4}" in js
+    assert "green: {bamboo: 6, moon: 7, mountain: 8, waterfall: 9}" in js
+    assert "purple: 0, green: 5" in js
+    # the deck's icons are exactly the mapped ones
+    for col in ("purple", "green"):
+        assert sorted(set(TD.PAINTING_TILES[col])) == [
+            "bamboo", "moon", "mountain", "waterfall"]
+    m = re.search(r"const TD_PAINT_IDX = (\{.*?\});", js, re.S)
+    assert m
+    back = re.search(r"const TD_PAINT_BACK = (\{[^}]*\});", js)
+    assert back
+    panels = sorted(int(n) for n in
+                    re.findall(r"\d+", m.group(1) + back.group(1)))
+    assert panels == list(range(10))
+    html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html"),
+                encoding="utf-8").read()
+    assert "tokaidoduo-paintings.webp" in html
+    assert ".tdpaintslot.gifted{border-color:#059669;" in html
     assert "background-size:600% 100%" in html
     assert ".tdware{" in html
     # FB-0039: a referenced webp that is not in bot.py's static
@@ -653,7 +697,7 @@ def test_player_seats_use_bga_player_boards():
     assert "background-image:url(tokaidoduo-pboards.webp);background-size:100% 200%;" in html
     assert ".tdpboard.pb1{background-position-y:100%}" in html
     assert ".tdmark{position:absolute;width:14px;height:14px;" in html
-    assert ".tdpaintslot{position:absolute;width:6.4%;height:19%;" in html
+    assert ".tdpaintslot{position:absolute;width:4.6%;height:23.5%;transform:translate(-50%,-50%);background-image:url(tokaidoduo-paintings.webp);background-size:1000% 100%;" in html
 
 
 def test_hot_spring_token_shows_on_board():

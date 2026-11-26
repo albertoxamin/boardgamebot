@@ -500,6 +500,17 @@ class ViewTests(unittest.TestCase):
         self.assertIn("rnTurnBanner(g)", js)
         self.assertIn("rnTurnStyle()", js)
 
+    def test_no_header_line_below_turn_banner_during_play(self):
+        # FB-0098: Annalisa asked to remove the dense header line below
+        # the turn banner during play (the banner already says whose
+        # turn it is). The play-phase branch of the turn element must
+        # render nothing after the banner; lobby and game-end headers
+        # stay, since there is no banner there.
+        js = open(os.path.dirname(__file__) + "/web/rumblenation.js").read()
+        self.assertNotIn("'⚔️ Turn ' + g.turn", js)
+        self.assertIn("Rumble Nation lobby", js)
+        self.assertIn("wins! · ' + names", js)
+
     def test_castle_token_sprites_match_their_numbers(self):
         # FB-0061: castle 7 and 11 were swapped in web/rumblenation.js, so
         # the token face did not match the castle value in the rules.

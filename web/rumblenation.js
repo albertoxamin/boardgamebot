@@ -184,10 +184,15 @@ function rnRender() {
   document.getElementById('rnLog').textContent = (g.log || []).join('\n');
   const names = g.players.map((p, i) => '<span class="rn' + RN_COLORS[i] + '">' +
     escapeHtml(p.name) + '</span> ' + p.score + ' pts · ' + p.stock + ' left · ⚔️' + p.sword).join(' vs ');
+  // FB-0098: Annalisa asked to remove the dense header line below the
+  // turn banner during play — the banner already says whose turn it
+  // is, and the reserve rows show each player's soldiers. The header
+  // stays in the lobby and at game end, where there is no banner.
+  // (Turn number and points are still on the Telegram board.)
   turn.innerHTML = rnTurnBanner(g) + (g.phase === 'lobby' ? '⚔️ Rumble Nation lobby — ' + g.players.length + '/4 · ' + names :
     g.phase === 'game_end' ? '🏆 ' + (g.winner === null ? 'Draw' :
       escapeHtml((g.players[g.winner] || {}).name || 'Winner')) + ' wins! · ' + names :
-    '⚔️ Turn ' + g.turn + ' · ' + names + (g.can_act ? ' · <b>your move</b>' : ''));
+    '');
   if (g.phase === 'lobby') {
     board.innerHTML = '<div class="rnlobby">Join, then anyone taps Start.</div>';
     if (!g.is_player) join.classList.remove('hidden');

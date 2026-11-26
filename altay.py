@@ -149,24 +149,35 @@ MARKET = ["worker", "stonecutter", "farmer", "scholar", "chariot", "cavalry",
 SEA_MARKET = MARKET + ["explorer", "sailor", "shipwright"]
 
 ACHIEVEMENTS = {
-    "irrigation": {"name": "Irrigation", "level": 1, "cost": {"food": 2}, "vp": 1,
-                   "sprite": [0, 0], "text": "+1 food when producing."},
-    "mining": {"name": "Mining", "level": 1, "cost": {"stone": 2}, "vp": 1,
-               "sprite": [1, 0], "text": "+1 stone when producing."},
-    "writing": {"name": "Writing", "level": 1, "cost": {"culture": 2}, "vp": 1,
-                "sprite": [2, 0], "text": "Draw one extra card each turn."},
-    "agriculture": {"name": "Agriculture", "level": 2, "cost": {"food": 3}, "vp": 2,
-                    "sprite": [3, 1], "text": "+1 food when producing."},
-    "metallurgy": {"name": "Metallurgy", "level": 2, "cost": {"metal": 3}, "vp": 2,
-                   "sprite": [4, 1], "text": "Metal cards cost 1 less."},
-    "amphitheatre": {"name": "Amphitheatre", "level": 2, "cost": {"culture": 3}, "vp": 2,
-                     "sprite": [5, 1], "text": "+1 culture when producing."},
-    "pyramids": {"name": "Pyramids", "level": 3, "cost": {"stone": 4}, "vp": 4,
-                 "sprite": [6, 2], "text": "Worth 4 VP."},
-    "astronomy": {"name": "Astronomy", "level": 3, "cost": {"culture": 4}, "vp": 4,
-                  "sprite": [7, 2], "text": "Worth 4 VP."},
-    "epic": {"name": "Epic Poetry", "level": 3, "cost": {"food": 4}, "vp": 4,
-             "sprite": [8, 2], "text": "Worth 4 VP."},
+    # The nine real BGA achievements (sheet assets/altay/images/altay-achievements.webp,
+    # 11 cols x 3 rows). Costs are the resource icons printed on each card:
+    # green apple = food, brown tree = wood, black anvil = metal, grey = stone,
+    # green head = culture. Level 1/2 are "technologies" worth 1 VP; level 3
+    # are "wonders" with variable VP (see achievement_vp), capped at 7 VP total
+    # per the rulebook. Effects are the real card texts, as far as the bot
+    # implements them: Government draws an extra card, Philosophy adds 1 culture
+    # when producing, Strategy/Leadership add 1 when defending/attacking,
+    # Engineering/Mathematics are once-per-turn "trash/discard 1 to draw 1"
+    # (use_technology), and the wonders score at the end of the game.
+    "engineering": {"name": "Engineering", "level": 1, "cost": {"wood": 2, "stone": 2}, "vp": 1,
+                    "sprite": [1, 0], "text": "Trash 1 card to draw 1 card."},
+    "mathematics": {"name": "Mathematics", "level": 1, "cost": {"metal": 2, "stone": 2}, "vp": 1,
+                    "sprite": [3, 0], "text": "Discard 1 card to draw 1 card."},
+    "strategy": {"name": "Strategy", "level": 1, "cost": {"food": 2, "metal": 2}, "vp": 1,
+                 "sprite": [4, 0], "text": "Add 1 when defending."},
+    "government": {"name": "Government", "level": 2, "cost": {"metal": 1, "stone": 2, "culture": 2},
+                   "vp": 1, "sprite": [2, 1], "text": "Draw 1 additional card."},
+    "philosophy": {"name": "Philosophy", "level": 2, "cost": {"culture": 3},
+                   "vp": 1, "sprite": [4, 1], "text": "Produce 1 culture."},
+    "leadership": {"name": "Leadership", "level": 2, "cost": {"metal": 2, "stone": 1, "culture": 2},
+                   "vp": 1, "sprite": [3, 1], "text": "Add 1 when attacking."},
+    "academy": {"name": "Academy", "level": 3, "cost": {"stone": 4, "culture": 2}, "vp": None,
+                "sprite": [1, 2], "text": "Gain 1 VP for each Technology you completed."},
+    "amphitheatre": {"name": "Amphitheatre", "level": 3,
+                     "cost": {"food": 1, "wood": 1, "metal": 1, "stone": 1, "culture": 2}, "vp": None,
+                     "sprite": [2, 2], "text": "Gain 1 VP for each 4 cards in your deck."},
+    "colossus": {"name": "Colossus", "level": 3, "cost": {"culture": 4}, "vp": None,
+                 "sprite": [5, 2], "text": "Gain 1 VP for each VP card in your deck."},
 }
 SEA_ACHIEVEMENTS = dict(ACHIEVEMENTS)
 # FB-0056: the Seafarers achievements sheet is 12 cols x 3 rows (same
@@ -285,6 +296,44 @@ def achievement_def(game, achievement_id):
     return achievement_defs(game).get(achievement_id)
 
 
+def achievement_vp(game, player_index, achievement_id):
+    """VP a completed achievement is worth for this player.
+
+    Technologies (level 1/2) are worth their flat vp (1). Wonders (level 3)
+    score from the game state, per their real card text; other level-3 cards
+    (Seafarers Lighthouse) keep their flat vp.
+    """
+    definition = achievement_def(game, achievement_id)
+    if not definition:
+        return 0
+    if definition["level"] < 3 or definition.get("vp") is not None:
+        return definition.get("vp", 0) or 0
+    player = game["players"][player_index]
+    all_cards = player["hand"] + player["discard"] + player["deck"]
+    if achievement_id == "academy":
+        return sum(1 for item in player["achievements"]
+                   if (achievement_def(game, item) or {}).get("level", 0) < 3)
+    if achievement_id == "amphitheatre":
+        return len(all_cards) // 4
+    if achievement_id == "colossus":
+        return sum(1 for card in all_cards if CARDS.get(card, {}).get("vp", 0) > 0)
+    return 0
+
+
+def _achievement_points(game, player_index):
+    """Achievement VP: technologies at face value, wonders capped at 7 total
+    (rulebook: wonder VP is worth at most 7 points)."""
+    definitions = achievement_defs(game)
+    player = game["players"][player_index]
+    technologies = sum(achievement_vp(game, player_index, item)
+                       for item in player["achievements"]
+                       if definitions.get(item, {}).get("level", 0) < 3)
+    wonders = sum(achievement_vp(game, player_index, item)
+                  for item in player["achievements"]
+                  if definitions.get(item, {}).get("level", 0) == 3)
+    return technologies + min(7, wonders)
+
+
 def set_seafarers(game, enabled):
     if game.get("phase") != "lobby":
         return "The expansion can only be changed in the lobby."
@@ -316,6 +365,7 @@ def new_player(user_id, name):
         "achievements": [],
         "achievement": None,
         "achievement_paid": {},
+        "tech_used": None,
         "bought": [],
         "swords": 0,
         "sword_cards": 0,
@@ -404,6 +454,7 @@ def _normalize(game):
         player.setdefault("ship_crews", {zone: 0 for zone in SEA_ZONES})
         player.setdefault("achievement", None)
         player.setdefault("achievement_paid", {})
+        player.setdefault("tech_used", None)
         player.setdefault("traded", False)
         for zone in SEA_ZONES:
             player["ships"].setdefault(zone, 0)
@@ -441,6 +492,7 @@ def start_game(game, events=None, rng=None):
         player["achievements"] = []
         player["achievement"] = None
         player["achievement_paid"] = {}
+        player["tech_used"] = None
         player["swords"] = 0
         player["sword_cards"] = 0
         player["builds"] = 0
@@ -829,14 +881,10 @@ def play_card(game, player_index, hand_index, events=None, rng=None, params=None
     if card.get("resources"):
         _normalize(game)
         bonus = 0
-        if "irrigation" in player["achievements"] and "food" in card["resources"]:
-            bonus += 1
-        if "mining" in player["achievements"] and "stone" in card["resources"]:
-            bonus += 1
-        if "amphitheatre" in player["achievements"] and "culture" in card["resources"]:
+        if "philosophy" in player["achievements"] and "culture" in card["resources"]:
             bonus += 1
         for key, amount in card["resources"].items():
-            player["resources"][key] += amount + (bonus if key in ("food", "stone", "culture") else 0)
+            player["resources"][key] += amount + (bonus if key == "culture" else 0)
     if card["kind"] == "build":
         player["builds"] += 1
     if card["kind"] == "build2":
@@ -861,8 +909,6 @@ def buy_card(game, player_index, card_id, events=None, rng=None):
     if card_id in player["bought"]:
         return "You already acquired that card this turn."
     cost = dict(CARDS[card_id].get("cost", {}))
-    if "metallurgy" in player["achievements"] and "metal" in cost:
-        cost["metal"] = max(0, cost["metal"] - 1)
     if not _can_pay(player["resources"], cost):
         return "You cannot afford that card."
     _pay(player["resources"], cost)
@@ -931,7 +977,8 @@ def attack(game, player_index, from_region, region_id, events=None, rng=None):
     from_region = option["from"]
     rng = _rng(game, rng)
     strength = (game["board"][str(from_region)]["settlements"].count(player_index)
-                + player["swords"] + naval_support(game, player_index, region_id))
+                + player["swords"] + naval_support(game, player_index, region_id)
+                + (1 if "leadership" in player["achievements"] else 0))
     used_cards = player["sword_cards"]
     player["swords"] = 0
     player["sword_cards"] = 0
@@ -962,7 +1009,8 @@ def attack(game, player_index, from_region, region_id, events=None, rng=None):
         region = game["board"][str(region_id)]
         shields = min(other["shields"] + sum(CARDS.get(card, {}).get("shields", 0)
                                              for card in other["hand"]), 4)
-        defense = len(region["settlements"]) + shields
+        defense = (len(region["settlements"]) + shields
+                   + (1 if "strategy" in other["achievements"] else 0))
         other["shields"] = 0
         for index in range(len(other["hand"]) - 1, -1, -1):
             if CARDS.get(other["hand"][index], {}).get("shields") and shields > 0:
@@ -1025,6 +1073,43 @@ def develop(game, player_index, achievement_id, events=None, rng=None):
     return None
 
 
+USEABLE_TECHNOLOGIES = {"engineering": "trash", "mathematics": "discard"}
+
+
+def use_technology(game, player_index, achievement_id, card_index, events=None, rng=None):
+    """Use a once-per-turn technology: Engineering trashes a hand card to
+    draw 1, Mathematics discards a hand card to draw 1 (real card texts)."""
+    events = events if events is not None else []
+    error = _check_current(game, player_index)
+    if error:
+        return error
+    if achievement_id not in USEABLE_TECHNOLOGIES:
+        return "That achievement has no usable effect."
+    player = game["players"][player_index]
+    if achievement_id not in player["achievements"]:
+        return "You have not developed that achievement."
+    if player.get("tech_used"):
+        return "You already used a technology this turn."
+    try:
+        card_index = int(card_index)
+    except (TypeError, ValueError):
+        return "Choose a card from your hand."
+    if card_index < 0 or card_index >= len(player["hand"]):
+        return "Choose a card from your hand."
+    card_id = player["hand"].pop(card_index)
+    if USEABLE_TECHNOLOGIES[achievement_id] == "discard":
+        player["discard"].append(card_id)
+        verb = "discarded"
+    else:
+        verb = "trashed"
+    player["tech_used"] = achievement_id
+    _draw(game, player_index, 1, _rng(game, rng))
+    events.append(f"{_player_name(game, player_index)} {verb} "
+                  f"{CARDS[card_id]['name']} with "
+                  f"{achievement_def(game, achievement_id)['name']} and drew a card.")
+    return None
+
+
 def trade(game, player_index, give, receive, events=None, rng=None):
     events = events if events is not None else []
     error = _check_current(game, player_index)
@@ -1059,8 +1144,7 @@ def trade(game, player_index, give, receive, events=None, rng=None):
 def score(game, player_index):
     _normalize(game)
     player = game["players"][player_index]
-    definitions = achievement_defs(game)
-    points = sum(definitions.get(item, {}).get("vp", 0) for item in player["achievements"])
+    points = _achievement_points(game, player_index)
     all_cards = player["hand"] + player["discard"] + player["deck"]
     points += sum(CARDS.get(item, {}).get("vp", 0) for item in all_cards)
     for region in game["board"].values():
@@ -1077,8 +1161,7 @@ def score(game, player_index):
 def score_breakdown(game, player_index):
     _normalize(game)
     player = game["players"][player_index]
-    definitions = achievement_defs(game)
-    achievements = sum(definitions.get(item, {}).get("vp", 0) for item in player["achievements"])
+    achievements = _achievement_points(game, player_index)
     cards = sum(CARDS.get(item, {}).get("vp", 0)
                 for item in player["hand"] + player["discard"] + player["deck"])
     territories = 0
@@ -1131,6 +1214,7 @@ def end_turn(game, player_index, events=None, rng=None):
     player["bought"] = []
     player["played"] = []
     player["traded"] = False
+    player["tech_used"] = None
     if any(kept.values()):
         items = ", ".join(f"{amount} {RESOURCE_ICONS[key]}"
                           for key, amount in kept.items() if amount)
@@ -1140,8 +1224,9 @@ def end_turn(game, player_index, events=None, rng=None):
     if game["end_at"] is not None and game["turn"] >= game["end_at"]:
         _finalize(game, events)
     else:
-        draw = HAND_SIZE + (1 if "writing" in player["achievements"] else 0)
-        _draw(game, game["current"], max(0, draw - len(game["players"][game["current"]]["hand"])), _rng(game, rng))
+        next_player = game["players"][game["current"]]
+        draw = HAND_SIZE + (1 if "government" in next_player["achievements"] else 0)
+        _draw(game, game["current"], max(0, draw - len(next_player["hand"])), _rng(game, rng))
         events.append(f"{_player_name(game, game['current'])} begins turn {game['turn'] + 1}.")
     return None
 
@@ -1182,6 +1267,7 @@ def board_json(game, viewer_id=None):
             "ship_crews": dict(player.get("ship_crews", {})),
             "ships_to_place": player.get("ships_to_place", 0),
             "traded": bool(player.get("traded")),
+            "tech_used": player.get("tech_used"),
             "bought": list(player["bought"]),
             "score": score(game, index) if game.get("board") else 0,
         }

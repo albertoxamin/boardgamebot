@@ -113,17 +113,162 @@ class AltayEngineTests(unittest.TestCase):
     def test_achievements_and_scoring(self):
         game, events = self.new_game()
         player = game["players"][0]
-        player["resources"]["food"] = 3
-        self.assertIsNone(altay.develop(game, 0, "irrigation", events))
-        self.assertEqual(player["achievement"], "irrigation")
-        self.assertIsNotNone(altay.develop(game, 0, "mining", events))
-        self.assertIsNone(altay.develop(game, 0, "irrigation", events))
-        self.assertEqual(player["achievements"], ["irrigation"])
+        player["resources"]["wood"] = 2
+        player["resources"]["stone"] = 2
+        self.assertIsNone(altay.develop(game, 0, "engineering", events))
+        self.assertEqual(player["achievement"], "engineering")
+        self.assertIsNotNone(altay.develop(game, 0, "mathematics", events))
+        for _ in range(3):
+            self.assertIsNone(altay.develop(game, 0, "engineering", events))
+        self.assertEqual(player["achievements"], ["engineering"])
         breakdown = altay.score_breakdown(game, 0)
         self.assertEqual(breakdown["achievements"], 1)
         self.assertEqual(breakdown["total"], breakdown["achievements"] + breakdown["cards"]
                          + breakdown["territories"] + breakdown["victory_markers"]
                          + breakdown["captured"] + breakdown["conquest_markers"])
+
+    def test_real_achievements_match_sheets_and_cards(self):
+        """The nine base achievements are the real BGA cards: names,
+        sprite coords, levels and the resource icons printed on each
+        card (food/wood/metal/stone/culture). No homebrew names remain,
+        and no sprite is a card back ([0, 0], [0, 1] or [0, 2])."""
+        expected = {
+            "engineering": ([1, 0], 1, {"wood": 2, "stone": 2}, 1),
+            "mathematics": ([3, 0], 1, {"metal": 2, "stone": 2}, 1),
+            "strategy": ([4, 0], 1, {"food": 2, "metal": 2}, 1),
+            "government": ([2, 1], 2, {"metal": 1, "stone": 2, "culture": 2}, 1),
+            "philosophy": ([4, 1], 2, {"culture": 3}, 1),
+            "leadership": ([3, 1], 2, {"metal": 2, "stone": 1, "culture": 2}, 1),
+            "academy": ([1, 2], 3, {"stone": 4, "culture": 2}, None),
+            "amphitheatre": ([2, 2], 3, {"food": 1, "wood": 1, "metal": 1,
+                                         "stone": 1, "culture": 2}, None),
+            "colossus": ([5, 2], 3, {"culture": 4}, None),
+        }
+        self.assertEqual(set(altay.ACHIEVEMENTS), set(expected))
+        for key, (sprite, level, cost, vp) in expected.items():
+            definition = altay.ACHIEVEMENTS[key]
+            self.assertEqual(definition["sprite"], sprite, key)
+            self.assertEqual(definition["level"], level, key)
+            self.assertEqual(definition["cost"], cost, key)
+            self.assertEqual(definition["vp"], vp, key)
+            self.assertTrue(definition["text"], key)
+        for game in (self.new_game()[0], self.new_seafarers_game()[0]):
+            board = altay.board_json(game)
+            for ach in board["achievements"]:
+                col, row = ach["sprite"]
+                self.assertTrue(0 <= col <= 11 and 0 <= row <= 2,
+                                f"achievement {ach['id']} sprite {ach['sprite']} out of range")
+                self.assertNotIn(ach["sprite"], ([0, 0], [0, 1], [0, 2]),
+                                 f"achievement {ach['id']} shows a card back")
+            sea = game["seafarers"]
+            if sea:
+                self.assertIn("astronomy", {a["id"] for a in board["achievements"]})
+                self.assertIn("lighthouse", {a["id"] for a in board["achievements"]})
+
+    def test_wonder_vp_scores_from_the_game(self):
+        """Level-3 wonders score per their real text: Academy 1 VP per
+        Technology completed, Amphitheatre 1 VP per 4 cards in the deck,
+        Colossus 1 VP per VP card in the deck; wonder VP is capped at 7."""
+        game, events = self.new_game()
+        player = game["players"][0]
+        player["achievements"] = ["engineering", "government"]
+        self.assertEqual(altay.achievement_vp(game, 0, "academy"), 2)
+        player["hand"] = ["chariot", "hunter", "hunter", "hunter"]
+        player["discard"] = ["city", "village"]
+        player["deck"] = ["hunter", "hunter"]
+        self.assertEqual(altay.achievement_vp(game, 0, "amphitheatre"), 2)
+        # Only the Chariot and the City are VP cards in the deck.
+        self.assertEqual(altay.achievement_vp(game, 0, "colossus"), 2)
+        player["achievements"] = ["engineering", "government",
+                                  "academy", "amphitheatre", "colossus"]
+        # 2 tech VP + (2 + 2 + 2) wonder VP = 8.
+        self.assertEqual(altay.score_breakdown(game, 0)["achievements"], 8)
+        player["achievements"] = ["engineering", "government", "strategy",
+                                  "philosophy", "leadership", "academy"]
+        # Academy alone is worth 5 (five technologies); the cap only
+        # applies to wonder VP, so 5 tech VP + 5 wonder VP = 10.
+        self.assertEqual(altay.score_breakdown(game, 0)["achievements"], 10)
+        player["deck"] = ["warrior"] * 40
+        # Amphitheatre would be 11 and Academy 0: wonder VP caps at 7.
+        player["achievements"] = ["academy", "amphitheatre"]
+        self.assertEqual(altay.score_breakdown(game, 0)["achievements"], 7)
+
+    def test_real_technology_effects(self):
+        """Government draws an extra card, Philosophy adds 1 culture
+        when producing, Leadership adds 1 when attacking and Strategy
+        adds 1 when defending."""
+        game, events = self.new_game()
+        player = game["players"][0]
+        game["players"][1]["achievements"] = ["government"]
+        self.assertIsNone(altay.end_turn(game, 0, events, random.Random(6)))
+        self.assertEqual(len(game["players"][1]["hand"]), altay.HAND_SIZE + 1)
+        game, events = self.new_game()
+        player = game["players"][0]
+        player["achievements"] = ["philosophy"]
+        player["hand"] = ["scholar", "hunter", "hunter", "hunter", "hunter"]
+        self.assertIsNone(altay.play_card(game, 0, 0, events))
+        self.assertEqual(player["resources"]["culture"], 3)
+        game, events = self.new_game()
+        player = game["players"][0]
+        player["achievements"] = ["leadership"]
+        player["hand"] = ["warrior", "hunter", "hunter", "hunter", "hunter"]
+        game["board"]["6"]["settlements"].append(1)
+        game["board"]["6"]["marker"] = None
+        self.assertIsNone(altay.play_card(game, 0, 0, events))
+        option = next(o for o in altay.attack_options(game, 0) if o["kind"] == "player")
+        # 1 settlement + 1 sword + 1 Leadership vs 1 settlement + 0 shields.
+        self.assertIsNone(altay.attack(game, 0, option["from"], 6, events, random.Random(4)))
+        self.assertEqual(player["captured"], 1)
+        game, events = self.new_game()
+        player = game["players"][0]
+        other = game["players"][1]
+        other["achievements"] = ["strategy"]
+        player["hand"] = ["warrior", "hunter", "hunter", "hunter", "hunter"]
+        game["board"]["6"]["settlements"].append(1)
+        game["board"]["6"]["marker"] = None
+        self.assertIsNone(altay.play_card(game, 0, 0, events))
+        option = next(o for o in altay.attack_options(game, 0) if o["kind"] == "player")
+        # 1 settlement + 1 sword vs 1 settlement + 1 Strategy: not enough.
+        self.assertIsNone(altay.attack(game, 0, option["from"], 6, events, random.Random(4)))
+        self.assertEqual(player["captured"], 0)
+
+    def test_use_technology_once_per_turn(self):
+        """Engineering trashes a hand card to draw 1, Mathematics
+        discards one to draw 1, each at most once per turn."""
+        game, events = self.new_game()
+        player = game["players"][0]
+        player["achievements"] = ["engineering"]
+        player["hand"] = ["warrior", "hunter", "hunter", "hunter", "hunter"]
+        player["deck"] = ["village", "village"]
+        self.assertIsNone(altay.use_technology(game, 0, "engineering", 0, events))
+        self.assertEqual(len(player["hand"]), 5)
+        self.assertNotIn("warrior", player["hand"] + player["discard"] + player["deck"])
+        self.assertIsNotNone(altay.use_technology(game, 0, "engineering", 0, events))
+        self.assertIsNone(altay.end_turn(game, 0, events, random.Random(6)))
+        self.assertIsNone(altay.end_turn(game, 1, events, random.Random(6)))
+        self.assertIsNone(altay.use_technology(game, 0, "engineering", 0, events))
+        game, events = self.new_game()
+        player = game["players"][0]
+        player["achievements"] = ["mathematics"]
+        player["hand"] = ["warrior", "hunter", "hunter", "hunter", "hunter"]
+        player["deck"] = ["village", "village"]
+        self.assertIsNone(altay.use_technology(game, 0, "mathematics", 0, events))
+        self.assertIn("warrior", player["discard"])
+        self.assertIsNotNone(altay.use_technology(game, 0, "strategy", 0, events))
+
+    def test_use_technology_buttons_in_mini_app(self):
+        """The Mini App must offer the once-per-turn Engineering /
+        Mathematics buttons with a hand-card picker, and wonder tiles
+        must show variable VP instead of a fixed number."""
+        with open(os.path.join(ROOT, "assets", "altay", "scripts", "altay.js"), encoding="utf-8") as f:
+            js = f.read()
+        self.assertIn("Use Engineering", js)
+        self.assertIn("Use Mathematics", js)
+        self.assertIn("atMove('use'", js)
+        self.assertIn("★ VP", js)
+        with open(os.path.join(ROOT, "assets", "shared", "flip7.html"), encoding="utf-8") as f:
+            html = f.read()
+        self.assertIn("altay.js?v=8", html)
 
     def test_market_limits_and_costs(self):
         game, events = self.new_game()
@@ -525,7 +670,7 @@ class AltayEngineTests(unittest.TestCase):
         base = ROOT
         with open(os.path.join(ROOT, "assets", "shared", "flip7.html"), encoding="utf-8") as f:
             html = f.read()
-        self.assertIn('src="/assets/altay/scripts/altay.js?v=7"', html)
+        self.assertIn('src="/assets/altay/scripts/altay.js?v=8"', html)
         self.assertIn("url(/assets/altay/images/altay-markers.webp?v=", html)
         with open(os.path.join(ROOT, "assets", "altay", "scripts", "altay.js"), encoding="utf-8") as f:
             js = f.read()

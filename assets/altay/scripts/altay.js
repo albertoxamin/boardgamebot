@@ -148,12 +148,14 @@ function atAch(ach, index) {
   // FB-0020: description under each achievement card — title tooltips
   // never show on touch, so name, cost, VP and effect must be readable
   // on the card itself (same pattern as atCardCell, FB-0013/FB-0016).
+  // Wonders have no fixed VP (vp is null) — their text scores them.
+  const vpText = ach.vp === null || ach.vp === undefined ? '★ VP' : ach.vp + ' VP';
   const cap = '<b>' + escapeHtml(ach.name) + '</b><br>' +
-    escapeHtml(cost + ' · ' + ach.vp + ' VP') + '<br>' + escapeHtml(ach.text);
+    escapeHtml(cost + ' · ' + vpText) + '<br>' + escapeHtml(ach.text);
   // FB-0022: data-ach on the whole tile incl. its caption, like the
   // market/hand cards — tapping the description text must work too.
   return '<div class="atachwrap" data-ach="' + escapeHtml(ach.id) + '"><div class="' + cls + '" style="background-position:' + x + '% ' + y +
-    '%" title="' + escapeHtml(ach.name + ' (' + cost + ', ' + ach.vp + ' VP) — ' + ach.text) +
+    '%" title="' + escapeHtml(ach.name + ' (' + cost + ', ' + vpText + ') — ' + ach.text) +
     '"></div>' +
     '<div class="atcap">' + cap + '</div></div>';
 }
@@ -359,6 +361,26 @@ function atRender() {
       ? '💡 Builds ' + (me.builds || 0) + ' · Swords ' + (me.swords || 0) + ' · Resources ' + res + ' — tap Buy, Build, Attack or Develop to use them.'
       : '💡 No resources, builds or swords yet — play cards from your hand first, then Buy, Build, Attack and Develop work.';
     actions.appendChild(hint);
+  }
+  // Real achievements: Engineering (trash 1 card to draw 1) and
+  // Mathematics (discard 1 card to draw 1) are usable once per turn.
+  if (g.can_act && !me.tech_used) {
+    const usable = (me.achievements || []).filter(a => a === 'engineering' || a === 'mathematics');
+    if (usable.length && (me.hand || []).length) {
+      const row = document.createElement('div');
+      row.className = 'atrow';
+      row.innerHTML = '<select>' + me.hand.map((c, i) =>
+        '<option value="' + i + '">' + escapeHtml(c.name) + '</option>').join('') + '</select>';
+      usable.forEach(a => {
+        const b = document.createElement('button');
+        b.type = 'button'; b.className = 'atbtn';
+        b.textContent = a === 'engineering' ? '🗑️ Use Engineering' : '♻️ Use Mathematics';
+        b.addEventListener('click', () => atMove('use', {
+          achievement: a, card: Number(row.querySelector('select').value)}));
+        row.appendChild(b);
+      });
+      actions.appendChild(row);
+    }
   }
   if (g.seafarers && g.can_act) {
     const seaRow = document.createElement('div');

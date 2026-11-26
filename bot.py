@@ -42,7 +42,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #                     -> legacy Telegram HTML5 Game; currently unused (no
 #                     /play command sends a game message)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 101
+WEB_VER = 102
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 # Mini App assets: per-game scripts in assets/<game>/scripts/, per-game
@@ -4503,10 +4503,10 @@ ALTAY_RULES = """🏜️ <b>Altay: Dawn of Civilization</b> (2–4 players, simp
 • Played cards produce resources or give swords/builds. Unspent resources are discarded at turn end. You can acquire each market card only once per turn.
 • Build costs 2 food and needs a Village/Architect/City build token. Build in a territory with your settlements (max 4 there) or in a free territory adjacent to your settlements.
 • Attack from an adjacent territory you control. Defeat a Conquest Marker by having more settlements+swords than its number, or capture an enemy settlement if your strength beats their settlements+shields. Played sword cards are redrawn after an attack.
-• Develop: invest one resource per action in one achievement at a time. Completing it scores its VP. Secret/deluxe variants are not used.
+• Develop: invest one resource per action in one achievement at a time. Level 1–2 achievements are Technologies worth 1 VP each and give an effect (Government draws an extra card, Philosophy produces 1 culture, Leadership adds 1 when attacking, Strategy adds 1 when defending); Engineering and Mathematics can be used once per turn to trash/discard a card and draw 1 (/altay_use &lt;achievement&gt; &lt;card number&gt;). Level 3 achievements are Wonders that score VP from the game state (Academy, Amphitheatre, Colossus), capped at 7 wonder VP total. Secret/deluxe variants are not used.
 • Final score: achievements + VP action cards + 1 per settlement + VP markers held + 1 per captured settlement + 1 per 3 Conquest Markers. Ties break by achievements, cards, then settlements.
 • Seafarers (toggle in the lobby with /altay_seafarers &lt;on|off&gt;): the original board gains two sea zones and two islands with markers 3 and 2. Each player starts with 3 ships and 3 crews. A ship beside your settlement lets you settle or attack across that sea zone; crossing two zones costs two ships. Ships beside the target give +1 support each, and a used ship's crew is lost. Sea attacks may place a settlement in the conquered territory. Explorer grants 3 coins or a sea resettlement, Sailor gives a sword or moves a ship/places a crew, and Shipwright places a ship. Astronomy and Lighthouse are added. Coins score 1 VP each. Once per turn you may trade 3 identical or 2 different resources for 1 resource.
-• Commands: /altay_play &lt;card number&gt;, /altay_buy &lt;card&gt;, /altay_build &lt;territory&gt;, /altay_attack &lt;territory&gt;, /altay_develop &lt;id&gt;, /altay_seafarers &lt;on|off&gt;, /altay_end (or use buttons/Mini App)."""
+• Commands: /altay_play &lt;card number&gt;, /altay_buy &lt;card&gt;, /altay_build &lt;territory&gt;, /altay_attack &lt;territory&gt;, /altay_develop &lt;id&gt;, /altay_use &lt;achievement&gt; &lt;card number&gt;, /altay_seafarers &lt;on|off&gt;, /altay_end (or use buttons/Mini App)."""
 
 BLACKFLAG_RULES = BF.RULES
 
@@ -5882,6 +5882,11 @@ def handle_altay(state, msg, cmd, text, uid, name):
             err = AL.attack(g, idx, None, int(parts[0]), ev)
     elif cmd == "/altay_develop":
         err = AL.develop(g, idx, parts[0], ev) if parts else "Usage: /altay_develop &lt;id&gt;"
+    elif cmd == "/altay_use":
+        if len(parts) < 2 or not parts[1].isdigit():
+            err = "Usage: /altay_use &lt;engineering|mathematics&gt; &lt;card number&gt;"
+        else:
+            err = AL.use_technology(g, idx, parts[0], int(parts[1]) - 1, ev)
     elif cmd == "/altay_trade":
         if len(parts) < 3:
             err = "Usage: /altay_trade &lt;give[:count] ...&gt; &lt;receive&gt;"
@@ -5989,6 +5994,9 @@ def altay_api_move(state, chat_id, user_id, body):
                 err = AL.attack(g, actor, body.get("from"), int(body.get("region", -1)), ev)
             elif action == "develop":
                 err = AL.develop(g, actor, str(body.get("achievement", "")), ev)
+            elif action == "use":
+                err = AL.use_technology(g, actor, str(body.get("achievement", "")),
+                                        body.get("card", -1), ev)
             elif action == "trade":
                 err = AL.trade(g, actor, body.get("give"), str(body.get("receive", "")), ev)
             elif action == "end":

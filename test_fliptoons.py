@@ -523,3 +523,23 @@ def test_reference_icons_card():
     # Always visible (no "hidden" class): consultable in lobby, game and end.
     line = [l for l in html.splitlines() if 'id="ftRefIcons"' in l][0]
     assert "hidden" not in line
+
+
+def test_reference_card_both_sides():
+    # FB-0099: Annalisa clarified the reference card is double-sided — the
+    # TTS mod deck12 has ICONS on the back and HOW TO PLAY on the face — so
+    # the overlay must show both sides and let the player flip between them.
+    import os as _os
+
+    base = _os.path.dirname(__file__) + "/web/fliptoons/"
+    assert _os.path.exists(base + "fl-reference-howto.webp")
+    from PIL import Image
+
+    im = Image.open(base + "fl-reference-howto.webp")
+    assert im.size == (750, 1050)
+    js = open(_os.path.dirname(__file__) + "/web/fliptoons.js").read()
+    assert "fl-reference-howto.webp" in js
+    assert "fl-reference-icons.webp" in js
+    # Tapping the card flips to the other side instead of dismissing it.
+    assert "stopPropagation" in js
+    assert "Tap the card to see the other side" in js

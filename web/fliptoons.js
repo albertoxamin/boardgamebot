@@ -204,12 +204,23 @@ function ftArt(c){
   if(hb)hb.addEventListener('click',ev=>{ev.stopPropagation();ftZoomClose();ftMove('hire',{slot:parseInt(hb.dataset.zhire)});});
  }
  function ftZoomClose(){let z=document.getElementById('ftZoom');if(z){z.classList.remove('open');z.innerHTML='';}}
-// FB-0097: the official ICONS reference card (from the TTS mod), consultable
-// throughout the whole game — it explains what the ability icons mean.
+// FB-0097 + FB-0099: the official double-sided reference card (from the TTS
+// mod), consultable throughout the whole game. One side is ICONS (what the
+// ability icons mean), the other is HOW TO PLAY (the turn structure). Tap
+// the card to flip it, tap outside to dismiss.
 function ftRefIcons(){
   let z=document.getElementById('ftZoom');
-  z.innerHTML='<div class="ftzcard"><img src="/fliptoons/fl-reference-icons.webp" alt="Icons reference card" style="width:100%;border-radius:6px;display:block"></div>'+
-   '<div class="ftzdesc">📇 ICONS — what the ability icons on the cards mean. Tap anywhere to dismiss.</div>';
+  let sides=[
+    {src:'/fliptoons/fl-reference-icons.webp',alt:'Icons reference card',cap:'📇 ICONS — what the ability icons on the cards mean.'},
+    {src:'/fliptoons/fl-reference-howto.webp',alt:'How to play reference card',cap:'📇 HOW TO PLAY — Flip, Check Fame, Market, Cleanup.'}
+  ];
+  let i=0;
+  function show(){
+    z.innerHTML='<div class="ftzcard"><img src="'+sides[i].src+'" alt="'+sides[i].alt+'" style="width:100%;border-radius:6px;display:block"></div>'+
+     '<div class="ftzdesc">'+sides[i].cap+' Tap the card to see the other side, tap outside to dismiss.</div>';
+    z.querySelector('img').addEventListener('click',ev=>{ev.stopPropagation();i=1-i;show();});
+  }
+  show();
   z.classList.add('open');
 }
 function ftRender(){

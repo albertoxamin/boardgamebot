@@ -177,7 +177,7 @@ A full 3-player game was also simulated end-to-end (hits/stays/actions/
 round rotation → a winner at 200+ in 13 rounds) with the Telegram layer
 mocked out.
 
-## Regicide (2-4 players) (same bot, second game)
+## Regicide (2-4 players)
 
 BGG: https://boardgamegeek.com/boardgame/307002/regicide
 
@@ -193,7 +193,7 @@ Mini App: Flip 7 board button = `?startapp=<chat>` (Flip 7 view), Regicide board
 `regicide.py` + `test_regicide.py` (setup counts, combo validation, exact-kill, discard/lose,
 jester/yield).
 
-## Yahtzee (2-6 players) (same bot, dice scorecard)
+## Yahtzee (2-6 players)
 
 BGG: https://boardgamegeek.com/boardgame/2243/yahtzee
 
@@ -209,7 +209,7 @@ Mini App: board button = `?startapp=yahtzee<chat>` (same Main Mini App,
 routed by `start_param`). Engine: `yahtzee.py` + `test_yahtzee.py` (score
 table, upper bonus, extra-Yahtzee bonus, full game to end).
 
-## Fliptoons (2-4 players) (same bot, grid-building card market)
+## Fliptoons (2-4 players)
 
 BGG: https://boardgamegeek.com/boardgame/449185/fliptoons
 
@@ -226,7 +226,7 @@ Mini App: board button = `?startapp=fliptoons<chat>` (same Main Mini App,
 routed by `start_param`). Engine: `fliptoons.py` + `test_fliptoons.py`
 (full card abilities, market, final flip).
 
-## Tornado Splash (2-5 players) (same bot, jet-ski racing)
+## Tornado Splash (2-5 players)
 
 BGG: https://boardgamegeek.com/boardgame/444648/tornado-splash
 
@@ -248,7 +248,7 @@ Text commands: `/tornado` (create), `/tornado_join`, `/tornado_start [gp]`,
 Mini App: board button = `?startapp=tornado<chat>` (same Main Mini App,
 routed by `start_param`). Engine: `tornado.py` + `test_tornado.py`.
 
-## Abandon All Artichokes (2-4 players) (same bot, deck-wrecking veggies)
+## Abandon All Artichokes (2-4 players)
 
 BGG: https://boardgamegeek.com/boardgame/302260
 
@@ -269,7 +269,7 @@ Text commands: `/artichokes` (create), `/artichokes_join`,
 Mini App: board button = `?startapp=artichokes<chat>` (same Main Mini App,
 routed by `start_param`). Engine: `artichokes.py` + `test_artichokes.py`.
 
-## Fellowship of the Ring (2-4 players) (same bot, co-op trick-taking)
+## Fellowship of the Ring (2-4 players)
 
 BGG: https://boardgamegeek.com/boardgame/429293/the-fellowship-of-the-ring-trick-taking-game
 
@@ -298,7 +298,7 @@ Text commands: `/fotr` (create), `/fotr_join`, `/fotr_join_npc`,
 `?startapp=fellowship<chat>` (same Main Mini App, routed by `start_param`).
 Engine: `fellowship.py` + `test_fellowship.py`.
 
-## Azul (2-4 players) (same bot, tile-drafting wall builder)
+## Azul (2-4 players)
 
 BGG: https://boardgamegeek.com/boardgame/230802/azul
 
@@ -322,7 +322,7 @@ Text commands: `/azul` (create), `/azul_join`, `/azul_join_npc`,
 Engine: `azul.py` + `test_azul.py` (drafting, wall scoring/floor penalties,
 final bonuses, full-game simulation).
 
-## Toy Battle (2 players) (same bot, troops and medals)
+## Toy Battle (2 players)
 
 BGG: https://boardgamegeek.com/boardgame/434654/toy-battle
 
@@ -347,7 +347,7 @@ Field layout comes from the BGA tutorial data. Text commands: `/toybattle`
 (same Main Mini App, routed by `start_param`). Engine: `toybattle.py` +
 `test_toybattle.py`.
 
-## Tokaido Duo (2 players) (same bot, Shikoku journey)
+## Tokaido Duo (2 players)
 
 BGG: https://boardgamegeek.com/boardgame/363183/tokaido-duo
 
@@ -377,7 +377,7 @@ the sprites are kept in `sources/tokaidoduo/bga/`. Text commands:
 `?startapp=tokaidoduo<chat>` (same Main Mini App, routed by `start_param`).
 Engine: `tokaidoduo.py` + `test_tokaidoduo.py`.
 
-## Altay (2-4 players) (same bot, civilization card game)
+## Altay (2-4 players)
 
 BGG: https://boardgamegeek.com/boardgame/334537/altay-dawn-of-civilization
 
@@ -406,7 +406,7 @@ Text commands: `/altay`, `/altay_join`, `/altay_join_npc`,
 `/altay_rematch`. Mini App: board button = `?startapp=altay<chat>` (same Main
 Mini App, routed by `start_param`). Engine: `altay.py` + `tests/altay/test_altay.py`.
 
-## Black Flag! (4-8 players) (same bot, naval card game)
+## Black Flag! (4-8 players)
 
 BGG: https://boardgamegeek.com/boardgame/472803/black-flag
 
@@ -433,7 +433,7 @@ component sheets into `assets/blackflag/images/blackflag-cards.webp`, `assets/bl
 (same Main Mini App, routed by `start_param`). Engine: `blackflag.py`; tests
 live in `tests/test_wiring.py`.
 
-## Rumble Nation (2-4 players) (same bot, castle battles)
+## Rumble Nation (2-4 players)
 
 BGG: https://boardgamegeek.com/boardgame/266722/rumble-nation
 
@@ -460,7 +460,7 @@ Board, card, dice and token art is extracted from Board Game Arena into
 (same Main Mini App, routed by `start_param`). Engine: `rumblenation.py`; tests
 in `test_rumblenation.py`.
 
-## Fadenfroh (2-4 players) (same bot, embroidery drafting)
+## Fadenfroh (2-4 players)
 
 BGG: https://boardgamegeek.com/boardgame/475685/fadenfroh
 

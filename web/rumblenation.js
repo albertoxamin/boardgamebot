@@ -1,5 +1,7 @@
 const RNG = {chat_id: null, init: '', board: null, timer: null, card: null};
 
+const RN_HOW_TO_PLAY_URL = 'https://youtu.be/l89gewMT6uQ?si=W345viv6T7_pu5rg';
+
 const RN_TACTIC_POS = {1: [737, 2], 2: [737, 280], 3: [942, 2], 4: [942, 280],
   5: [2, 722], 6: [412, 722], 7: [207, 722], 8: [617, 722], 9: [822, 722],
   10: [1147, 2], 11: [1147, 280], 12: [1147, 558]};
@@ -106,10 +108,11 @@ function rnRender() {
   const actions = document.getElementById('rnActions');
   const join = document.getElementById('rnJoin');
   const start = document.getElementById('rnStart');
+  const howto = document.getElementById('rnHowTo');
   const rematch = document.getElementById('rnRematch');
   const roll = document.getElementById('rnRoll');
   const reroll = document.getElementById('rnReroll');
-  [join, start, rematch, roll, reroll].forEach(el => el.classList.add('hidden'));
+  [join, start, howto, rematch, roll, reroll].forEach(el => el.classList.add('hidden'));
   actions.innerHTML = '';
   document.getElementById('rnLog').textContent = (g.log || []).join('\n');
   const names = g.players.map((p, i) => '<span class="rn' + (i ? 'blue' : 'red') + '">' +
@@ -122,6 +125,7 @@ function rnRender() {
     board.innerHTML = '<div class="rnlobby">Join, then anyone taps Start.</div>';
     if (!g.is_player) join.classList.remove('hidden');
     start.classList.remove('hidden');
+    howto.classList.remove('hidden');
     return;
   }
   if (g.phase === 'game_end') rematch.classList.remove('hidden');
@@ -170,6 +174,13 @@ function rnRender() {
 }
 document.getElementById('rnJoin').addEventListener('click', () => rnMove('join'));
 document.getElementById('rnStart').addEventListener('click', () => rnMove('start'));
+document.getElementById('rnHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(RN_HOW_TO_PLAY_URL);
+    else window.open(RN_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(RN_HOW_TO_PLAY_URL, '_blank'); }
+});
 document.getElementById('rnRematch').addEventListener('click', () => rnMove('rematch'));
 document.getElementById('rnRoll').addEventListener('click', () => rnMove('roll'));
 document.getElementById('rnReroll').addEventListener('click', () => rnMove('reroll'));

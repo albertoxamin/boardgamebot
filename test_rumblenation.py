@@ -279,6 +279,31 @@ class ViewTests(unittest.TestCase):
         css = open(os.path.dirname(__file__) + "/web/flip7.html").read()
         self.assertIn(".rnlegend{", css)
 
+    def test_lobby_has_how_to_play_button(self):
+        # FB-0065: the Rumble Nation lobby has a "How to play" button that
+        # opens the how-to-play video, both on the Telegram board and in
+        # the Mini App lobby.
+        import bot as BOT
+        import json
+
+        g = RN.new_game(-1004393094474, 1, "Alice")
+        g["chat_type"] = "supergroup"
+        kb = BOT.rumblenation_keyboard(g)
+        flat = [b for row in kb for b in row]
+        howto = [b for b in flat if b.get("text") == "▶️ How to play"]
+        self.assertEqual(len(howto), 1)
+        self.assertEqual(howto[0].get("url"), BOT.RN_HOW_TO_PLAY_URL)
+        self.assertIn("youtu.be/l89gewMT6uQ", howto[0]["url"])
+        self.assertNotIn("rn:howto", json.dumps(kb))
+        js = open(os.path.dirname(__file__) + "/web/rumblenation.js").read()
+        self.assertIn("RN_HOW_TO_PLAY_URL", js)
+        self.assertIn("youtu.be/l89gewMT6uQ", js)
+        self.assertIn("howto.classList.remove('hidden')", js)
+        self.assertIn("openLink", js)
+        html = open(os.path.dirname(__file__) + "/web/flip7.html").read()
+        self.assertIn('id="rnHowTo"', html)
+        self.assertIn("▶️ How to play", html)
+
     def test_castle_token_sprites_match_their_numbers(self):
         # FB-0061: castle 7 and 11 were swapped in web/rumblenation.js, so
         # the token face did not match the castle value in the rules.

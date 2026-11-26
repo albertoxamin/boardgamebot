@@ -40,7 +40,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 79
+WEB_VER = 80
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -5325,6 +5325,9 @@ def tokaidoduo_board_text(g):
     return "\n".join(lines)
 
 
+TD_HOW_TO_PLAY_URL = "https://youtu.be/fOsKvq0FlaU?si=O9RLwyu3qvbCV7QT"
+
+
 def tokaidoduo_keyboard(g):
     if g["phase"] == "game_end":
         kb = [[{"text": "🔄 Rematch!", "callback_data": "td:rematch"}]]
@@ -5336,6 +5339,7 @@ def tokaidoduo_keyboard(g):
             if can_add_npc("tokaidoduo", g):
                 kb.append([{"text": "🤖 Add NPC", "callback_data": "td:npc"}])
             kb.append([{"text": "▶️ Start game", "callback_data": "td:start"}])
+            kb.append([{"text": "🎥 How to play", "url": TD_HOW_TO_PLAY_URL}])
             return kb + (wk or [])
         kb = []
         pend = g.get("pending")

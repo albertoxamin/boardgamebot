@@ -1,4 +1,5 @@
 const TDG = {user_id: 0, chat_id: null, board: null, timer: null, init: '', webVer: null, newVer: false, verAt: 0};
+const TD_HOW_TO_PLAY_URL = 'https://youtu.be/fOsKvq0FlaU?si=O9RLwyu3qvbCV7QT';
 
 async function tdCheckVer() {
   // FB-0026 (Altay, same cause): the Mini App never reloads its own JS
@@ -365,8 +366,9 @@ function tdRender() {
   const actions = document.getElementById('tdActions');
   const join = document.getElementById('tdJoin');
   const start = document.getElementById('tdStart');
+  const howto = document.getElementById('tdHowTo');
   const rematch = document.getElementById('tdRematch');
-  [join, start, rematch].forEach(el => el.classList.add('hidden'));
+  [join, start, howto, rematch].forEach(el => el.classList.add('hidden'));
   actions.innerHTML = '';
   document.getElementById('tdLog').textContent = (g.log || []).join('\n');
   const names = g.players.map(p => escapeHtml(p.name) + (p.npc ? ' 🤖' : '') +
@@ -376,6 +378,7 @@ function tdRender() {
     board.innerHTML = '<div class="tdlobby">Join, then anyone taps Start.<br>Each player controls a Pilgrim, a Merchant and an Artist.</div>';
     if (!g.is_player) join.classList.remove('hidden');
     start.classList.remove('hidden');
+    howto.classList.remove('hidden');
     return;
   }
   const dice = ['pilgrim', 'merchant', 'artist'].map(ch =>
@@ -559,5 +562,12 @@ function tdRender() {
 }
 document.getElementById('tdJoin').addEventListener('click', () => tdMove('join'));
 document.getElementById('tdStart').addEventListener('click', () => tdMove('start'));
+document.getElementById('tdHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(TD_HOW_TO_PLAY_URL);
+    else window.open(TD_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(TD_HOW_TO_PLAY_URL, '_blank'); }
+});
 document.getElementById('tdRematch').addEventListener('click', () => tdMove('rematch'));
 tdLoad();

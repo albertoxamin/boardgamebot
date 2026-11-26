@@ -1163,6 +1163,29 @@ def test_board_lines_show_boutiques_and_wave_abilities():
     assert all(len(v) == 2 and all(t for _, t in v) for v in TD.WAVES.values())
 
 
+def test_lobby_has_how_to_play_button():
+    # FB-0083: the Tokaido Duo lobby has a "🎥 How to play" button that opens
+    # the how-to-play video, both on the Telegram board and in the Mini App
+    # lobby.
+    import bot as BOT
+
+    g = TD.new_game(-1004393094474, 1, "Alice")
+    kb = BOT.tokaidoduo_keyboard(g)
+    flat = [b for row in kb for b in row]
+    howto = [b for b in flat if b.get("text") == "🎥 How to play"]
+    assert len(howto) == 1
+    assert howto[0].get("url") == BOT.TD_HOW_TO_PLAY_URL
+    assert "youtu.be/fOsKvq0FlaU" in howto[0]["url"]
+    js = open(os.path.dirname(__file__) + "/web/tokaidoduo.js").read()
+    assert "TD_HOW_TO_PLAY_URL" in js
+    assert "youtu.be/fOsKvq0FlaU" in js
+    assert "openLink" in js
+    assert "tdHowTo" in js
+    html = open(os.path.dirname(__file__) + "/web/flip7.html").read()
+    assert 'id="tdHowTo"' in html
+    assert "🎥 How to play" in html
+
+
 if __name__ == "__main__":
     for name, fn in sorted(list(globals().items())):
         if name.startswith("test_"):

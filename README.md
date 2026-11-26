@@ -141,7 +141,7 @@ Rocket-Loader-transformed scripts. Three ways to offer it:
    `answerCallbackQuery(url=FLIP7_GAME_URL)`. Scores can be posted
    server-side with `setGameScore` (not from the page).
 
-## Rules used (researched online)
+## Flip 7
 
 Sources: official rulebook (bghub.org/r/flip7.pdf), Asmodee "How to Play
 Flip 7", The Ludarium academy guide.

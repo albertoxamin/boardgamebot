@@ -1,4 +1,6 @@
 // Tornado Splash Mini App (synced, initData auto-login). Loaded by flip7.html router.
+
+const TS_HOW_TO_PLAY_URL = 'https://youtu.be/7iSZihL0nWw?si=5o_WTg3LRXG2ALzg';
 const TSV={user_id:0,chat_id:null,board:null,timer:null,init:'',sel:new Set(),boost:false,prevKey:'',prevAll:null};
 function tsCounts(b){let c={};(b.players||[]).forEach((p,i)=>{c['s:'+i+':hand']=p.hand_count;c['s:'+i+':pos']=p.pos;c['s:'+i+':points']=p.points;});return c;}
 function tsLog(s){let e=document.getElementById('tsLog');if(e)e.textContent+=s+'\n';}
@@ -117,6 +119,7 @@ function tsRender(){
  let $=id=>document.getElementById(id);
  $('tsJoin').classList.toggle('hidden',!(b.phase==='lobby'&&!b.is_player));
  $('tsStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.is_player&&b.players.length>=2));
+ $('tsHowTo').classList.toggle('hidden', b.phase !== 'lobby');
  $('tsGp').classList.toggle('hidden',!(b.phase==='lobby'&&b.is_player&&b.players.length>=2));
  $('tsAuto').classList.toggle('hidden',!(b.phase==='picking'&&b.is_player));
  $('tsPlay').classList.toggle('hidden',!(myTurn&&b.is_player));
@@ -143,6 +146,13 @@ function tsRender(){
 }
 document.getElementById('tsJoin').addEventListener('click',()=>tsMove('join'));
 document.getElementById('tsStart').addEventListener('click',()=>tsMove('start',{gp:false}));
+document.getElementById('tsHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(TS_HOW_TO_PLAY_URL);
+    else window.open(TS_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(TS_HOW_TO_PLAY_URL, '_blank'); }
+});
 document.getElementById('tsGp').addEventListener('click',()=>tsMove('start',{gp:true}));
 document.getElementById('tsAuto').addEventListener('click',()=>tsMove('auto'));
 document.getElementById('tsPlay').addEventListener('click',()=>tsMove('play',{cards:[...TSV.sel],boost:TSV.boost}));

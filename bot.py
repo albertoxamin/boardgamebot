@@ -40,7 +40,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 76
+WEB_VER = 77
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -2687,6 +2687,9 @@ def tornado_board_text(g):
     return "\n".join(lines)
 
 
+TS_HOW_TO_PLAY_URL = "https://youtu.be/7iSZihL0nWw?si=5o_WTg3LRXG2ALzg"
+
+
 def tornado_keyboard(g):
     ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
     wk = web_keyboard(ct, g["chat_id"], game="tornado")
@@ -2697,6 +2700,7 @@ def tornado_keyboard(g):
                        {"text": "🏆 Grand Prix", "callback_data": "ts:gp"}])
         if can_add_npc("tornado", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "ts:npc"}])
+        kb.append([{"text": "🎥 How to play", "url": TS_HOW_TO_PLAY_URL}])
         return kb + (wk or [])
     if g["phase"] == "picking":
         kb = []

@@ -362,3 +362,26 @@ if __name__ == "__main__":
         fn()
         print(f"ok - {fn.__name__}")
     print(f"All {len(fns)} tornado tests passed.")
+
+
+def test_lobby_has_how_to_play_button():
+    # FB-0078: the Tornado Splash lobby has a "🎥 How to play" button that
+    # opens the how-to-play video, both on the Telegram board and in the
+    # Mini App lobby.
+    import bot as BOT
+
+    g = TS.new_game(-1004393094474, 1, "Alice")
+    kb = BOT.tornado_keyboard(g)
+    flat = [b for row in kb for b in row]
+    howto = [b for b in flat if b.get("text") == "🎥 How to play"]
+    assert len(howto) == 1
+    assert howto[0].get("url") == BOT.TS_HOW_TO_PLAY_URL
+    assert "youtu.be/7iSZihL0nWw" in howto[0]["url"]
+    js = open(os.path.dirname(__file__) + "/web/tornado.js").read()
+    assert "TS_HOW_TO_PLAY_URL" in js
+    assert "youtu.be/7iSZihL0nWw" in js
+    assert "openLink" in js
+    assert "tsHowTo" in js
+    html = open(os.path.dirname(__file__) + "/web/flip7.html").read()
+    assert 'id="tsHowTo"' in html
+    assert "🎥 How to play" in html

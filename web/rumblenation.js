@@ -108,7 +108,13 @@ function rnTurnStyle() {
     '.rnreserve.rnturn{border:2px solid #f59e0b;' +
     'box-shadow:0 0 0 2px #f59e0b55,0 0 12px #f59e0b66;background:#1e293b}' +
     '.rnturnbadge{display:inline-block;background:#f59e0b;color:#111;' +
-    'border-radius:999px;padding:1px 8px;font-size:11px;font-weight:900}';
+    'border-radius:999px;padding:1px 8px;font-size:11px;font-weight:900}' +
+    // FB-0101: one shared map — say so above the board, or the meeples of
+    // every player on each castle read as soldiers landing on the other
+    // player's map (the physical game has a map per player).
+    '.rnsharednote{text-align:center;font-size:13px;color:#e2e8f0;' +
+    'background:#0f172a;border:1px solid #334155;border-radius:8px;' +
+    'padding:5px 8px;margin:0 0 6px}';
   if (document.head) document.head.appendChild(s);
 }
 function rnTurnBanner(g) {
@@ -203,6 +209,9 @@ function rnRender() {
   if (g.phase === 'game_end') rematch.classList.remove('hidden');
   let html = '';
   if (g.phase === 'action' || g.phase === 'select') html += rnReserve(g);
+  // FB-0101: one shared map — label it, or every player's meeples on a
+  // castle read as soldiers landing on the other player's map.
+  html += '<div class="rnsharednote">🗺️ One shared map — every player\'s soldiers are on it, in their colour.</div>';
   html += '<div class="rnboard">';
   Object.values(g.regions).forEach(r => { html += rnRegion(r, g); });
   html += '</div>';

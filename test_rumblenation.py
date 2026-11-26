@@ -511,6 +511,27 @@ class ViewTests(unittest.TestCase):
         self.assertIn("Rumble Nation lobby", js)
         self.assertIn("wins! · ' + names", js)
 
+    def test_shared_map_is_labelled(self):
+        # FB-0101: Annalisa read the one shared map as a map per player and
+        # wondered why the current player's soldiers also appeared on the
+        # other player's map. She confirmed a shared map is fine — the
+        # Mini App now labels it above the board, and the Telegram board
+        # lines say so too. Deploying still only adds the acting player's
+        # soldiers to that castle.
+        g, ev = game([3, 4, 5])
+        setup_castles(g, {9: 0, 8: 1, 7: 2})
+        RN.roll(g, 0)
+        self.assertIsNone(RN.deploy(g, 0, 5, 7, ev))
+        # Deploying adds soldiers only for the acting player — the other
+        # player's count in that castle stays 0.
+        self.assertEqual(g["troops"]["2"]["0"], 3)
+        self.assertEqual(g["troops"]["2"]["1"], 0)
+        lines = RN.board_lines(g)
+        self.assertTrue(any("One shared map" in l for l in lines))
+        js = open(os.path.dirname(__file__) + "/web/rumblenation.js").read()
+        self.assertIn("rnsharednote", js)
+        self.assertIn("One shared map", js)
+
     def test_castle_token_sprites_match_their_numbers(self):
         # FB-0061: castle 7 and 11 were swapped in web/rumblenation.js, so
         # the token face did not match the castle value in the rules.

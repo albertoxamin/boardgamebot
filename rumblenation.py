@@ -469,6 +469,12 @@ def board_lines(g):
         + (f" · small×{len(p['small_castles'])}" if p.get("small_castles") else "")
         for p in g["players"])
     lines.append(f"⚔️ <b>Rumble Nation</b> · turn {g['turn']} · {names}")
+    if g["phase"] in ("action", "select"):
+        # FB-0101: Annalisa read the one shared map as a map per player and
+        # wondered why the current player's soldiers also appeared on the
+        # other player's map. She confirmed a shared map is fine — say so.
+        lines.append("🗺️ One shared map — each castle shows every player's "
+                     "soldiers in their colour.")
     lines.append("🏯 " + " ".join(
         f"{v}={REGIONS[g['castle_at'][str(v)]]['title']}" for v in CASTLE_VALUES
         if str(v) in g["castle_at"]))

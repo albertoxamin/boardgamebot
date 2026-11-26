@@ -32,7 +32,16 @@ async function ffLoad() {
                parseInt(qp.get('chat_id'), 10) || ffChatId(tg.chat_instance);
   const r = await ffApi('/api/fadenfroh/mygames?init_data=' + encodeURIComponent(tg.init));
   const mine = r.games || [];
-  const pick = mine.find(g => g.chat_id === pref) || mine.find(g => g.phase !== 'game_end') || mine[0];
+  let pick = mine.find(g => g.chat_id === pref) || mine.find(g => g.phase !== 'game_end') || mine[0];
+  if (!pick && pref) {
+    // Spectate the chat's game if one exists (Flip 7 / Odin pattern).
+    // Without this a spectator falls through to create — which mid-game
+    // accidentally returns the existing game, but after game_end spawns a
+    // brand-new game in the group with a "created by <spectator>" message.
+    const spec = await ffApi('/api/fadenfroh/game?chat_id=' + encodeURIComponent(pref) +
+      '&init_data=' + encodeURIComponent(tg.init));
+    if (spec.ok) pick = {chat_id: pref};
+  }
   if (pick) ffSelect(pick.chat_id);
   else if (pref) {
     const cr = await ffApi('/api/fadenfroh/create', {
@@ -315,22 +324,31 @@ function ffRender() {
   const actorP = (g.actor !== null && g.actor !== undefined) ? g.players[g.actor] : null;
   const myTurn = ffIsMyTurn(g);
   const npcTurn = !!(actorP && actorP.npc);
+  // Spectating, like the other games: not a player, outside the lobby
+  // (in the lobby a non-player is a joiner, not a spectator). The board
+  // is view-only for them — no actions, no Start, no Rematch.
+  const spectating = !g.is_player && g.phase !== 'lobby';
+  const specBar = spectating ?
+    '<div class="lobby-note">👁 Spectating — view only (join in Telegram to play)</div>' : '';
   const turnSuffix = myTurn ? ' · <b>your move</b>' : npcTurn ? ' · <b>NPC\'s turn</b>' :
     actorP ? ' · <b>' + escapeHtml(actorP.name) + '\'s turn</b>' : '';
-  turn.innerHTML = ffTurnBanner(g) + (g.phase === 'lobby' ? '🪡 Fadenfroh lobby — ' + g.players.length + '/4 · ' + names :
+  turn.innerHTML = specBar + ffTurnBanner(g) + (g.phase === 'lobby' ? '🪡 Fadenfroh lobby — ' + g.players.length + '/4 · ' + names :
     g.phase === 'game_end' ? '🏆 ' + escapeHtml((g.players[g.winner] || {}).name || 'Winner') +
       ' wins! · ' + names :
     '🪡 Round ' + g.round + '/5 · ' + g.phase + ' · ' + names + turnSuffix);
   // FB-0126: in the bonus phase the B and C goal tiles are the choice —
   // tap one to score it. Other goals dim while choosing.
   const bonusPick = g.phase === 'bonus' && g.can_act;
-  goals.innerHTML = '🎯 ' + ['A', 'B', 'C', 'D'].map(k => {
+  // Goals are only dealt at start — in the lobby g.goals is {} and the
+  // tiles rendered as "Goal A: undefined" with a NaN sprite position.
+  const dealt = ['A', 'B', 'C', 'D'].filter(k => g.goals[k] !== undefined && g.goals[k] !== null);
+  goals.innerHTML = dealt.length ? '🎯 ' + dealt.map(k => {
     const tap = bonusPick && (k === 'B' || k === 'C');
     const cls = 'ffgoal' + (tap ? ' fftap' : bonusPick ? ' ffoff' : '');
     return '<span class="' + cls + '"' + (tap ? ' data-goal="' + k + '"' : '') +
       ' title="Goal ' + k + ': ' + g.goals[k] + '">' + k +
       '<span class="ffscore" style="' + ffScoreStyle(g.goals[k]) + '"></span></span>';
-  }).join('');
+  }).join('') : '';
   if (bonusPick) {
     goals.querySelectorAll('[data-goal]').forEach(el =>
       el.addEventListener('click', () => ffMove('choice', {value: el.dataset.goal})));
@@ -398,12 +416,16 @@ function ffRender() {
   players.querySelectorAll('[data-place]').forEach(el =>
     el.addEventListener('click', () => ffMove('choice', {value: el.dataset.place})));
   if (g.phase === 'lobby') {
-    if (g.is_player) join.classList.remove('hidden');
-    start.classList.remove('hidden');
+    // Join is for non-players (it was inverted: shown only to players,
+    // who are already seated, so a spectator could never join — and the
+    // server-side join accepts any user). Start is for seated players
+    // only: the API lets anyone start, so a spectator must not see it.
+    if (!g.is_player) join.classList.remove('hidden');
+    if (g.is_player) start.classList.remove('hidden');
     howto.classList.remove('hidden');
     return;
   }
-  if (g.phase === 'game_end') { rematch.classList.remove('hidden'); return; }
+  if (g.phase === 'game_end') { if (g.is_player) rematch.classList.remove('hidden'); return; }
   if (!g.can_act) return;
   if (!g.pending || g.pending.kind !== 'place') { FF.placeCard = null; FF.placeKey = ''; }
   if (g.phase === 'shopping') return;

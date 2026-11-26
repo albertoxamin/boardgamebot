@@ -362,6 +362,61 @@ class FlowTests(unittest.TestCase):
         self.assertEqual(theirs["players"][1]["supply"], [6, 7])
         self.assertEqual(len(mine["cards"]), 81)
 
+    def test_spectator_board_is_view_only(self):
+        # A non-player sees the public board but can never act, and the
+        # actor's pending cards stay hidden from them.
+        import bot as BOT
+
+        g, _ = two_player_game()
+        ev = []
+        for _ in range(200):
+            idx = FD.current_index(g)
+            pend = g.get("pending")
+            if pend and pend["kind"] == "place":
+                break
+            if g["phase"] == "shopping":
+                err = FD.pass_offer(g, idx, 0, ev)
+            elif pend["kind"] == "keep":
+                err = FD.apply_choice(g, idx, 0, ev)
+            elif pend["kind"] == "bonus":
+                err = FD.apply_choice(g, idx, "B", ev)
+            else:
+                self.fail((g["phase"], pend))
+            self.assertIsNone(err)
+        else:
+            self.fail("no place pending reached")
+        spec = BOT.fadenfroh_board_json(g, 99)
+        self.assertFalse(spec["is_player"])
+        self.assertFalse(spec["can_act"])
+        self.assertEqual(spec["pending"]["kind"], "place")
+        self.assertIsNone(spec["pending"].get("cards"))
+        mine = BOT.fadenfroh_board_json(g, 1)
+        self.assertEqual(mine["pending"]["cards"], g["pending"]["cards"])
+
+    def test_spectate_loads_existing_game_before_creating(self):
+        # Albert: spectating was broken — ffLoad fell through to POST
+        # create, which after game_end spawns a brand-new game in the
+        # group. Like Flip 7 / Odin, it must first try the existing game.
+        js = open(os.path.join(ROOT, "assets", "fadenfroh", "scripts", "fadenfroh.js")).read()
+        game_at = js.find("/api/fadenfroh/game?chat_id=")
+        create_at = js.find("/api/fadenfroh/create")
+        self.assertGreater(game_at, -1)
+        self.assertGreater(create_at, -1)
+        self.assertLess(game_at, create_at)
+        self.assertIn("Spectating — view only", js)
+
+    def test_spectate_lobby_join_and_start(self):
+        # In the lobby Join is for non-players (it was inverted: shown
+        # only to seated players, so a spectator could never join) and
+        # Start is for seated players only (the API lets anyone start).
+        # Rematch is players-only too; undealt lobby goals render nothing
+        # instead of "Goal A: undefined" tiles with NaN sprite positions.
+        js = open(os.path.join(ROOT, "assets", "fadenfroh", "scripts", "fadenfroh.js")).read()
+        self.assertIn("if (!g.is_player) join.classList.remove('hidden')", js)
+        self.assertIn("if (g.is_player) start.classList.remove('hidden')", js)
+        self.assertIn("if (g.is_player) rematch.classList.remove('hidden')", js)
+        self.assertIn("g.goals[k] !== undefined", js)
+
 
 if __name__ == "__main__":
     unittest.main()

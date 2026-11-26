@@ -204,6 +204,14 @@ function ftArt(c){
   if(hb)hb.addEventListener('click',ev=>{ev.stopPropagation();ftZoomClose();ftMove('hire',{slot:parseInt(hb.dataset.zhire)});});
  }
  function ftZoomClose(){let z=document.getElementById('ftZoom');if(z){z.classList.remove('open');z.innerHTML='';}}
+// FB-0097: the official ICONS reference card (from the TTS mod), consultable
+// throughout the whole game — it explains what the ability icons mean.
+function ftRefIcons(){
+  let z=document.getElementById('ftZoom');
+  z.innerHTML='<div class="ftzcard"><img src="/fliptoons/fl-reference-icons.webp" alt="Icons reference card" style="width:100%;border-radius:6px;display:block"></div>'+
+   '<div class="ftzdesc">📇 ICONS — what the ability icons on the cards mean. Tap anywhere to dismiss.</div>';
+  z.classList.add('open');
+}
 function ftRender(){
  let b=FLP.board; if(!b)return;
  let old=FLP.prevAll,oldCounts=old&&old.counts||{};
@@ -280,5 +288,6 @@ document.getElementById('ftHowTo').addEventListener('click', () => {
 });
 document.getElementById('ftSkip').addEventListener('click',()=>ftMove('skip'));
 document.getElementById('ftZoom').addEventListener('click',ftZoomClose);
+document.getElementById('ftRefIcons').addEventListener('click',ftRefIcons);
 document.getElementById('ftRematch').addEventListener('click',()=>ftMove('rematch'));
 if(!document.getElementById('fliptoons').classList.contains('hidden')) ftLoad();

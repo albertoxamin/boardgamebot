@@ -500,3 +500,26 @@ def test_lobby_has_how_to_play_button():
     html = open(os.path.dirname(__file__) + "/web/flip7.html").read()
     assert 'id="ftHowTo"' in html
     assert "🎥 How to play" in html
+
+
+def test_reference_icons_card():
+    # FB-0097: every player gets the official ICONS reference card, consultable
+    # throughout the whole game — a button in the Mini App opens it as an
+    # overlay (Annalisa chose ICONS over HOW TO PLAY / both).
+    import os as _os
+
+    base = _os.path.dirname(__file__) + "/web/fliptoons/"
+    assert _os.path.exists(base + "fl-reference-icons.webp")
+    from PIL import Image
+
+    im = Image.open(base + "fl-reference-icons.webp")
+    assert im.size == (750, 1050)
+    js = open(_os.path.dirname(__file__) + "/web/fliptoons.js").read()
+    assert "ftRefIcons" in js
+    assert "fl-reference-icons.webp" in js
+    html = open(_os.path.dirname(__file__) + "/web/flip7.html").read()
+    assert 'id="ftRefIcons"' in html
+    assert "Icons reference card" in html
+    # Always visible (no "hidden" class): consultable in lobby, game and end.
+    line = [l for l in html.splitlines() if 'id="ftRefIcons"' in l][0]
+    assert "hidden" not in line

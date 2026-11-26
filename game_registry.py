@@ -82,7 +82,7 @@ GAME_SPECS = (
                        "/leaves_rules", "/leaves_cancel"),
         web_label="🎮 Play 13 Leaves (HTML)", callback_prefix="lv",
         min_players=3, max_players=6, npc_full="⛔ 13 Leaves is 3-6 players (full).",
-        rematch_phases=("game_end",), cover="",
+        rematch_phases=("game_end",), cover="../../../leaves/images/leaves-cover.jpg",
         module="game_modules.leaves", web_module="leaves", static_assets=("leaves.js", "13leaves.png"),
     ),
     GameSpec(
@@ -173,7 +173,7 @@ GAME_SPECS = (
                        "/azul_place", "/azul_rules", "/azul_cancel", "/azul_rematch"),
         web_label="🎮 Play Azul (HTML)", callback_prefix="az",
         min_players=2, max_players=4, npc_full="⛔ Azul is 2-4 players (full).",
-        rematch_phases=("game_end",), cover="../azul_assets/gamemedia/box/en_280.png",
+        rematch_phases=("game_end",), cover="../../../azul/images/azul_assets/gamemedia/box/en_280.png",
         module="azul", web_module="azul", static_assets=("azul.js",),
     ),
     GameSpec(

@@ -97,8 +97,7 @@ player who flipped them. Lobby boards are sent as the game's box-art photo
 and re-sent when the lobby changes. During play the board message is edited
 in place when a move produces no events; when a turn does produce events
 (e.g. a Flip 7 flip result) the board is re-sent as a fresh message and the
-old one deleted, so the newest message always carries the buttons. (13
-Leaves has no box art yet, so its lobby is plain text.)
+old one deleted, so the newest message always carries the buttons.
 
 ## Mini App (Telegram, synced)
 
@@ -231,7 +230,8 @@ BGG: https://boardgamegeek.com/boardgame/434442/13-leaves
 row: the first lead plays any set of the same value, then you play onto the
 left or right end — at least as many cards as that end stack, with a value
 below the lowest (left) or above the highest (right). First to empty your
-hand wins.
+hand wins. The lobby shows the game's box art
+(`assets/leaves/images/leaves-cover.jpg`).
 Text commands: `/leaves` (create), `/leaves_join`, `/leaves_join_npc`,
 `/leaves_start`, `/leaves_play <value> <count>` (e.g. `/leaves_play 5 2`),
 `/leaves_pass`, `/leaves_cancel` (creator), `/leaves_rules`. Mini App:
@@ -672,7 +672,7 @@ stored in `assets/fadenfroh/rulebook.pdf` and
 - `assets/fadenfroh/images/fadenfroh-*.webp` and `sources/fadenfroh/bga/` – BGA-extracted Fadenfroh fabric, scoring, starting-card and token art
 - `sources/tokaidoduo/bga/` – BGA sprite sheets for Tokaido Duo (dice, wares, waves, paintings, boutiques, character boards)
 - `assets/artichokes/images/artichokes_cards/` – BGA card art (0–9 vegetables, 10–14 Artichokes, 15 Rhubarb, 16 back)
-- `assets/shared/images/covers/*.{jpg,png}` – box art shown as the lobby photo for each game (13 Leaves has none yet)
+- `assets/shared/images/covers/*.{jpg,png}` – box art shown as the lobby photo for each game (13 Leaves' cover lives in `assets/leaves/images/leaves-cover.jpg`)
 - `web/server.py` – static-file server for local testing of the Mini App page only (no `/api/*`, so no synced play; the live Mini App is served by `bot.py` itself on `:8080`)
 - `state.json` – created at runtime (per-chat games, decks, scores).
 

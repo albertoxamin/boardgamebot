@@ -98,11 +98,28 @@ function rnReserve(g) {
       '</b> soldier' + (p.stock === 1 ? '' : 's') + ' in reserve</span>';
   }).join('') + '</div>';
 }
+// FB-0061 follow-up: the castle number tokens were fixed 44px while the
+// region centres are %-based, so at phone width the closest pairs
+// overlapped (Odawara-Inabayama are 32.8px apart at 360px wide,
+// Kyo-Yoshida 39.5px — both under the 44px token). The token is nested
+// inside .rnregion, so a CSS % would resolve against the region, not
+// the board: size it in JS from the board width instead, 8% of the
+// board capped at 44px (28px at 360px, 31px at 390px, 44px on desktop).
+// rnRender runs every 3s, so a rotation re-measures. Falls back to 44px
+// when the board is not measurable (hidden / not yet in the DOM).
+function rnCastleDiam() {
+  const el = document.getElementById('rnBoard');
+  const w = el ? el.clientWidth : 0;
+  if (!w) return 44;
+  return Math.max(24, Math.min(44, Math.floor(Math.min(w, 680) * 0.08)));
+}
 function rnRegion(r, g) {
   const castle = r.castle;
+  const d = rnCastleDiam();
+  const h = Math.round(d * 43 / 44);
   const tok = castle && RN_CASTLE_POS[castle]
-    ? '<span class="rncastle" style="' + rnSprite('token', RN_CASTLE_POS[castle], 44, 43, 687, 593) + '"></span>'
-    : '<span class="rncastle rnempty"></span>';
+    ? '<span class="rncastle" style="' + rnSprite('token', RN_CASTLE_POS[castle], d, h, 687, 593) + '"></span>'
+    : '<span class="rncastle rnempty" style="width:' + d + 'px;height:' + h + 'px"></span>';
   let troops = '';
   for (let p = 0; p < g.players.length; p++) {
     const n = r.troops[p] + r.reinforce[p];

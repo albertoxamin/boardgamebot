@@ -351,14 +351,47 @@ class ViewTests(unittest.TestCase):
 
     def test_number_tokens_are_small(self):
         # FB-0063: the castle number tokens were too big in the Mini App.
+        # FB-0061 follow-up: they are now sized in JS from the board
+        # width (rnCastleDiam, 8% capped at 44px) instead of fixed 44px,
+        # so they shrink at phone width; the CSS 44px is only a fallback.
         js = open(os.path.dirname(__file__) + "/web/rumblenation.js").read()
-        m = re.search(r"rnSprite\('token', RN_CASTLE_POS\[castle\], (\d+), (\d+),", js)
-        self.assertIsNotNone(m)
-        self.assertLessEqual(int(m.group(1)), 46)
+        self.assertIn("rnCastleDiam", js)
+        self.assertIn("Math.min(44", js)
+        self.assertIn("* 0.08", js)
+        self.assertIn("rnSprite('token', RN_CASTLE_POS[castle], d, h, 687, 593)", js)
         css = open(os.path.dirname(__file__) + "/web/flip7.html").read()
         m = re.search(r"\.rncastle\{[^}]*width:(\d+)px", css)
         self.assertIsNotNone(m)
         self.assertLessEqual(int(m.group(1)), 46)
+
+    def test_castle_tokens_never_overlap_at_phone_width(self):
+        # FB-0061 follow-up: fixed 44px tokens overlapped at phone width
+        # — Odawara-Inabayama are 32.8px apart at 360px, Kyo-Yoshida
+        # 39.5px, both under 44px. With rnCastleDiam (8% of the board,
+        # capped at 44px) every pair must clear each other and every
+        # token must fit fully inside the board, at 360/390/700px.
+        aspect = 1480 / 2000  # rumblenation-board.webp
+        for width in (360, 390, 700):
+            board_w = min(width, 680)  # .rnboard is min(100%, 680px)
+            height = board_w * aspect
+            diam = min(44, int(board_w * 0.08))
+            need = diam + 2
+            pts = {r["name"]: (r["x"] / 100 * board_w,
+                                r["y"] / 100 * height)
+                   for r in RN.REGIONS}
+            for a in pts:
+                for b in pts:
+                    if b <= a:
+                        continue
+                    dist = ((pts[a][0] - pts[b][0]) ** 2 +
+                            (pts[a][1] - pts[b][1]) ** 2) ** 0.5
+                    self.assertGreaterEqual(
+                        dist, need, f"{a} and {b} overlap at {width}px")
+            for name, (cx, cy) in pts.items():
+                self.assertGreaterEqual(cx - diam / 2, 0, f"{name} clipped left")
+                self.assertLessEqual(cx + diam / 2, board_w, f"{name} clipped right")
+                self.assertGreaterEqual(cy - diam / 2, 0, f"{name} clipped top")
+                self.assertLessEqual(cy + diam / 2, height, f"{name} clipped bottom")
 
     def test_dice_legend_at_bottom(self):
         # FB-0064: a legend under the board explains the dice -> soldiers

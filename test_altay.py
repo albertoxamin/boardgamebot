@@ -609,6 +609,42 @@ class AltayEngineTests(unittest.TestCase):
         self.assertIn("index: shipwright", js)
         self.assertIn("action: 'resettle'", js)
 
+    def test_lobby_has_how_to_play_buttons(self):
+        # FB-0084: the Altay lobby has two "🎥 How to play" buttons — one
+        # for the base game and one for the Seafarers expansion — both on
+        # the Telegram board and in the Mini App lobby.
+        import bot as BOT
+
+        game = altay.new_game(7, 42, "Ada")
+        self.assertEqual(game["phase"], "lobby")
+        kb = BOT.altay_keyboard(game)
+        flat = [b for row in kb for b in row]
+        howto = [b for b in flat if b.get("text") == "🎥 How to play ALTAY"]
+        self.assertEqual(len(howto), 1)
+        self.assertEqual(howto[0].get("url"), BOT.AL_HOW_TO_PLAY_URL)
+        self.assertIn("youtube.com/watch?v=siN2PgEhtGA", howto[0]["url"])
+        sea = [b for b in flat
+               if b.get("text") == "🎥 How to play ALTAY SEAFARERS EXPANSION"]
+        self.assertEqual(len(sea), 1)
+        self.assertEqual(sea[0].get("url"), BOT.AL_HOW_TO_PLAY_SEAFARERS_URL)
+        self.assertIn("youtu.be/uc2jhm9Bx8s", sea[0]["url"])
+        base = os.path.dirname(os.path.abspath(__file__))
+        with open(os.path.join(base, "web", "altay.js"), encoding="utf-8") as f:
+            js = f.read()
+        self.assertIn("AL_HOW_TO_PLAY_URL", js)
+        self.assertIn("AL_HOW_TO_PLAY_SEAFARERS_URL", js)
+        self.assertIn("youtube.com/watch?v=siN2PgEhtGA", js)
+        self.assertIn("youtu.be/uc2jhm9Bx8s", js)
+        self.assertIn("openLink", js)
+        self.assertIn("ayHowTo", js)
+        self.assertIn("ayHowToSea", js)
+        with open(os.path.join(base, "web", "flip7.html"), encoding="utf-8") as f:
+            html = f.read()
+        self.assertIn('id="ayHowTo"', html)
+        self.assertIn('id="ayHowToSea"', html)
+        self.assertIn("🎥 How to play ALTAY", html)
+        self.assertIn("🎥 How to play ALTAY SEAFARERS EXPANSION", html)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

@@ -1,4 +1,6 @@
 const ATG = {user_id: 0, chat_id: null, board: null, timer: null, init: '', mode: null, msgs: [], webVer: null, newVer: false, verAt: 0};
+const AL_HOW_TO_PLAY_URL = 'https://www.youtube.com/watch?v=siN2PgEhtGA';
+const AL_HOW_TO_PLAY_SEAFARERS_URL = 'https://youtu.be/uc2jhm9Bx8s?si=eE3gEtbIm8kgC2DF&t=344';
 
 async function atCheckVer() {
   // FB-0026: the Mini App never reloads its own JS while open, and the
@@ -236,9 +238,11 @@ function atRender() {
   const npc = document.getElementById('ayNpc');
   const sea = document.getElementById('aySea');
   const start = document.getElementById('ayStart');
+  const howto = document.getElementById('ayHowTo');
+  const howtoSea = document.getElementById('ayHowToSea');
   const rematch = document.getElementById('ayRematch');
   document.getElementById('altay').classList.toggle('atseaon', !!g.seafarers);
-  [join, npc, sea, start, rematch].forEach(el => el.classList.add('hidden'));
+  [join, npc, sea, start, howto, howtoSea, rematch].forEach(el => el.classList.add('hidden'));
   [board, inv, hand, actions, market, achievements].forEach(el => { el.innerHTML = ''; });
   atRenderLog();
   const names = g.players.map(p => escapeHtml(p.name) + (p.npc ? ' 🤖' : '') +
@@ -269,6 +273,8 @@ function atRender() {
       sea.classList.remove('hidden');
     }
     start.classList.remove('hidden');
+    howto.classList.remove('hidden');
+    howtoSea.classList.remove('hidden');
     return;
   }
   if (g.phase === 'over') rematch.classList.remove('hidden');
@@ -434,5 +440,19 @@ document.getElementById('ayNpc').addEventListener('click', () => atMove('npc'));
 document.getElementById('aySea').addEventListener('click', () =>
   atMove('seafarers', {enabled: !(ATG.board && ATG.board.seafarers)}));
 document.getElementById('ayStart').addEventListener('click', () => atMove('start'));
+document.getElementById('ayHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(AL_HOW_TO_PLAY_URL);
+    else window.open(AL_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(AL_HOW_TO_PLAY_URL, '_blank'); }
+});
+document.getElementById('ayHowToSea').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(AL_HOW_TO_PLAY_SEAFARERS_URL);
+    else window.open(AL_HOW_TO_PLAY_SEAFARERS_URL, '_blank');
+  } catch (e) { window.open(AL_HOW_TO_PLAY_SEAFARERS_URL, '_blank'); }
+});
 document.getElementById('ayRematch').addEventListener('click', () => atMove('rematch'));
 atLoad();

@@ -40,7 +40,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 80
+WEB_VER = 81
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -5642,6 +5642,10 @@ def altay_board_text(g):
     return "\n".join(lines)
 
 
+AL_HOW_TO_PLAY_URL = "https://www.youtube.com/watch?v=siN2PgEhtGA"
+AL_HOW_TO_PLAY_SEAFARERS_URL = "https://youtu.be/uc2jhm9Bx8s?si=eE3gEtbIm8kgC2DF&t=344"
+
+
 def altay_keyboard(g):
     if g["phase"] == "over":
         return [[{"text": "🔄 Rematch!", "callback_data": "al:rematch"}]]
@@ -5658,6 +5662,9 @@ def altay_keyboard(g):
         kb.append([{"text": f"🌊 Seafarers: {'on' if AL.is_seafarers(g) else 'off'}",
                     "callback_data": "al:sea"}])
         kb.append([{"text": "▶️ Start game", "callback_data": "al:start"}])
+        kb.append([{"text": "🎥 How to play ALTAY", "url": AL_HOW_TO_PLAY_URL}])
+        kb.append([{"text": "🎥 How to play ALTAY SEAFARERS EXPANSION",
+                    "url": AL_HOW_TO_PLAY_SEAFARERS_URL}])
         return kb + (wk or [])
     player = g["players"][g["current"]]
     sel = g.get("sel")

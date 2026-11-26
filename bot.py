@@ -40,7 +40,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 95
+WEB_VER = 96
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 # Mini App assets: per-game scripts in assets/<game>/scripts/, per-game
@@ -4496,7 +4496,7 @@ def azul_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
-ALTAY_RULES = """🏜️ <b>Altay: Dawn of Civilization</b> (2 players, simplified): win the most VP when someone places their last settlement.
+ALTAY_RULES = """🏜️ <b>Altay: Dawn of Civilization</b> (2–4 players, simplified): win the most VP when someone places their last settlement.
 • Each turn: play action cards, use resources to acquire market cards, build settlements, attack, and invest in an achievement in any order.
 • Played cards produce resources or give swords/builds. Unspent resources are discarded at turn end. You can acquire each market card only once per turn.
 • Build costs 2 food and needs a Village/Architect/City build token. Build in a territory with your settlements (max 4 there) or in a free territory adjacent to your settlements.
@@ -5644,7 +5644,7 @@ def altay_board_text(g):
         for index, player in enumerate(g["players"]):
             faction = AL.FACTIONS.get(player.get("faction"), {}).get("name", "auto")
             lines.append(f"• {html.escape(player['name'])} — {faction}")
-        lines.append("Need 2 players. /altay_join to join, /altay_join_npc for a mock player, /altay_start to begin.")
+        lines.append("Need 2–4 players. /altay_join to join, /altay_join_npc for a mock player, /altay_start to begin.")
         return "\n".join(lines)
     if g["phase"] == "over":
         scores = ", ".join(f"{html.escape(p['name'])} {value}"

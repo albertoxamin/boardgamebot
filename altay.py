@@ -1,6 +1,6 @@
 """Altay: Dawn of Civilization engine for the Telegram bot and Mini App.
 
-A compact two-player implementation using the public Board Game Arena art.
+A compact two-to-four-player implementation using the public Board Game Arena art.
 Action cards, achievements, settlements and conquest markers are simplified
 while keeping the core production / build / combat / development loop.
 """
@@ -243,7 +243,13 @@ _ADJACENCY = {
     24: [10, 18, 19, 20, 21, 22, 23], 25: [], 26: [],
 }
 ADJACENCY = {region: sorted(neighbors) for region, neighbors in _ADJACENCY.items()}
-START_REGIONS = [0, 3]
+# Starting territories, one per seat: each is farmland, none is adjacent
+# to another, and the four spread across the board's quadrants (0 top-left,
+# 3 bottom-left, 1 top-centre, 5 bottom-right) so 3-4 player games do not
+# start on top of each other. The real game gives every player one starting
+# settlement regardless of player count; nothing else in the setup depends
+# on how many players sit down.
+START_REGIONS = [0, 3, 1, 5]
 HAND_SIZE = 5
 SETTLEMENT_LIMIT = 4
 START_SETTLEMENTS = 15
@@ -347,8 +353,8 @@ def new_game(chat_id, creator_id, creator_name):
 def join_game(game, user_id, name):
     if game["phase"] != "lobby":
         return "Game already started."
-    if len(game["players"]) >= 2:
-        return "Altay supports two players."
+    if len(game["players"]) >= 4:
+        return "Altay supports 2–4 players."
     if any(player["user_id"] == int(user_id) for player in game["players"]):
         return "You are already in the game."
     game["players"].append(new_player(user_id, name))
@@ -411,8 +417,8 @@ def start_game(game, events=None, rng=None):
     events = events if events is not None else []
     if game["phase"] != "lobby":
         return "Game already started."
-    if len(game["players"]) != 2:
-        return "Altay needs exactly two players."
+    if len(game["players"]) < 2 or len(game["players"]) > 4:
+        return "Altay needs 2–4 players."
     rng = _rng(game, rng)
     used = []
     for index, player in enumerate(game["players"]):
@@ -889,7 +895,9 @@ def build_settlement(game, player_index, region_id, events=None, rng=None):
     game["board"][str(region_id)]["settlements"].append(player_index)
     events.append(f"{_player_name(game, player_index)} built in {REGION_NAMES[region_id]}.")
     if player["reserve"] <= 0:
-        game["end_at"] = game["turn"] + (1 if player_index == 1 else 0)
+        # The game ends at the end of the builder's turn, whatever the
+        # player count — the same rule the 2-player game always had.
+        game["end_at"] = game["turn"]
         events.append("The last settlement was built. The game is near its end.")
     return None
 
@@ -1128,7 +1136,7 @@ def end_turn(game, player_index, events=None, rng=None):
                           for key, amount in kept.items() if amount)
         events.append(f"{_player_name(game, player_index)} discarded {items}.")
     game["turn"] += 1
-    game["current"] = 1 - game["current"]
+    game["current"] = (game["current"] + 1) % len(game["players"])
     if game["end_at"] is not None and game["turn"] >= game["end_at"]:
         _finalize(game, events)
     else:

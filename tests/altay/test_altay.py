@@ -149,6 +149,134 @@ class AltayEngineTests(unittest.TestCase):
         self.assertEqual(len(game["scores"]), 2)
         json.dumps(game)
 
+    def new_game_with_players(self, count, seed=1, seafarers=False):
+        game = altay.new_game(7, 42, "Ada")
+        if seafarers:
+            self.assertIsNone(altay.set_seafarers(game, True))
+        names = ["Ada", "Ben", "Cid", "Dee"]
+        for index in range(1, count):
+            self.assertIsNone(altay.join_game(game, 42 + index, names[index]))
+        events = []
+        self.assertIsNone(altay.start_game(game, events, random.Random(seed)))
+        return game, events
+
+    def test_three_and_four_player_games_start(self):
+        # FB-0109: Altay is a 2-4 player game — 3 and 4 players must be
+        # able to start, each with a distinct faction, a full hand and
+        # one settlement in a starting territory of their own.
+        game, _ = self.new_game_with_players(3)
+        self.assertEqual(game["phase"], "playing")
+        self.assertEqual([p["faction"] for p in game["players"]],
+                         ["EARTHFOLK", "ELVENFOLK", "FIREFOLK"])
+        self.assertEqual(len(set(p["faction"] for p in game["players"])), 3)
+        for index, region in enumerate(altay.START_REGIONS[:3]):
+            self.assertIsNone(game["board"][str(region)]["marker"])
+            self.assertEqual(game["board"][str(region)]["settlements"], [index])
+            self.assertEqual(len(game["players"][index]["hand"]), altay.HAND_SIZE)
+        game4, _ = self.new_game_with_players(4)
+        self.assertEqual([p["faction"] for p in game4["players"]],
+                         ["EARTHFOLK", "ELVENFOLK", "FIREFOLK", "SMALLFOLK"])
+        for index, region in enumerate(altay.START_REGIONS):
+            self.assertEqual(game4["board"][str(region)]["settlements"], [index])
+        # The four starting territories are spread out: no two are
+        # adjacent, so nobody starts on top of anyone else.
+        starts = altay.START_REGIONS
+        for a in starts:
+            for b in starts:
+                if b > a:
+                    self.assertNotIn(b, altay.ADJACENCY[a])
+        board = altay.board_json(game4, 42)
+        json.dumps(board)
+        self.assertEqual(len(board["players"]), 4)
+        self.assertEqual([p["color"] for p in board["players"]],
+                         [altay.FACTIONS[f]["color"] for f in altay.FACTION_ORDER])
+
+    def test_fifth_join_refused_and_start_needs_two_players(self):
+        game, _ = self.new_game_with_players(4)
+        self.assertIsNotNone(altay.join_game(game, 99, "Eve"))
+        self.assertEqual(len(game["players"]), 4)
+        solo = altay.new_game(7, 42, "Ada")
+        error = altay.start_game(solo, [], random.Random(1))
+        self.assertIsNotNone(error)
+        self.assertIn("2", error)
+        self.assertEqual(solo["phase"], "lobby")
+        self.assertIsNone(altay.join_game(solo, 43, "Ben"))
+        self.assertIsNone(altay.start_game(solo, [], random.Random(1)))
+
+    def test_turn_rotation_cycles_through_all_seats(self):
+        game, events = self.new_game_with_players(3)
+        self.assertIsNotNone(altay.play_card(game, 2, 0, events))
+        self.assertIsNone(altay.end_turn(game, 0, events, random.Random(6)))
+        self.assertEqual(game["current"], 1)
+        self.assertIsNone(altay.play_card(game, 1, 0, events))
+        self.assertIsNone(altay.end_turn(game, 1, events, random.Random(6)))
+        self.assertEqual(game["current"], 2)
+        self.assertIsNone(altay.end_turn(game, 2, events, random.Random(6)))
+        self.assertEqual(game["current"], 0)
+        self.assertEqual(game["turn"], 3)
+
+    def test_attack_targets_a_non_adjacent_players_settlement(self):
+        # FB-0109: in 3-4 player games an attack must hit the territory's
+        # actual owner — here player 2 (seat 3), not "the other player".
+        game, events = self.new_game_with_players(3)
+        game["board"]["6"]["settlements"].append(2)
+        game["board"]["6"]["marker"] = None
+        player = game["players"][0]
+        player["hand"] = ["warrior", "warrior", "hunter", "hunter", "hunter"]
+        self.assertIsNone(altay.play_card(game, 0, 0, events))
+        self.assertIsNone(altay.play_card(game, 0, 0, events))
+        option = next(o for o in altay.attack_options(game, 0)
+                      if o["kind"] == "player" and o["region"] == 6)
+        self.assertEqual(option["defender"], 2)
+        self.assertIsNone(altay.attack(game, 0, option["from"], 6, events,
+                                       random.Random(4)))
+        self.assertNotIn(2, game["board"]["6"]["settlements"])
+        self.assertEqual(player["captured"], 1)
+
+    def test_four_player_game_ends_and_scores_all_players(self):
+        game, events = self.new_game_with_players(4)
+        player = game["players"][0]
+        player["reserve"] = 1
+        player["hand"] = ["village", "hunter", "hunter", "hunter", "hunter"]
+        player["resources"]["food"] = 2
+        self.assertIsNone(altay.play_card(game, 0, 0, events))
+        self.assertIsNone(altay.build_settlement(game, 0, 0, events))
+        self.assertIsNone(altay.end_turn(game, 0, events, random.Random(5)))
+        self.assertEqual(game["phase"], "over")
+        self.assertIn(game["winner"], (0, 1, 2, 3))
+        self.assertEqual(len(game["scores"]), 4)
+        for index in range(4):
+            self.assertEqual(game["scores"][index], altay.score(game, index))
+        json.dumps(game)
+
+    def test_four_player_seafarers_and_npc_seats(self):
+        # Seafarers gives every seat its ships and crews, and NPCs can
+        # fill the 3rd and 4th seats — the lobby and Mini App must offer
+        # 4 seats, not 2.
+        import bot as BOT
+
+        game, _ = self.new_game_with_players(4, seafarers=True)
+        for player in game["players"]:
+            self.assertEqual(player["ship_supply"], 3)
+            self.assertEqual(player["crews"], 3)
+        lobby = BOT.altay_board_text(altay.new_game(7, 42, "Ada"))
+        self.assertIn("2–4 players", lobby)
+        game2 = altay.new_game(7, 42, "Ada")
+        self.assertIsNone(BOT.add_npc("altay", game2))
+        self.assertIsNone(BOT.add_npc("altay", game2))
+        self.assertIsNone(BOT.add_npc("altay", game2))
+        self.assertEqual(len(game2["players"]), 4)
+        self.assertIsNotNone(BOT.add_npc("altay", game2))
+        events = []
+        self.assertIsNone(altay.start_game(game2, events, random.Random(1)))
+        board = BOT.altay_board_json(game2, 42)
+        self.assertEqual(board["max_players"], 4)
+        self.assertEqual(len(board["players"]), 4)
+        with open(os.path.join(ROOT, "assets", "altay", "scripts", "altay.js"),
+                  encoding="utf-8") as f:
+            js = f.read()
+        self.assertIn("g.players.length + '/' + (g.max_players || 2)", js)
+
     def test_play_event_names_card_effect_and_board_json_exposes_played(self):
         # FB-0013: the effect of a played card must be visible — in the
         # event log line and in board_json's played list (Mini App shows
@@ -397,7 +525,7 @@ class AltayEngineTests(unittest.TestCase):
         base = ROOT
         with open(os.path.join(ROOT, "assets", "shared", "flip7.html"), encoding="utf-8") as f:
             html = f.read()
-        self.assertIn('src="/assets/altay/scripts/altay.js?v=6"', html)
+        self.assertIn('src="/assets/altay/scripts/altay.js?v=7"', html)
         self.assertIn("url(/assets/altay/images/altay-markers.webp?v=", html)
         with open(os.path.join(ROOT, "assets", "altay", "scripts", "altay.js"), encoding="utf-8") as f:
             js = f.read()

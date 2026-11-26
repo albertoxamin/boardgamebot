@@ -357,9 +357,9 @@ the sprites are kept in `sources/tokaidoduo/bga/`. Text commands:
 `?startapp=tokaidoduo<chat>` (same Main Mini App, routed by `start_param`).
 Engine: `tokaidoduo.py` + `test_tokaidoduo.py`.
 
-## Altay (same bot, 2-player civilization card game)
+## Altay (same bot, 2–4 player civilization card game)
 
-A compact two-player version of *Altay: Dawn of Civilization* (Simone Luciani,
+A compact 2–4 player version of *Altay: Dawn of Civilization* (Simone Luciani,
 2023). Factions keep their BGA starting decks; each turn you play action cards
 to produce resources, acquire market cards, build settlements, fight Conquest
 Markers or opponents, and invest in one achievement at a time. Final scoring

@@ -247,7 +247,7 @@ function atRender() {
   atRenderLog();
   const names = g.players.map(p => escapeHtml(p.name) + (p.npc ? ' 🤖' : '') +
     ' <b style="color:' + p.color + '">' + p.score + ' VP</b>').join(' · ');
-  turn.innerHTML = g.phase === 'lobby' ? '🏜️ Altay lobby — ' + g.players.length + '/2 · ' + names :
+  turn.innerHTML = g.phase === 'lobby' ? '🏜️ Altay lobby — ' + g.players.length + '/' + (g.max_players || 2) + ' · ' + names :
     g.phase === 'over' ? '🏆 ' + (g.winner === null ? 'Draw' :
       escapeHtml((g.players[g.winner] || {}).name || 'Winner')) + ' wins! · ' + names :
     '🏜️ Turn ' + (g.turn + 1) + ' · ' + names + (g.can_act ? ' · <b>your move</b>' : '');

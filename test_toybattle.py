@@ -190,6 +190,71 @@ class EngineTests(unittest.TestCase):
         self.assertEqual(g["winner"], 0)
         self.assertEqual(g["end_reason"], "stuck")
 
+    def test_board_coordinates_match_board_art(self):
+        # FB-0090 follow-up / msg 2411: the old BASES/MEDAL_SPOTS values were
+        # measured on a landscape frame, so troops rendered up to a full tile
+        # off the printed spaces. Positions are now (top %, left %) of the
+        # portrait board art (web/toybattle-board.webp, 600x1000), measured
+        # off the art and verified with an overlay render.
+        seen = set()
+        for b, (top, left, adj, special) in TB.BASES.items():
+            self.assertTrue(0 <= top <= 100 and 0 <= left <= 100, b)
+            self.assertNotIn((round(top, 1), round(left, 1)), seen, b)
+            seen.add((round(top, 1), round(left, 1)))
+        self.assertLess(TB.BASES[41][0], 15)   # red HQ at the top
+        self.assertGreater(TB.BASES[1][0], 85)  # blue HQ at the bottom
+        self.assertAlmostEqual(TB.BASES[1][1], 50.2, delta=1)
+        self.assertAlmostEqual(TB.BASES[41][1], 50.2, delta=1)
+        self.assertEqual({b for b, v in TB.BASES.items() if v[3]},
+                         {15, 16, 20, 21})
+        self.assertEqual(len(TB.MEDAL_SPOTS), 14)
+        per_region = {}
+        for m, (top, left, region) in TB.MEDAL_SPOTS.items():
+            self.assertTrue(0 <= top <= 100 and 0 <= left <= 100, m)
+            per_region[region] = per_region.get(region, 0) + 1
+            for b, (bt, bl, _a, _s) in TB.BASES.items():
+                dist = ((top - bt) ** 2 + (left - bl) ** 2) ** 0.5
+                self.assertGreater(dist, 3, f"medal {m} on base {b}")
+        self.assertEqual(per_region, {1: 3, 2: 1, 3: 1, 4: 2, 5: 2, 6: 1, 7: 1, 8: 3})
+
+    def test_troop_abilities_cover_all_troops(self):
+        # FB-0091: ability descriptions come from the Toy Battle rules
+        # (bot.py TOYBATTLE_RULES), not invented.
+        self.assertEqual(set(TB.TROOP_ABILITIES), set(range(1, 9)))
+        for t, text in TB.TROOP_ABILITIES.items():
+            self.assertTrue(text, t)
+        self.assertIn("Draw 2", TB.TROOP_ABILITIES[1])
+        self.assertIn("extra", TB.TROOP_ABILITIES[2])
+        self.assertIn("adjacent", TB.TROOP_ABILITIES[3])
+        self.assertIn("connection", TB.TROOP_ABILITIES[4])
+        self.assertIn("random", TB.TROOP_ABILITIES[5])
+        self.assertIn("Draw 1", TB.TROOP_ABILITIES[6])
+        self.assertIn("No special", TB.TROOP_ABILITIES[7])
+        self.assertIn("Joker", TB.TROOP_ABILITIES[8])
+
+    def test_miniapp_tap_to_place_abilities_medals(self):
+        # FB-0090: tap a legal base on the board to place the selected troop.
+        # FB-0091: ability text under each toy + hover zoom on hand tokens.
+        # FB-0092 / msg 2412: medals on the map from toybattle-medals.webp —
+        # the sprite's star frame is for any claimed medal (the old code
+        # showed the empty-slot frame for red's medals, so they were
+        # invisible) with an owner-coloured ring.
+        js = open(os.path.dirname(__file__) + "/web/toybattle.js").read()
+        self.assertIn("querySelectorAll('[data-base]')", js)
+        self.assertIn("tbMove('place'", js)
+        self.assertIn("tbplaceable", js)
+        self.assertIn("TB_ABILITIES", js)
+        self.assertIn("tbAbility(type)", js)
+        self.assertIn("tbtoyname", js)
+        self.assertIn("tbtoyability", js)
+        self.assertIn("background-position:0 0", js)
+        self.assertIn("tbclaimed", js)
+        self.assertIn("troop_abilities", js)
+        html = open(os.path.dirname(__file__) + "/web/flip7.html").read()
+        self.assertIn(".tbtoyability", html)
+        self.assertIn("scale(1.9)", html)
+        self.assertIn(".tbmedal.tbclaimed", html)
+
 
 if __name__ == "__main__":
     unittest.main(verbosity=2)

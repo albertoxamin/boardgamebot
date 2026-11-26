@@ -343,7 +343,11 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .tbspecial{outline:1px solid #fbbf24}
 .tblegal{box-shadow:0 0 0 2px #22c55e}
 .tbselected{box-shadow:0 0 0 3px #f59e0b}
+.tbbase.tbplaceable{cursor:pointer}
 .tbmedal{position:absolute;width:24px;height:24px;background:url(toybattle-medals.webp) 0 0/200% 100%;transform:translate(-50%,-50%);z-index:3;border-radius:50%;box-shadow:0 1px 3px #000a}
+.tbmedal.tbclaimed.tbblue{box-shadow:0 0 0 2px #38bdf8,0 1px 3px #000a}
+.tbmedal.tbclaimed.tbred{box-shadow:0 0 0 2px #f87171,0 1px 3px #000a}
+.tbmedal.tbunclaimed{opacity:.55}
 .tbtile{display:inline-block;width:44px;height:58px;background:url(toybattle-tiles.webp) 0 0/1200% 200%;border-radius:4px;box-shadow:inset 0 0 0 1px #0007,1px 2px 3px #0009;flex:none}
 .tbackrow{border:1px solid #334155;border-radius:10px;padding:7px;margin:6px 0;background:#0f172a99}
 .tbackrow.tbcurrent{border-color:#f59e0b;box-shadow:0 0 8px #f59e0b66}
@@ -351,8 +355,15 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .tbrack{display:flex;gap:3px;flex-wrap:wrap}
 .tback{display:inline-block;width:38px;height:50px;background:linear-gradient(135deg,#334155,#1e293b);border:1px solid #64748b;border-radius:4px;flex:none}
 .track{padding:0;border:0;background:transparent;cursor:pointer}
-.track .tbtile{width:38px;height:50px}
+.track .tbtile{width:38px;height:50px;transition:transform .15s ease}
 .track:hover .tbtile{outline:2px solid #f59e0b}
+.tbtoy{display:inline-flex;flex-direction:column;align-items:center;width:64px;flex:none;position:relative}
+.tbtoy.tbselected .tbtile{outline:2px solid #f59e0b}
+.tbtoyname{font-size:11px;font-weight:800;line-height:1.2;text-align:center;margin-top:2px}
+.tbtoyability{font-size:10px;line-height:1.25;color:#94a3b8;text-align:center}
+.tbtoy:hover{z-index:20}
+.track:hover,.track:active{position:relative;z-index:20}
+.track:hover .tbtile,.track:focus-visible .tbtile,.track:active .tbtile{transform:scale(1.9);position:relative;z-index:20}
 .tblobby{min-height:120px;background:linear-gradient(#0f172ae8,#0f172ae8),url(toybattle-board.webp) center/cover;border:1px solid #475569;border-radius:10px;display:flex;align-items:center;justify-content:center;font-weight:800}
 .tdboard{position:relative;width:min(100%,420px);aspect-ratio:789/1600;margin:8px auto;background:#f5efe0 url(tokaidoduo-board.webp?v=1) center/100% 100% no-repeat;border:2px solid #475569;border-radius:8px}
 .tdmeeple{position:absolute;width:24px;height:30px;margin:-15px 0 0 -12px;background-image:url(tokaidoduo-meeples.webp);background-size:300% 200%;background-repeat:no-repeat;border:3px solid #fff;box-shadow:0 1px 4px #000a;z-index:3}

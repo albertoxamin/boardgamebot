@@ -9,25 +9,44 @@ TROOP_NAMES = {
     1: "Skully", 2: "Cap'N", 3: "Jumbo", 4: "Hook",
     5: "XB-42", 6: "Star", 7: "Roxy", 8: "Kwak",
 }
+# Special ability of each troop, worded from the Toy Battle rules
+# (bot.py TOYBATTLE_RULES): the single source of truth for the Mini App
+# captions. Kwak's "joker" rule is its ability: it covers any enemy troop
+# and can be covered by any troop.
+TROOP_ABILITIES = {
+    1: "Draw 2 troops",
+    2: "Place 1 extra troop",
+    3: "Discard an adjacent enemy troop",
+    4: "Ignores connection",
+    5: "Discard a random enemy rack troop",
+    6: "Draw 1 troop",
+    7: "No special ability",
+    8: "Joker: covers any enemy troop, can be covered by any troop",
+}
 
+# Base positions as (top %, left %) of the portrait board art
+# (web/toybattle-board.webp, 600x1000), measured off the art itself:
+# stone squares and tower platforms, verified with an overlay render.
+# The old values were measured on a landscape frame and landed up to a
+# full tile off the printed spaces (FB-0090 follow-up / msg 2411).
 BASES = {
-    1: (87.5, 43.2, [11, 12], False),
-    11: (84.9, 10.2, [1, 13], False),
-    12: (84.9, 76.6, [1, 14], False),
-    13: (70.5, 30.4, [11, 15, 17, 18], False),
-    14: (70.6, 56.0, [12, 16, 18, 19], False),
-    15: (63.2, 8.1, [13, 17], True),
-    16: (63.2, 79.1, [14, 19], True),
-    17: (44.2, 13.0, [13, 15, 20, 22], False),
-    18: (44.2, 43.4, [13, 14, 22, 23], False),
-    19: (44.2, 73.8, [14, 16, 21, 23], False),
-    20: (24.4, 7.8, [17, 22], True),
-    21: (24.4, 78.8, [19, 23], True),
-    22: (15.8, 30.6, [17, 18, 20, 24], False),
-    23: (15.8, 56.2, [18, 19, 21, 25], False),
-    24: (1.5, 10.4, [22, 41], False),
-    25: (1.5, 76.8, [23, 41], False),
-    41: (1.4, 43.2, [24, 25], False),
+    1: (94.0, 50.2, [11, 12], False),
+    11: (91.5, 83.5, [1, 13], False),
+    12: (92.0, 17.5, [1, 14], False),
+    13: (77.2, 62.7, [11, 15, 17, 18], False),
+    14: (77.1, 37.2, [12, 16, 18, 19], False),
+    15: (69.7, 84.9, [13, 17], True),
+    16: (69.7, 14.7, [14, 19], True),
+    17: (50.6, 79.3, [13, 15, 20, 22], False),
+    18: (50.6, 49.7, [13, 14, 22, 23], False),
+    19: (50.8, 19.5, [14, 16, 21, 23], False),
+    20: (31.1, 85.2, [17, 22], True),
+    21: (31.1, 15.0, [19, 23], True),
+    22: (22.2, 62.5, [17, 18, 20, 24], False),
+    23: (22.5, 37.2, [18, 19, 21, 25], False),
+    24: (8.3, 83.3, [22, 41], False),
+    25: (8.9, 17.7, [23, 41], False),
+    41: (8.1, 50.2, [24, 25], False),
 }
 
 REGIONS = {
@@ -41,13 +60,17 @@ REGIONS = {
     8: ([18, 22, 23, 24, 25], 3),
 }
 
+# Medal spots as (top %, left %, region) of the portrait board art
+# (web/toybattle-board.webp, 600x1000). Same landscape-frame error as
+# BASES before this fix: the old values put e.g. region-2/6 medals on top
+# of the towers. Spots sit on open grass inside their region's gap.
 MEDAL_SPOTS = {
-    1: (65.9, 47.9, 1), 2: (68.9, 47.9, 1), 3: (71.9, 47.9, 1),
-    4: (68.9, 23.4, 2), 5: (68.9, 72.4, 3),
-    6: (47.6, 32.5, 4), 7: (50.6, 32.5, 4),
-    8: (47.6, 62.7, 5), 9: (50.6, 62.7, 5),
-    10: (28.4, 23.4, 6), 11: (28.4, 72.4, 7),
-    12: (25.4, 47.9, 8), 13: (28.4, 47.9, 8), 14: (31.4, 47.9, 8),
+    1: (72.5, 45.6, 1), 2: (75.4, 45.6, 1), 3: (78.4, 45.6, 1),
+    4: (75.4, 69.8, 2), 5: (75.4, 21.4, 3),
+    6: (54.2, 60.8, 4), 7: (57.2, 60.8, 4),
+    8: (54.2, 30.9, 5), 9: (57.2, 30.9, 5),
+    10: (35.1, 69.8, 6), 11: (35.1, 21.4, 7),
+    12: (32.1, 45.6, 8), 13: (35.1, 45.6, 8), 14: (38.1, 45.6, 8),
 }
 
 

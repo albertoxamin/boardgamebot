@@ -1,5 +1,17 @@
 const TBG = {user_id: 0, chat_id: null, board: null, timer: null, init: '', selected: null};
 const TB_HOW_TO_PLAY_URL = 'https://www.youtube.com/watch?v=O2HjOQUFAio';
+// Troop special abilities, worded from the Toy Battle rules (same strings
+// as TROOP_ABILITIES in toybattle.py). Used until the board JSON serves
+// troop_abilities (see tbAbility); keep the two in sync.
+const TB_ABILITIES = {
+  1: 'Draw 2 troops', 2: 'Place 1 extra troop', 3: 'Discard an adjacent enemy troop',
+  4: 'Ignores connection', 5: 'Discard a random enemy rack troop', 6: 'Draw 1 troop',
+  7: 'No special ability', 8: 'Joker: covers any enemy troop, can be covered by any troop'
+};
+function tbAbility(type) {
+  const m = (TBG.board && TBG.board.troop_abilities) || TB_ABILITIES;
+  return m[type] || m[String(type)] || '';
+}
 
 function tbLog(s) {
   const e = document.getElementById('tbLog');
@@ -62,29 +74,40 @@ async function tbMove(action, extra) {
 function tbTile(type, owner, extraClass) {
   const col = ((Number(type) || 1) - 1) % 12;
   const row = Number(owner) === 1 ? 100 : 0;
+  const name = escapeHtml(TBG.board.troop_names[type] || type);
+  const ab = escapeHtml(tbAbility(type));
   return '<span class="tbtile ' + (extraClass || '') + '" style="background-position:' +
-         (col / 11 * 100) + '% ' + row + '%" title="' + escapeHtml(TBG.board.troop_names[type] || type) +
+         (col / 11 * 100) + '% ' + row + '%" title="' + name + (ab ? ' — ' + ab : '') +
          '"></span>';
 }
 function tbBase(b, data, g) {
   const top = data.top;
   const legal = g.legal && Object.values(g.legal).some(list => list.map(String).includes(String(b)));
-  const cls = 'tbbase' + (legal ? ' tblegal' : '') + (data.special ? ' tbspecial' : '');
+  const placeable = TBG.selected !== null &&
+    (g.legal[String(TBG.selected)] || []).map(String).includes(String(b));
+  const cls = 'tbbase' + (legal ? ' tblegal' : '') + (data.special ? ' tbspecial' : '') +
+              (placeable ? ' tbplaceable' : '');
   let inner = '';
   if (top) inner = tbTile(top.type, top.owner, 'tbonboard') +
     (data.height > 1 ? '<span class="tbheight">' + data.height + '</span>' : '');
   else inner = '<span class="tbemptybase">' + (data.special ? '★' : '') + '</span>';
   if (String(b) === '1' || String(b) === '41') inner += '<span class="tbhq">HQ</span>';
-  const sel = TBG.selected !== null && String(g.legal && Object.keys(g.legal).find(k => (g.legal[k] || []).map(String).includes(String(b))) || '-1') === String(TBG.selected) ? ' tbselected' : '';
+  const sel = placeable ? ' tbselected' : '';
   return '<div class="' + cls + sel + '" style="top:' + data.top_pos + '%;left:' + data.left_pos +
-         '%" data-base="' + b + '" title="Base ' + b + '">' + inner + '</div>';
+         '%" data-base="' + b + '" title="Base ' + b + (placeable ? ' — tap to place here' : '') + '">' + inner + '</div>';
 }
 function tbMedal(m, data) {
+  // web/toybattle-medals.webp has two frames: gold star (claimed medal)
+  // and an empty slot. Any claimed medal shows the star; the owner's
+  // colour ring tells whose it is. Unclaimed spots show the empty slot.
   const owner = data.owner;
-  const bg = owner === null || owner === undefined ? 'background-position:100% 0;opacity:.45' :
-             'background-position:' + (Number(owner) === 0 ? '0' : '100%') + ' 0';
-  return '<span class="tbmedal" style="top:' + data.top + '%;left:' + data.left + '%;' + bg +
-         '" title="Medal ' + m + ': ' + (owner === null ? 'unclaimed' : escapeHtml((TBG.board.players[owner] || {}).name || '')) + '"></span>';
+  const claimed = owner !== null && owner !== undefined;
+  const bg = claimed ? 'background-position:0 0' : 'background-position:100% 0';
+  const cls = 'tbmedal' + (claimed ? ' tbclaimed tb' + (Number(owner) === 0 ? 'blue' : 'red')
+                                   : ' tbunclaimed');
+  return '<span class="' + cls + '" style="top:' + data.top + '%;left:' + data.left + '%;' + bg +
+         '" title="Medal ' + m + ': ' + (claimed ? 'claimed by ' +
+         escapeHtml((TBG.board.players[owner] || {}).name || '') : 'unclaimed') + '"></span>';
 }
 function tbRack(p, me, g, idx) {
   const tiles = [];
@@ -93,10 +116,18 @@ function tbRack(p, me, g, idx) {
     const type = p.rack[i];
     const can = me && g.can_act && !g.pending && (g.legal[String(i)] || []).length;
     if (type === undefined) tiles.push('<span class="tback"></span>');
-    else if (can) tiles.push('<button type="button" class="track" data-index="' + i + '" title="' +
-      escapeHtml(g.troop_names[type] || type) + '">' + tbTile(type, idx) + '</button>');
-    else tiles.push('<span class="track">' + (type === undefined ? '' :
-      (me ? tbTile(type, idx) : '<span class="tback"></span>')) + '</span>');
+    else if (!me) tiles.push('<span class="track"><span class="tback"></span></span>');
+    else {
+      const sel = TBG.selected === i ? ' tbselected' : '';
+      const inner = can
+        ? '<button type="button" class="track" data-index="' + i + '" title="' +
+          escapeHtml(g.troop_names[type] || type) + ' — ' + escapeHtml(tbAbility(type)) + '">' +
+          tbTile(type, idx) + '</button>'
+        : '<span class="track">' + tbTile(type, idx) + '</span>';
+      tiles.push('<span class="tbtoy' + sel + '">' + inner +
+        '<span class="tbtoyname">' + escapeHtml(g.troop_names[type] || type) + '</span>' +
+        '<span class="tbtoyability">' + escapeHtml(tbAbility(type)) + '</span></span>');
+    }
   }
   return tiles.join('');
 }
@@ -143,6 +174,14 @@ function tbRender() {
     board.innerHTML = html;
     board.querySelectorAll('[data-index]').forEach(el => el.addEventListener('click', () => {
       TBG.selected = Number(el.dataset.index); tbRender();
+    }));
+    // Tap-to-place (FB-0090): with a troop selected, tapping a legal base
+    // on the board places it there. The 📍 Base buttons below stay as-is.
+    board.querySelectorAll('[data-base]').forEach(el => el.addEventListener('click', () => {
+      if (TBG.selected === null || g.pending) return;
+      const base = Number(el.dataset.base);
+      if ((g.legal[String(TBG.selected)] || []).map(Number).includes(base))
+        tbMove('place', {index: TBG.selected, base: base});
     }));
     if (g.pending) {
       g.options.forEach(o => {

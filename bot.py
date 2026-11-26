@@ -40,7 +40,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 85
+WEB_VER = 86
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -4724,7 +4724,7 @@ def toybattle_board_json(g, viewer_id=None):
     board = {
         "chat_id": g["chat_id"], "phase": g["phase"], "turn": g["turn"],
         "board_name": TB.BOARD_NAME, "medal_target": TB.MEDAL_TARGET,
-        "rack_limit": TB.RACK_LIMIT, "troop_names": TB.TROOP_NAMES,
+        "rack_limit": TB.RACK_LIMIT, "troop_names": TB.TROOP_NAMES, "troop_abilities": TB.TROOP_ABILITIES,
         "players": players, "actor": actor, "can_act": can_act,
         "is_player": me_idx is not None, "winner": g["winner"],
         "end_reason": g["end_reason"], "log": g["log"][-12:],

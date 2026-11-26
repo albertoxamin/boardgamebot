@@ -193,6 +193,7 @@ mocked out.
 BGG: https://boardgamegeek.com/boardgame/307002/regicide
 
 Co-op vs 12 royals (J 10/20, Q 15/30, K 20/40), 2–4 players, hand limit 7/6/5.
+The official rulebook is stored in `assets/regicide/rulebook.pdf`.
 Text commands (distinct from Flip 7): `/regicide` (create, also auto-creates from the
 Mini App), `/regicide_join`, `/regicide_start` (anyone), `/regicide_play 7h` (played card
 becomes public; combos/Ace-pairs/joker via Mini App private hand UI), `/regicide_yield`,
@@ -312,7 +313,8 @@ Castle Combo (Grégory Grard & Mathieu Roussel, 2024), 2–5 players. Recruit
 characters from the Castle and Village markets into a 3×3 tableau: each
 card grants an immediate ability and scores from shields, sets, positions
 and stored gold, and the Messenger pawn decides which row you may buy from.
-Most points wins.
+Most points wins. The official rulebook is stored in
+`assets/castlecombo/rulebook.pdf`.
 Text commands: `/castlecombo` (create), `/castlecombo_join`,
 `/castlecombo_join_npc`, `/castlecombo_start`, `/castlecombo_buy <card id>`,
 `/castlecombo_flip <card id>`, `/castlecombo_move`, `/castlecombo_renew`,
@@ -379,7 +381,8 @@ characters succeed. Chapters 1, 2 and 13 follow the published rules closely;
 chapters 3–18 use simplified/approximated rosters and goals because the
 printed chapter cards are not all available in digital form. The 2-player
 mode also simplifies the printed "pyramid" hand into a normal two-handed game
-(the One Ring is moved into a player's hand when it would be undealt).
+(the One Ring is moved into a player's hand when it would be undealt). The
+official rulebook is stored in `assets/fellowship/rulebook.pdf`.
 
 Source reference: `sources/fellowship_of_the_ring_tts_scripted.tts`, a scripted
 Tabletop Simulator mod save (v13.3) downloaded from

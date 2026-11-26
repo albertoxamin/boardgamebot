@@ -141,7 +141,9 @@ Rocket-Loader-transformed scripts. Three ways to offer it:
    `answerCallbackQuery(url=FLIP7_GAME_URL)`. Scores can be posted
    server-side with `setGameScore` (not from the page).
 
-## Flip 7
+## Flip 7 (2-6 players)
+
+BGG: https://boardgamegeek.com/boardgame/420087/flip-7
 
 Sources: official rulebook (bghub.org/r/flip7.pdf), Asmodee "How to Play
 Flip 7", The Ludarium academy guide.
@@ -175,7 +177,9 @@ A full 3-player game was also simulated end-to-end (hits/stays/actions/
 round rotation → a winner at 200+ in 13 rounds) with the Telegram layer
 mocked out.
 
-## Regicide (same bot, second game)
+## Regicide (2-4 players) (same bot, second game)
+
+BGG: https://boardgamegeek.com/boardgame/307002/regicide
 
 Co-op vs 12 royals (J 10/20, Q 15/30, K 20/40), 2–4 players, hand limit 7/6/5.
 Text commands (distinct from Flip 7): `/regicide` (create, also auto-creates from the
@@ -189,7 +193,9 @@ Mini App: Flip 7 board button = `?startapp=<chat>` (Flip 7 view), Regicide board
 `regicide.py` + `test_regicide.py` (setup counts, combo validation, exact-kill, discard/lose,
 jester/yield).
 
-## Yahtzee (same bot, dice scorecard)
+## Yahtzee (2-6 players) (same bot, dice scorecard)
+
+BGG: https://boardgamegeek.com/boardgame/2243/yahtzee
 
 Classic Yahtzee, 2–6 players: roll 5 dice up to 3 times (keep any dice
 between rolls), then fill one of 13 boxes. Upper section 63+ earns a +35
@@ -203,7 +209,9 @@ Mini App: board button = `?startapp=yahtzee<chat>` (same Main Mini App,
 routed by `start_param`). Engine: `yahtzee.py` + `test_yahtzee.py` (score
 table, upper bonus, extra-Yahtzee bonus, full game to end).
 
-## Fliptoons (same bot, grid-building card market)
+## Fliptoons (2-4 players) (same bot, grid-building card market)
+
+BGG: https://boardgamegeek.com/boardgame/449185/fliptoons
 
 Fliptoons Season 1, 2–4 players. Each round you flip cards into a 3×2
 grid, score its fame, then take 2 market actions (hire a market card, or
@@ -218,7 +226,9 @@ Mini App: board button = `?startapp=fliptoons<chat>` (same Main Mini App,
 routed by `start_param`). Engine: `fliptoons.py` + `test_fliptoons.py`
 (full card abilities, market, final flip).
 
-## Tornado Splash (same bot, jet-ski racing)
+## Tornado Splash (2-5 players) (same bot, jet-ski racing)
+
+BGG: https://boardgamegeek.com/boardgame/444648/tornado-splash
 
 Tornado Splash (Arclight Games, 2025), 2–5 players. Each racer picks one of
 6 jet skis (each with its own 20-card deck of straight/curve cards worth 1–2
@@ -238,7 +248,9 @@ Text commands: `/tornado` (create), `/tornado_join`, `/tornado_start [gp]`,
 Mini App: board button = `?startapp=tornado<chat>` (same Main Mini App,
 routed by `start_param`). Engine: `tornado.py` + `test_tornado.py`.
 
-## Abandon All Artichokes (same bot, deck-wrecking veggies)
+## Abandon All Artichokes (2-4 players) (same bot, deck-wrecking veggies)
+
+BGG: https://boardgamegeek.com/boardgame/302260
 
 Abandon All Artichokes (Gamewright), 2–4 players. Everyone starts with 10
 Artichokes in hand; a turn refills the 5-card Garden Row, harvests one row
@@ -257,7 +269,9 @@ Text commands: `/artichokes` (create), `/artichokes_join`,
 Mini App: board button = `?startapp=artichokes<chat>` (same Main Mini App,
 routed by `start_param`). Engine: `artichokes.py` + `test_artichokes.py`.
 
-## Fellowship of the Ring (same bot, co-op trick-taking)
+## Fellowship of the Ring (2-4 players) (same bot, co-op trick-taking)
+
+BGG: https://boardgamegeek.com/boardgame/429293/the-fellowship-of-the-ring-trick-taking-game
 
 The Lord of the Rings: The Fellowship of the Ring Trick-Taking Game
 (Office Dog / Asmodee), 2–4 players, 18 chapters. Private hands, follow the
@@ -284,7 +298,9 @@ Text commands: `/fotr` (create), `/fotr_join`, `/fotr_join_npc`,
 `?startapp=fellowship<chat>` (same Main Mini App, routed by `start_param`).
 Engine: `fellowship.py` + `test_fellowship.py`.
 
-## Azul (same bot, tile-drafting wall builder)
+## Azul (2-4 players) (same bot, tile-drafting wall builder)
+
+BGG: https://boardgamegeek.com/boardgame/230802/azul
 
 Azul (Michael Kiesling, 2017), 2–4 players. Each round 5/7/9 factory displays
 (2/3/4 players) are filled with four tiles; on your turn you take every tile
@@ -306,7 +322,9 @@ Text commands: `/azul` (create), `/azul_join`, `/azul_join_npc`,
 Engine: `azul.py` + `test_azul.py` (drafting, wall scoring/floor penalties,
 final bonuses, full-game simulation).
 
-## Toy Battle (same bot, 2-player troops and medals)
+## Toy Battle (2 players) (same bot, troops and medals)
+
+BGG: https://boardgamegeek.com/boardgame/434654/toy-battle
 
 Toy Battle (Repos Production, 2024), 2 players on the Castle Field board.
 Each player has 20 troops (3 each of 8 types, 4 removed unseen); the first
@@ -329,7 +347,9 @@ Field layout comes from the BGA tutorial data. Text commands: `/toybattle`
 (same Main Mini App, routed by `start_param`). Engine: `toybattle.py` +
 `test_toybattle.py`.
 
-## Tokaido Duo (same bot, 2-player Shikoku journey)
+## Tokaido Duo (2 players) (same bot, Shikoku journey)
+
+BGG: https://boardgamegeek.com/boardgame/363183/tokaido-duo
 
 Tokaido Duo (Antoine Bauza, Funforge/Stonemaier, 2022), 2 players. Each
 player controls a Pilgrim, a Merchant and an Artist. Each round the first
@@ -357,7 +377,9 @@ the sprites are kept in `sources/tokaidoduo/bga/`. Text commands:
 `?startapp=tokaidoduo<chat>` (same Main Mini App, routed by `start_param`).
 Engine: `tokaidoduo.py` + `test_tokaidoduo.py`.
 
-## Altay (same bot, 2–4 player civilization card game)
+## Altay (2-4 players) (same bot, civilization card game)
+
+BGG: https://boardgamegeek.com/boardgame/334537/altay-dawn-of-civilization
 
 A compact 2–4 player version of *Altay: Dawn of Civilization* (Simone Luciani,
 2023). Factions keep their BGA starting decks; each turn you play action cards
@@ -384,7 +406,9 @@ Text commands: `/altay`, `/altay_join`, `/altay_join_npc`,
 `/altay_rematch`. Mini App: board button = `?startapp=altay<chat>` (same Main
 Mini App, routed by `start_param`). Engine: `altay.py` + `tests/altay/test_altay.py`.
 
-## Black Flag! (same bot, 4-8 player naval card game)
+## Black Flag! (4-8 players) (same bot, naval card game)
+
+BGG: https://boardgamegeek.com/boardgame/472803/black-flag
 
 A simplified digital version of *Black Flag!* (Robert Burke, Matt Forbeck and
 James Ernest, 2018). Everyone gets a Captain, its Ship, a hidden Role and 4
@@ -410,9 +434,11 @@ component sheets into `assets/blackflag/images/blackflag-cards.webp`, `assets/bl
 (same Main Mini App, routed by `start_param`). Engine: `blackflag.py`; tests
 live in `tests/test_wiring.py`.
 
-## Rumble Nation (same bot, 2-player castle battles)
+## Rumble Nation (2-4 players) (same bot, castle battles)
 
-A simplified 2-player digital version of *Rumble Nation* (S Renegade Games,
+BGG: https://boardgamegeek.com/boardgame/266722/rumble-nation
+
+A simplified 2–4 player digital version of *Rumble Nation* (S Renegade Games,
 2022). Eleven castles (values 2-12) are shuffled face down. On your turn roll
 3 dice, optionally reroll them all, then place each die's points as soldiers
 in any area. Tactic cards can move/copy soldiers or swap dice before placing.
@@ -435,7 +461,9 @@ Board, card, dice and token art is extracted from Board Game Arena into
 (same Main Mini App, routed by `start_param`). Engine: `rumblenation.py`; tests
 in `test_rumblenation.py`.
 
-## Fadenfroh (same bot, 2-4 player embroidery drafting)
+## Fadenfroh (2-4 players) (same bot, embroidery drafting)
+
+BGG: https://boardgamegeek.com/boardgame/475685/fadenfroh
 
 A digital version of *Fadenfroh* (1 More Time Games): five rounds of drafting
 fabric from a market of offers, threads, needles and the thimble. Players trade

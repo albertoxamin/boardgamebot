@@ -564,7 +564,7 @@ However, your opponents are competing with you for fabric cards and useful mater
 
 Whoever has the most victory points at the end of the game wins!
 
-A digital version of *Fadenfroh* (1 More Time Games): five rounds of drafting
+In this digital version of *Fadenfroh* (1 More Time Games): five rounds of drafting
 fabric from a market of offers, threads, needles and the thimble. Players trade
 three threads to draw and keep one card, stitch cards into three overlapping
 rows (covering at least one placed half), and score rotating berry, animal,

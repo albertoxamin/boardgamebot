@@ -84,6 +84,32 @@ class SetupTests(unittest.TestCase):
                 self.assertEqual([h["art"] for h in halves],
                                  [[i, sheet_row], [i, sheet_row]])
 
+    def test_current_player_is_unmissable_in_mini_app(self):
+        # FB-0123: Annalisa could not tell whose turn it was from the
+        # Mini App — the header is one dense line. Like Rumble Nation,
+        # the Mini App now shows a big banner with the current player's
+        # name above the header, and the current player's box gets an
+        # amber border + glow plus a turn badge. "Your move" must mean
+        # the actor is the viewer: can_act is also true while the NPC
+        # acts (anyone may play for it). The board JSON already carries
+        # the actor index and player user ids, so no bot change is needed.
+        g, _ = two_player_game()
+        import bot as BOT
+        board = BOT.fadenfroh_board_json(g, 1)
+        self.assertEqual(board["phase"], "shopping")
+        self.assertEqual(board["actor"], 0)
+        js = open(os.path.join(ROOT, "assets", "fadenfroh", "scripts",
+                               "fadenfroh.js")).read()
+        self.assertIn("ffTurnBanner", js)
+        self.assertIn("ffTurnBanner(g)", js)
+        self.assertIn("ffTurnStyle()", js)
+        self.assertIn("ffIsMyTurn", js)
+        self.assertIn(".ffturnbanner{", js)
+        self.assertIn(".ffplayer.ffturn{", js)
+        self.assertIn("ffturnbadge", js)
+        self.assertIn("your move", js)
+        self.assertIn("NPC\\'s turn", js)
+
     def test_start_rejects_bad_player_counts(self):
         g = FD.new_game(7, 1, "Alice")
         self.assertEqual(FD.start_game(g, []), "Fadenfroh needs 2-4 players")

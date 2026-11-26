@@ -1,3 +1,4 @@
+import html as html_lib
 import json
 import os
 import re
@@ -96,6 +97,21 @@ class RegistryTests(unittest.TestCase):
         with open(os.path.join(web_assets.ASSETS_DIR, "shared", "scripts", "flip7.js"), encoding="utf-8") as handle:
             js = handle.read()
         self.assertIn("/api/guide?key=", js)
+
+    def test_popcorn_wiring_present(self):
+        self.assertIs(bot.RENDERERS["popcorn"], bot.popcorn_render)
+        self.assertIs(bot.RULES_BY_KEY["popcorn"], bot.POPCORN_RULES)
+        self.assertIn("/popcorn_move", GR.GAMES_BY_KEY["popcorn"].help_commands)
+
+    def test_popcorn_tutorial_button_present(self):
+        with open(web_assets.HTML_PATH, encoding="utf-8") as handle:
+            markup = handle.read()
+        self.assertIn("🎥 How to play", markup)
+        self.assertIn(
+            "https://www.youtube.com/watch?v=XxEKn0NgP8E"
+            "&pp=ygUeaG93IHRvIHBsYXkgcG9wY29ybiBib2FyZCBnYW1l",
+            html_lib.unescape(markup),
+        )
 
     def test_open_lobbies_filters_chat_and_phase(self):
         state = {key: {} for key in GR.GAME_KEYS}

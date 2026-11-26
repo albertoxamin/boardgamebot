@@ -27,6 +27,7 @@ import altay as AL
 import blackflag as BF
 import rumblenation as RN
 import fadenfroh as FD
+import popcorn as PC
 import game_registry as GR
 import web_assets
 from game_modules.leaves import LEAVES_MODULE
@@ -42,7 +43,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #                     -> legacy Telegram HTML5 Game; currently unused (no
 #                     /play command sends a game message)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 110
+WEB_VER = 111
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 # Mini App assets: per-game scripts in assets/<game>/scripts/, per-game
@@ -476,6 +477,7 @@ NPC_PLAYERS = {
     "blackflag": _blackflag_npc,
     "rumblenation": lambda uid=NPC_ID, name="🤖 NPC": {**RN.new_player(uid, name), **_npc_player(uid, name)},
     "fadenfroh": lambda uid=NPC_ID, name="🤖 NPC": {**FD.new_player(uid, name), **_npc_player(uid, name)},
+    "popcorn": lambda uid=NPC_ID, name="🤖 NPC": {**PC.new_player(uid, name), **_npc_player(uid, name)},
 }
 
 
@@ -5353,6 +5355,214 @@ def fadenfroh_api_move(state, chat_id, user_id, body):
     return ev, None
 
 
+POPCORN_RULES = PC.RULES
+PC_LEN = PC.MAX_PLAYERS
+
+
+def popcorn_get(state, chat_id):
+    return state.setdefault("popcorn", {}).get(str(chat_id))
+
+
+def popcorn_actor_idx(g, uid):
+    actor = PC.current_index(g)
+    if actor is None:
+        return None
+    p = g["players"][actor]
+    return actor if p["user_id"] == uid or _is_npc(p) else None
+
+
+def popcorn_board_text(g):
+    lines = list(PC.board_lines(g))
+    if g["phase"] == "buy":
+        lines.append("🎮 Buy a movie/theater or activate an Ad, then tap ✅ Done "
+                     "(or use /popcorn_move &lt;code&gt;).")
+    elif g["phase"] == "show":
+        lines.append("🎮 Tap a Guest option to seat it, or ⚡ Auto-seat remaining Guests.")
+    return "\n".join(lines)
+
+
+def popcorn_keyboard(g):
+    if g["phase"] == "game_end":
+        return [[{"text": "🔄 Rematch!", "callback_data": "pc:rematch"}]]
+    ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
+    wk = web_keyboard(ct, g["chat_id"], game="popcorn")
+    if g["phase"] == "lobby":
+        kb = [[{"text": "🙋 Join Popcorn", "callback_data": "pc:join"}]]
+        if can_add_npc("popcorn", g):
+            kb.append([{"text": "🤖 Add NPC", "callback_data": "pc:npc"}])
+        kb.append([{"text": "▶️ Start game", "callback_data": "pc:start"}])
+        return kb + (wk or [])
+    actor = PC.current_index(g)
+    if actor is None:
+        return wk or []
+    opts = PC.action_options(g, g["players"][actor]["user_id"])
+    kb = []
+    if g["phase"] == "buy":
+        done = [o for o in opts if o["action"] == "done"]
+        opts = [o for o in opts if o["action"] != "done"][:18] + done
+    else:
+        opts = opts[:24]
+    for o in opts:
+        kb.append([{"text": o["label"][:60], "callback_data": "pc:" + o["code"]}])
+    return kb + (wk or [])
+
+
+def popcorn_render(g, events=None):
+    lines = [html.escape(e) for e in (events or [])]
+    actor = PC.current_index(g)
+    if actor is not None:
+        p = g["players"][actor]
+        if _is_npc(p):
+            lines.append("👉 🤖 NPC's turn - anyone can play for it!")
+        else:
+            mention = (f'<a href="tg://user?id={p["user_id"]}">'
+                       f'{html.escape(p["name"])}</a>')
+            lines.append(f"👉 {mention} - your move.")
+    text = "\n".join(lines + [popcorn_board_text(g)])
+    r = send_board(g, "popcorn", text, popcorn_keyboard(g))
+    if r.get("ok"):
+        old = g.get("board_message_id")
+        g["board_message_id"] = r["result"]["message_id"]
+        if old:
+            api("deleteMessage", chat_id=g["chat_id"], message_id=old)
+
+
+def handle_popcorn(state, msg, cmd, text, uid, name):
+    chat_id = msg["chat"]["id"]
+    g = popcorn_get(state, chat_id)
+    if cmd == "/popcorn_rules":
+        send(chat_id, POPCORN_RULES)
+        return True
+    if cmd == "/popcorn":
+        if not g:
+            _name = msg.get("from", {}).get("first_name") or "Player"
+            g = PC.new_game(chat_id, uid, _name)
+            g["chat_type"] = msg.get("chat", {}).get("type", "private")
+            state.setdefault("popcorn", {})[str(chat_id)] = g
+            popcorn_render(g, [f"🍿 Popcorn game created by {html.escape(_name)}!"])
+        else:
+            popcorn_render(g)
+        return True
+    if not g:
+        send(chat_id, "No Popcorn game here yet - send /popcorn to create one.")
+        return True
+    g["chat_type"] = g.get("chat_type") or msg.get("chat", {}).get("type", "private")
+    if cmd == "/popcorn_join_npc":
+        err = add_npc("popcorn", g)
+        send(chat_id, err or "🤖 NPC joined - anyone can play for it!")
+        if not err:
+            popcorn_render(g)
+        return True
+    if cmd == "/popcorn_join":
+        if g["phase"] != "lobby":
+            send(chat_id, "⛔ Game already started.")
+        elif any(p["user_id"] == uid for p in g["players"]):
+            send(chat_id, "You're already in!")
+        elif len(g["players"]) >= PC_LEN:
+            send(chat_id, "⛔ Popcorn is 2-4 players (full).")
+        else:
+            g["players"].append(PC.new_player(uid, name))
+            send(chat_id, f"🙋 <b>{html.escape(name)}</b> joined Popcorn.")
+            popcorn_render(g)
+        return True
+    if cmd == "/popcorn_start":
+        if g["phase"] != "lobby":
+            send(chat_id, "Already started.")
+        else:
+            ev = []
+            err = PC.start_game(g, ev)
+            send(chat_id, f"⛔ {err}" if err else "🍿 Popcorn started!")
+            if not err:
+                popcorn_render(g, ev)
+        return True
+    if cmd == "/popcorn_cancel":
+        if uid != g["created_by"]:
+            send(chat_id, "⛔ Only the creator can cancel.")
+        else:
+            del state["popcorn"][str(chat_id)]
+            send(chat_id, "🗑 Popcorn game cancelled.")
+        return True
+    if cmd == "/popcorn_rematch":
+        ev, err = rematch_game(state, "popcorn", chat_id, uid)
+        send(chat_id, f"⛔ {err}" if err else "🔄 Rematch!")
+        return True
+    if cmd == "/popcorn_move":
+        actor = popcorn_actor_idx(g, uid)
+        code = text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1)) > 1 else ""
+        action, params = PC.parse_code(code)
+        if actor is None:
+            err = "not your turn"
+        elif not action:
+            err = "Usage: /popcorn_move &lt;button-code&gt;"
+        else:
+            ev = []
+            err = PC.act(g, actor, action, params, ev)
+            if not err:
+                popcorn_render(g, ev)
+                return True
+        send(chat_id, f"⛔ {err}")
+        return True
+    return False
+
+
+def popcorn_board_json(g, viewer_id=None):
+    board = PC.board_json(g, viewer_id)
+    actor = board["actor"]
+    board["is_player"] = any(p["user_id"] == viewer_id for p in g["players"])
+    board["can_act"] = actor is not None and (
+        g["players"][actor]["user_id"] == viewer_id or _is_npc(g["players"][actor]))
+    return board
+
+
+def popcorn_api_move(state, chat_id, user_id, body):
+    g = popcorn_get(state, chat_id)
+    if not g:
+        return [], "no Popcorn game in that chat"
+    action = body.get("action")
+    ev = []
+    idx = next((i for i, p in enumerate(g["players"]) if p["user_id"] == user_id), None)
+    if action == "join":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        if idx is not None:
+            return ev, None
+        if len(g["players"]) >= PC_LEN:
+            return [], "full"
+        iu_name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
+        g["players"].append(PC.new_player(user_id, iu_name))
+        ev.append("🙋 joined Popcorn.")
+    elif action == "join_npc":
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        err = add_npc("popcorn", g)
+        if err:
+            return [], err
+        ev.append("🤖 NPC joined Popcorn.")
+    elif action == "start":
+        if g["phase"] != "lobby":
+            return [], "already started"
+        err = PC.start_game(g, ev)
+        if err:
+            return [], err
+    elif action == "rematch":
+        return rematch_game(state, "popcorn", chat_id, user_id)
+    else:
+        actor = popcorn_actor_idx(g, user_id)
+        if actor is None:
+            return [], "not in this game"
+        if action == "move":
+            action, params = PC.parse_code(body.get("code", ""))
+        else:
+            params = body.get("params") or {}
+        if not action:
+            return [], "unknown action"
+        err = PC.act(g, actor, action, params, ev)
+        if err:
+            return [], err
+    popcorn_render(g, ev)
+    return ev, None
+
+
 TOKAIDODUO_RULES = """🗾 <b>Tokaido Duo rules</b> (2 players, Shikoku): each player controls a Pilgrim, a Merchant and an Artist. Score Faith + Commerce + Culture; highest total wins (tie: more coins, then shared).
 • Each round the first picker rolls 3 dice (one per character). Draft is 1-2-1: first picker takes one, the other takes one, first picker takes the last. First picker alternates each round. A chosen character <b>must</b> move the exact die value.
 • <b>Pilgrim ⛩️</b> moves clockwise around the 37-station ring. May pass occupied stations, but may not land on one - jumps to the next empty station. Coastal Town: gain the boutique coins (2-4). Temple: +1 Temple (9 ends the game). Garden: +1 Garden (6 ends the game). Hot Spring: take the token (steal it from your opponent); use it on a future pick to repeat a move. Seashore: take a Wave tile from the board (or steal one).
@@ -6305,7 +6515,9 @@ RENDERERS = {"games": render, "regicide": rg_render, "odin": odin_render,
                 "tokaidoduo": tokaidoduo_render,
                  "altay": altay_render, "blackflag": blackflag_render,
                   "rumblenation": rumblenation_render,
-                  "fadenfroh": fadenfroh_render}
+                   "fadenfroh": fadenfroh_render,
+                   "popcorn": popcorn_render}
+
 
 RULES_BY_KEY = {"games": RULES, "regicide": REGICIDE_RULES, "odin": ODIN_RULES,
                 "leaves": LEAVES_MODULE.rules(), "lsd": LSD_RULES, "spots": SPOTS_RULES,
@@ -6316,7 +6528,9 @@ RULES_BY_KEY = {"games": RULES, "regicide": REGICIDE_RULES, "odin": ODIN_RULES,
                   "tokaidoduo": TOKAIDODUO_RULES,
                   "altay": ALTAY_RULES, "blackflag": BLACKFLAG_RULES,
                    "rumblenation": RUMBLENATION_RULES,
-                   "fadenfroh": FADENFROH_RULES}
+                    "fadenfroh": FADENFROH_RULES,
+                    "popcorn": POPCORN_RULES}
+
 
 
 def guide_payload(key):
@@ -6349,6 +6563,7 @@ PLAYER_MAKERS = {
     "blackflag": lambda u, n: BF.new_player(u, n),
     "rumblenation": lambda u, n: RN.new_player(u, n),
     "fadenfroh": lambda u, n: FD.new_player(u, n),
+    "popcorn": lambda u, n: PC.new_player(u, n),
 }
 
 GAME_MAKERS = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
@@ -6360,7 +6575,9 @@ GAME_MAKERS = {"games": G.new_game, "regicide": R.new_game, "odin": O.new_game,
                 "tokaidoduo": TD.new_game,
                  "altay": AL.new_game, "blackflag": BF.new_game,
                   "rumblenation": RN.new_game,
-                  "fadenfroh": FD.new_game}
+                   "fadenfroh": FD.new_game,
+                   "popcorn": PC.new_game}
+
 
 
 def rematch_game(state, key, chat_id, uid):
@@ -6497,6 +6714,9 @@ def handle_command(state, msg):
         return
     if cmd.startswith("/fadenfroh"):
         handle_fadenfroh(state, msg, cmd, text, uid, name)
+        return
+    if cmd.startswith("/popcorn"):
+        handle_popcorn(state, msg, cmd, text, uid, name)
         return
     if cmd in ("/start", "/help", "/commands"):
         send(chat_id, HELP)
@@ -6960,6 +7180,56 @@ def handle_callback(state, cb):
         answer_cb(cb["id"], err or "Done")
         if not err:
             fadenfroh_render(g, ev)
+        return
+    if data.startswith("pc:"):
+        g = popcorn_get(state, chat_id)
+        if not g:
+            return answer_cb(cb["id"], "No Popcorn game here.")
+        parts = data.split(":", 2)
+        action = parts[1] if len(parts) > 1 else ""
+        value = parts[2] if len(parts) > 2 else ""
+        ev = []
+        if action == "join":
+            if g["phase"] != "lobby":
+                return answer_cb(cb["id"], "Game already started.")
+            if any(p["user_id"] == uid for p in g["players"]):
+                return answer_cb(cb["id"], "Already joined.")
+            if len(g["players"]) >= PC_LEN:
+                return answer_cb(cb["id"], "Game is full.")
+            g["players"].append(PC.new_player(uid, cb["from"].get("first_name") or "Player"))
+            answer_cb(cb["id"], "Joined!")
+            popcorn_render(g, [f"🙋 {html.escape(cb['from'].get('first_name') or 'Player')} joined."])
+            return
+        if action == "npc":
+            err = add_npc("popcorn", g)
+            answer_cb(cb["id"], err or "🤖 NPC joined")
+            if not err:
+                popcorn_render(g)
+            return
+        if action == "start":
+            if g["phase"] != "lobby":
+                return answer_cb(cb["id"], "Already started.")
+            err = PC.start_game(g, ev)
+            answer_cb(cb["id"], err or "Started")
+            if not err:
+                popcorn_render(g, ev)
+            return
+        if action == "rematch":
+            ev, err = rematch_game(state, "popcorn", chat_id, uid)
+            answer_cb(cb["id"], err or "Rematch!")
+            if not err:
+                save_state(state)
+            return
+        actor = popcorn_actor_idx(g, uid)
+        if actor is None:
+            return answer_cb(cb["id"], "Not your turn.")
+        move, params = PC.parse_code(action + (":" + value if value else ""))
+        if not move:
+            return answer_cb(cb["id"], "Unknown button.")
+        err = PC.act(g, actor, move, params, ev)
+        answer_cb(cb["id"], err or "Done")
+        if not err:
+            popcorn_render(g, ev)
         return
     if data.startswith("tb:"):
         g = toybattle_get(state, chat_id)
@@ -8593,8 +8863,10 @@ def start_web_server(state):
                     "/assets/fadenfroh/images/fadenfroh-fabric.webp", "/assets/fadenfroh/images/fadenfroh-starting.webp",
                     "/assets/fadenfroh/images/fadenfroh-scoring.webp", "/assets/fadenfroh/images/fadenfroh-threads.webp",
                     "/assets/fadenfroh/images/fadenfroh-needle.webp", "/assets/fadenfroh/images/fadenfroh-thimble.webp",
-                    "/assets/fadenfroh/images/fadenfroh-round.webp", "/assets/fadenfroh/images/fadenfroh-marker.webp"):
+                    "/assets/fadenfroh/images/fadenfroh-round.webp", "/assets/fadenfroh/images/fadenfroh-marker.webp",
+                    "/assets/popcorn/images/popcorn-board.webp"):
                 p = os.path.join(ASSETS_DIR, u.path.lstrip("/").removeprefix("assets/"))
+
                 if os.path.exists(p):
                     return self._send(200, open(p, "rb").read(), "image/webp",
                                       cache="public, max-age=86400")
@@ -8863,6 +9135,25 @@ def start_web_server(state):
                 with STATE_LOCK:
                     g = fadenfroh_get(state, chat_id)
                     board = fadenfroh_board_json(g, uid) if g else None
+                return self._send(200 if board else 404, {"ok": bool(board), "game": board})
+            if u.path == "/api/popcorn/mygames":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                with STATE_LOCK:
+                    games = [popcorn_board_json(g, uid) for g in state.get("popcorn", {}).values()
+                             if any(p["user_id"] == uid for p in g["players"])]
+                return self._send(200, {"ok": True, "games": games})
+            if u.path == "/api/popcorn/game":
+                q = urllib.parse.parse_qs(u.query)
+                uid = verify_init_data(q.get("init_data", [""])[0])
+                if uid is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                chat_id = q.get("chat_id", [""])[0]
+                with STATE_LOCK:
+                    g = popcorn_get(state, chat_id)
+                    board = popcorn_board_json(g, uid) if g else None
                 return self._send(200 if board else 404, {"ok": bool(board), "game": board})
             if u.path == "/api/tokaidoduo/mygames":
                 q = urllib.parse.parse_qs(u.query)
@@ -9551,6 +9842,52 @@ def start_web_server(state):
                     events, err = fadenfroh_api_move(state, chat_id, uid, body)
                     g = fadenfroh_get(state, chat_id)
                     board = fadenfroh_board_json(g, uid) if g else None
+                    save_state(state)
+                return self._send(200 if not err else 400,
+                                  {"ok": not err, "error": err, "events": events, "game": board})
+            if path in ("/api/popcorn/create", "/api/popcorn/move"):
+                try:
+                    body = json.loads(self.rfile.read(int(self.headers.get("Content-Length", 0))))
+                except Exception:
+                    return self._send(400, {"ok": False, "error": "bad json"})
+                iu = init_user(body.get("init_data", ""))
+                if iu is None:
+                    return self._send(403, {"ok": False, "error": "open as Telegram Mini App (init_data required)"})
+                uid, name, start_param, chat_instance = iu
+                if path == "/api/popcorn/create":
+                    chat_id = None
+                    for cand in (start_param, str(body.get("chat_id") or ""), chat_instance):
+                        cand = str(cand)
+                        if cand.startswith("popcorn"):
+                            cand = cand[len("popcorn"):]
+                        try:
+                            chat_id = int(cand)
+                            break
+                        except (TypeError, ValueError):
+                            continue
+                    if not chat_id:
+                        return self._send(400, {"ok": False, "error": "open the Mini App from a chat (startapp link)"})
+                    with STATE_LOCK:
+                        g = popcorn_get(state, chat_id)
+                        if g and g["phase"] != "game_end":
+                            return self._send(200, {"ok": True, "game": popcorn_board_json(g, uid), "created": False})
+                        g = PC.new_game(chat_id, uid, name)
+                        g["chat_type"] = "supergroup" if chat_id < 0 else "private"
+                        state.setdefault("popcorn", {})[str(chat_id)] = g
+                        popcorn_render(g, [f"🍿 Popcorn created by {html.escape(name)} via Mini App!"])
+                        save_state(state)
+                        board = popcorn_board_json(g, uid)
+                    return self._send(200, {"ok": True, "game": board, "created": True})
+                chat_id = body.get("chat_id")
+                if not chat_id and str(start_param).startswith("popcorn"):
+                    try:
+                        chat_id = int(str(start_param)[len("popcorn"):])
+                    except ValueError:
+                        pass
+                with STATE_LOCK:
+                    events, err = popcorn_api_move(state, chat_id, uid, body)
+                    g = popcorn_get(state, chat_id)
+                    board = popcorn_board_json(g, uid) if g else None
                     save_state(state)
                 return self._send(200 if not err else 400,
                                   {"ok": not err, "error": err, "events": events, "game": board})

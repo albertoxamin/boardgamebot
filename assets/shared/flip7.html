@@ -561,8 +561,21 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .ffneedle{position:absolute;width:18px;height:63px;background:url(/assets/fadenfroh/images/fadenfroh-needle.webp) center/16px 54px no-repeat;opacity:.85}
 .ffstart{position:absolute;width:44px;height:63px;background-image:url(/assets/fadenfroh/images/fadenfroh-starting.webp);background-size:352px 189px;border:2px solid #fbbf24;border-radius:3px}
 .ffactions button{max-width:100%}
+.pcboard{background:linear-gradient(#0f172ade,#0f172ade),url(/assets/popcorn/images/popcorn-board.webp) center/cover;border:1px solid #475569;border-radius:10px;padding:8px}
+.pcturn{font-size:18px;font-weight:800;margin:6px 0}
+.pcmarket,.pcplayers,.pcactions{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:6px 0}
+.pcplayers{align-items:stretch}
+.pclabel{width:100%;font-size:13px;font-weight:800;color:#cbd5e1;margin-top:4px}
+.pccard{flex:1 1 130px;background:#0f172aee;border:2px solid #475569;border-radius:7px;padding:5px 7px;font-size:12px;font-weight:800}
+.pccard small{display:block;font-size:10px;font-weight:600;color:#94a3b8}
+.pcplayer{flex:1 1 280px;background:#0f172acc;border:1px solid #475569;border-radius:9px;padding:6px;min-width:260px;font-size:13px}
+.pctheater{background:#1e293b;border:1px solid #334155;border-radius:5px;padding:2px 5px;margin-top:3px;font-size:11px}
+.pcseat{display:inline-block;min-width:16px;text-align:center;font-size:14px}
+.pcactions button{max-width:100%}
+.videolink{position:fixed;top:10px;right:50px;z-index:900;background:#1e293b;color:#e2e8f0;border:2px solid #475569;border-radius:999px;padding:4px 10px;font-size:12px;font-weight:800;text-decoration:none;box-shadow:0 2px 8px #0008}
 </style></head><body>
 <h1>🎴 Flip 7</h1>
+<a id="videoBtn" class="videolink" href="https://www.youtube.com/watch?v=XxEKn0NgP8E&amp;pp=ygUeaG93IHRvIHBsYXkgcG9wY29ybiBib2FyZCBnYW1l" target="_blank" rel="noopener">🎥 How to play</a>
 <button id="guideBtn" class="guide-btn hidden" type="button" aria-label="How to play">?</button>
 <a id="rulebookBtn" class="rulebook-btn hidden" href="#" target="_blank" rel="noopener" aria-label="Rulebook">📖</a>
 <div id="regicide" class="hidden">
@@ -793,9 +806,21 @@ button:disabled{opacity:.45;cursor:not-allowed}
   <button class="primary hidden" id="ffStart">🎮 Start game</button>
   <button class="primary hidden" id="ffHowTo">🎥 How to play</button>
   <button class="primary hidden" id="ffRematch">🔄 Rematch!</button>
-  <div class="log" id="ffLog"></div>
+   <div class="log" id="ffLog"></div>
+  </div>
+ <div id="popcorn" class="hidden pcboard">
+  <div id="pcTurn" class="pcturn"></div>
+  <div id="pcMarket" class="pcmarket"></div>
+  <div id="pcPlayers" class="pcplayers"></div>
+  <div id="pcActions" class="pcactions"></div>
+  <button class="primary hidden" id="pcJoin">🙋 Join</button>
+  <button class="primary hidden" id="pcNpc">🤖 Add NPC</button>
+  <button class="primary hidden" id="pcStart">🎮 Start game</button>
+  <button class="primary hidden" id="pcRematch">🔄 Rematch!</button>
+  <div class="log" id="pcLog"></div>
  </div>
 <div id="synced">
+
 <div id="syncBoard"></div>
 <div id="syncTurn" style="font-size:18px;font-weight:700"></div>
 <div id="syncActions"></div>
@@ -854,15 +879,15 @@ window.PXSCROLL={
  }
 };
 </script>
-  <script data-cfasync="false" src="/assets/shared/scripts/flip7.js?v=33"></script>
+  <script data-cfasync="false" src="/assets/shared/scripts/flip7.js?v=34"></script>
   <script data-cfasync="false" src="/assets/regicide/scripts/regicide.js?v=19"></script>
 
- <script data-cfasync="false" src="/assets/odin/scripts/odin.js?v=10"></script>
- <script data-cfasync="false" src="/assets/leaves/scripts/leaves.js?v=6"></script>
- <script data-cfasync="false" src="/assets/lsd/scripts/lsd.js?v=5"></script>
- <script data-cfasync="false" src="/assets/spots/scripts/spots.js?v=15"></script>
- <script data-cfasync="false" src="/assets/yahtzee/scripts/yahtzee.js?v=4"></script>
- <script data-cfasync="false" src="/assets/fliptoons/scripts/fliptoons.js?v=12"></script>
+  <script data-cfasync="false" src="/assets/odin/scripts/odin.js?v=10"></script>
+  <script data-cfasync="false" src="/assets/leaves/scripts/leaves.js?v=6"></script>
+  <script data-cfasync="false" src="/assets/lsd/scripts/lsd.js?v=5"></script>
+  <script data-cfasync="false" src="/assets/spots/scripts/spots.js?v=15"></script>
+  <script data-cfasync="false" src="/assets/yahtzee/scripts/yahtzee.js?v=4"></script>
+  <script data-cfasync="false" src="/assets/fliptoons/scripts/fliptoons.js?v=12"></script>
 <script data-cfasync="false" src="/assets/castlecombo/scripts/castlecombo-faces.js?v=2"></script>
 <script data-cfasync="false" src="/assets/castlecombo/scripts/castlecombo.js?v=7"></script>
 <script data-cfasync="false" src="/assets/tornado/scripts/tornado.js?v=3"></script>
@@ -875,4 +900,6 @@ window.PXSCROLL={
 <script data-cfasync="false" src="/assets/blackflag/scripts/blackflag.js?v=3"></script>
 <script data-cfasync="false" src="/assets/rumblenation/scripts/rumblenation.js?v=3"></script>
 <script data-cfasync="false" src="/assets/fadenfroh/scripts/fadenfroh.js?v=6"></script>
+<script data-cfasync="false" src="/assets/popcorn/scripts/popcorn.js?v=1"></script>
+
 </body></html>

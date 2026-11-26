@@ -256,10 +256,22 @@ GAME_SPECS = (
         rematch_phases=("game_end",), cover="fadenfroh.png",
         module="fadenfroh", web_module="fadenfroh",
         static_assets=("fadenfroh.js", "fadenfroh-fabric.webp", "fadenfroh-starting.webp",
-                       "fadenfroh-scoring.webp", "fadenfroh-threads.webp", "fadenfroh-needle.webp",
-                       "fadenfroh-thimble.webp", "fadenfroh-round.webp", "fadenfroh-marker.webp"),
+                        "fadenfroh-scoring.webp", "fadenfroh-threads.webp", "fadenfroh-needle.webp",
+                        "fadenfroh-thimble.webp", "fadenfroh-round.webp", "fadenfroh-marker.webp"),
+    ),
+    GameSpec(
+        key="popcorn", name="🍿 Popcorn", command="/popcorn", join_command="/popcorn_join",
+        description="bag-building cinema, seat Guests for Popcorn",
+        help_commands=("/popcorn_join", "/popcorn_join_npc", "/popcorn_start",
+                       "/popcorn_move", "/popcorn_rules", "/popcorn_cancel", "/popcorn_rematch"),
+        web_label="🎮 Play Popcorn (HTML)", callback_prefix="pc",
+        min_players=2, max_players=4, npc_full="⛔ Popcorn is 2-4 players (full).",
+        rematch_phases=("game_end",), cover="popcorn.png",
+        module="popcorn", web_module="popcorn",
+        static_assets=("popcorn.js", "popcorn-board.webp"),
     ),
 )
+
 
 GAMES_BY_KEY = {spec.key: spec for spec in GAME_SPECS}
 GAME_KEYS = tuple(spec.key for spec in GAME_SPECS)

@@ -608,6 +608,29 @@ stored in `assets/fadenfroh/rulebook.pdf` and
 `?startapp=fadenfroh<chat>`. Engine: `fadenfroh.py`; tests in
 `tests/fadenfroh/test_fadenfroh.py`.
 
+## Popcorn (2-4 players)
+
+A digital version of *Popcorn* (Iello, 2024) — a bag-building game where
+players buy movies, build theaters, advertise and seat Guests from a hidden
+bag for Popcorn, money, theater trophies and awards. Nine rounds end with the
+final Guest card; each theater's favorite color scores its trophies, and
+unseated Guests in the exit become Primers for the next round. Ties are broken
+by archived movies. Rules were checked against the
+[official rulebook](https://iellogames.com/wp-content/uploads/2024/12/Popcorn_Rulebook_EN_V1_Light.pdf)
+(stored in `assets/popcorn/rulebook.pdf` and `sources/popcorn/rulebook.pdf`)
+and the [BGA rules summary](https://en.doc.boardgamearena.com/Gamehelppopcorn).
+Board/cover art was extracted from [the BGA table](https://boardgamearena.com/tableview?table=953855470)
+into `assets/popcorn/images/popcorn-board.webp`,
+`assets/shared/images/covers/popcorn.png` and `sources/popcorn/bga/`.
+[🎥 How to play](https://www.youtube.com/watch?v=XxEKn0NgP8E&pp=ygUeaG93IHRvIHBsYXkgcG9wY29ybiBib2FyZCBnYW1l)
+is also linked by a button in the Mini App. [Board Game Geek page](https://boardgamegeek.com/boardgame/430563/popcorn).
+
+Text commands: `/popcorn`, `/popcorn_join`, `/popcorn_join_npc`,
+`/popcorn_start`, `/popcorn_move <button-code>`, `/popcorn_rules`,
+`/popcorn_cancel` (creator) and `/popcorn_rematch`. Mini App: board button =
+`?startapp=popcorn<chat>`. Engine: `popcorn.py`; tests in
+`tests/popcorn/test_popcorn.py`.
+
 ## Files
 
 - `game.py` – pure engine: deck, scoring, bust/Flip 7, actions, rounds.
@@ -617,6 +640,7 @@ stored in `assets/fadenfroh/rulebook.pdf` and
 - `altay.py` – pure engine: faction decks, production, market, settlement building, combat, achievements, final scoring, Seafarers ships/crews/routes/trade.
 - `blackflag.py` – pure engine: Captains, Ships, hidden Roles, card combat, Treasure Chest, Doubloons, Hourglass and win checks.
 - `fadenfroh.py` – pure engine: market drafting, three embroidered rows, 16 scoring cards, feather/hoop bonuses and final choice.
+- `popcorn.py` – pure engine: bag-building movie market, theaters, seating, awards, audience draw and final scoring.
 - `yahtzee.py` – pure engine: dice, scorecard, turns, scoring.
 - `fliptoons.py` – pure engine: deck, grid, abilities, market, final flip.
 - `tornado.py` – pure engine: boats, decks, courses, ranks, movement, Grand Prix.
@@ -651,6 +675,7 @@ stored in `assets/fadenfroh/rulebook.pdf` and
 - `tests/test_wiring.py` – registry, bot wiring and Black Flag engine tests: `python3 -m pytest tests/test_wiring.py`
 - `tests/rumblenation/test_rumblenation.py` – Rumble Nation engine tests: `python3 -m pytest tests/rumblenation/test_rumblenation.py`
 - `tests/fadenfroh/test_fadenfroh.py` – Fadenfroh engine tests: `python3 -m pytest tests/fadenfroh/test_fadenfroh.py`
+- `tests/popcorn/test_popcorn.py` – Popcorn engine tests: `python3 -m pytest tests/popcorn/test_popcorn.py`
 - `assets/shared/flip7.html` – Mini App shell for all games (synced; one page, per-game view scripts)
 - `assets/yahtzee/scripts/yahtzee.js` – Yahtzee Mini App view (synced)
 - `assets/regicide/scripts/regicide.js` – Regicide Mini App view (synced, viewer-filtered hands)
@@ -678,6 +703,10 @@ stored in `assets/fadenfroh/rulebook.pdf` and
 - `assets/rumblenation/images/rumblenation-board.webp`, `assets/rumblenation/images/rumblenation-cards.webp`, `assets/rumblenation/images/rumblenation-dice.webp`, `assets/rumblenation/images/rumblenation-tokens.webp` – BGA-extracted Rumble Nation art
 - `assets/fadenfroh/scripts/fadenfroh.js` – Fadenfroh Mini App view (synced, viewer-filtered hands and BGA sprites)
 - `assets/fadenfroh/images/fadenfroh-*.webp` and `sources/fadenfroh/bga/` – BGA-extracted Fadenfroh fabric, scoring, starting-card and token art
+- `assets/popcorn/scripts/popcorn.js` – Popcorn Mini App view (synced, bot-driven board)
+- `assets/popcorn/images/popcorn-board.webp` and `assets/shared/images/covers/popcorn.png` – BGA-extracted Popcorn board and cover art
+- `sources/popcorn/bga/` – BGA Popcorn box/banner/display screenshots
+- `assets/popcorn/rulebook.pdf` and `sources/popcorn/rulebook.pdf` – official Popcorn rulebook
 - `sources/tokaidoduo/bga/` – BGA sprite sheets for Tokaido Duo (dice, wares, waves, paintings, boutiques, character boards)
 - `assets/artichokes/images/artichokes_cards/` – BGA card art (0–9 vegetables, 10–14 Artichokes, 15 Rhubarb, 16 back)
 - `assets/shared/images/covers/*.{jpg,png}` – box art shown as the lobby photo for each game (13 Leaves' cover lives in `assets/leaves/images/leaves-cover.jpg`)

@@ -1,6 +1,13 @@
-const FF = {chat_id: null, init: '', board: null, timer: null, me: 0, placeCard: null, placeKey: ''};
+const FF = {chat_id: null, init: '', board: null, timer: null, me: 0, placeCard: null, placeKey: '', placeMode: 'c1'};
 const FF_HOW_TO_PLAY_URL = 'https://www.youtube.com/watch?v=ezMd-IwlTyA';
 
+// FB-0126 (Albert): the Mini App is an interactive board, not a wall of
+// buttons — "if there are more than 5 buttons maybe you're doing the wrong
+// thing". So: shopping taps the market itself (a material pile or an
+// offer), embroidery taps a card in hand then the ghost where it goes on
+// your own rows, keep taps the drawn card, bonus taps goal B or C. The
+// only control row left is one 3-way "how it lands" switch while stitching
+// (cover 1 half / cover 2 halves / with a needle); the board is the UI.
 function ffLog(s) {
   const e = document.getElementById('ffLog');
   if (e) e.textContent += s + '\n';
@@ -81,19 +88,34 @@ function ffTurnStyle() {
     'box-shadow:0 0 0 2px #f59e0b55,0 0 12px #f59e0b66;background:#1e293b}' +
     '.ffturnbadge{display:inline-block;background:#f59e0b;color:#111;' +
     'border-radius:999px;padding:1px 8px;font-size:11px;font-weight:900}' +
-    // FB-0125: styles for the visual embroidery picker — the card the
-    // player is stitching is ghosted (dashed amber) where it would land.
+    // FB-0126: the board is the UI — tappable market piles/offers, a
+    // ghost of the card where it would land on your rows, a selected-card
+    // lift, one 3-way "how it lands" switch, tappable goal tiles.
+    '.ffhint{width:100%;font-size:13px;color:#cbd5e1;margin:2px 0 4px}' +
+    '.ffpile{display:inline-flex;flex-direction:column;align-items:center;min-width:56px;' +
+    'padding:8px 10px;background:#0f172a;border:1px solid #475569;border-radius:10px;' +
+    'color:#e2e8f0;cursor:pointer}' +
+    '.ffpile.ffstatic{cursor:default;opacity:.85}' +
+    '.ffpile .ffic{font-size:22px}' +
+    '.ffpile .ffcnt{font-size:12px;font-weight:800}' +
+    '.ffoffer{display:inline-flex;align-items:flex-end;gap:2px;padding:6px;background:#0f172a;' +
+    'border:1px solid #475569;border-radius:10px;cursor:pointer}' +
+    '.ffoffer.ffstatic{cursor:default;opacity:.85}' +
+    '.ffoffer .ffoffcap{font-size:11px;font-weight:800;color:#cbd5e1;margin-left:4px}' +
     '.ffghost{position:absolute;width:44px;height:63px;background-image:url(/assets/fadenfroh/images/fadenfroh-fabric.webp);' +
-    'background-size:792px 567px;border:2px dashed #f59e0b;border-radius:3px;opacity:.85;box-sizing:border-box}' +
-    '.ffplace{display:block;width:100%;text-align:left;background:#0f172a;border:1px solid #475569;' +
-    'border-radius:10px;padding:8px;margin:6px 0;color:#e2e8f0;cursor:pointer}' +
-    '.ffplace:active,.ffplace:focus-visible{border-color:#f59e0b}' +
-    '.ffplacelabel{font-size:13px;font-weight:700;margin-bottom:4px}' +
-    '.ffcardpick{display:inline-block;vertical-align:top;margin:4px;padding:6px;border:2px solid #475569;' +
-    'border-radius:10px;background:#0f172a;color:#e2e8f0;cursor:pointer;text-align:center}' +
-    '.ffcardpick:active,.ffcardpick:focus-visible{border-color:#f59e0b}' +
-    '.ffpickcap{font-size:12px;font-weight:700;margin-top:4px}' +
-    '.ffrowhead{width:100%;font-weight:800;margin:8px 0 2px}';
+    'background-size:792px 567px;border:2px dashed #f59e0b;border-radius:3px;opacity:.85;box-sizing:border-box;cursor:pointer}' +
+    '.ffcardpick{position:relative}' +
+    '.ffcardpick.ffselected{border-color:#f59e0b;box-shadow:0 0 0 2px #f59e0b55,0 0 10px #f59e0b66;transform:translateY(-2px)}' +
+    '.ffdiscard{position:absolute;top:-7px;right:-7px;width:22px;height:22px;border-radius:50%;' +
+    'background:#7f1d1d;color:#fff;border:1px solid #fca5a5;font-size:12px;line-height:20px;' +
+    'text-align:center;cursor:pointer;z-index:2}' +
+    '.ffseg{display:flex;gap:6px;width:100%;margin:6px 0}' +
+    '.ffseg button{flex:1;background:#1e293b;border:1px solid #475569;border-radius:9px;' +
+    'padding:8px 4px;color:#e2e8f0;font-size:13px;font-weight:800;cursor:pointer}' +
+    '.ffseg button.on{background:#f59e0b;border-color:#f59e0b;color:#111}' +
+    '.ffseg button:disabled{opacity:.35;cursor:default}' +
+    '.ffgoal.fftap{cursor:pointer;border-color:#f59e0b;box-shadow:0 0 0 2px #f59e0b55}' +
+    '.ffgoal.ffoff{opacity:.45}';
   if (document.head) document.head.appendChild(s);
 }
 function ffIsMyTurn(g) {
@@ -135,10 +157,38 @@ function ffStartStyle(h) {
   const row = FF_START_ROW[h.c] || 0;
   return 'background-position:' + (-(col * 88 + (h.h || 0) * 44)) + 'px ' + (-(row * 63)) + 'px';
 }
-function ffRowHtml(row) {
-  if (!row.length) return '<div class="ffrow"></div>';
-  const min = Math.min.apply(null, row.map(h => h.col));
-  const max = Math.max.apply(null, row.map(h => h.col));
+// Mirror of the engine's _placement_targets: where the selected card's two
+// halves (and a needle, if used) would land on this row, for one mode:
+// 'c1' covers 1 half and grows the row, 'c2' covers 2 halves, 'needle'
+// sits next to the row with a needle in the gap.
+function ffGhostFor(row, side, mode) {
+  const cols = row.map(h => h.col).sort((a, b) => a - b);
+  if (!cols.length) return null;
+  const lo = cols[0], hi = cols[cols.length - 1];
+  if (mode === 'needle') {
+    const gap = side === 'left' ? lo - 1 : hi + 1;
+    const start = side === 'left' ? gap - 2 : gap + 1;
+    return {cols: [start, start + 1], gap: gap};
+  }
+  const start = mode === 'c2'
+    ? (side === 'left' ? lo : hi - 1)
+    : (side === 'left' ? lo - 1 : hi);
+  return {cols: [start, start + 1], gap: null};
+}
+function ffPlaceValue(i, row, side, mode) {
+  if (mode === 'needle') return i + ':' + row + ':' + side + ':0:1';
+  return i + ':' + row + ':' + side + ':' + (mode === 'c2' ? 2 : 1) + ':0';
+}
+function ffRowHtml(row, ghosts) {
+  ghosts = ghosts || [];
+  const cols = row.map(h => h.col);
+  ghosts.forEach(gh => {
+    cols.push.apply(cols, gh.cols);
+    if (gh.gap !== null && gh.gap !== undefined) cols.push(gh.gap);
+  });
+  if (!cols.length) return '<div class="ffrow"></div>';
+  const min = Math.min.apply(null, cols);
+  const max = Math.max.apply(null, cols);
   const items = row.map(h => {
     let cls = 'ffhalf', style = '', label = '';
     if (h.needle) {
@@ -152,6 +202,19 @@ function ffRowHtml(row) {
     return '<span class="' + cls + '" style="left:' + ((h.col - min) * 46) + 'px;' + style +
       '" title="' + escapeHtml(label + ' @ column ' + h.col) + '"></span>';
   });
+  // FB-0126: the ghost is the button — it sits exactly where the card
+  // would land, and tapping it stitches the card there.
+  ghosts.forEach(gh => {
+    gh.cols.forEach((c, k) => {
+      items.push('<span class="ffghost" data-place="' + gh.value + '" style="left:' +
+        ((c - min) * 46) + 'px;' + ffHalfStyle(gh.cid, k) +
+        '" title="Tap to stitch here"></span>');
+    });
+    if (gh.gap !== null && gh.gap !== undefined) {
+      items.push('<span class="ffneedle" data-place="' + gh.value + '" style="left:' +
+        ((gh.gap - min) * 46) + 'px" title="Tap to stitch here"></span>');
+    }
+  });
   return '<div class="ffrow" style="width:' + ((max - min + 1) * 46) + 'px">' + items.join('') + '</div>';
 }
 function ffButton(label, fn) {
@@ -160,101 +223,75 @@ function ffButton(label, fn) {
   b.addEventListener('click', fn);
   return b;
 }
-function ffHtmlButton(html, cls, fn) {
-  const b = document.createElement('button');
-  b.type = 'button'; b.className = cls; b.innerHTML = html;
-  b.addEventListener('click', fn);
-  return b;
-}
-// FB-0125: the embroidery phase used to dump every possible placement
-// (card x row x end x cover x needle, up to ~45) as cryptic text buttons
-// like "#69 ... -> row 1 L 1". Now it is a two-step visual picker: first
-// pick the card to stitch (shown with its real BGA fabric art), then tap
-// where it goes on a preview of the row, with the card ghosted where it
-// would land. Discard shows the card too, so every option is recognisable.
+// FB-0126: embroidery is tap-the-card, then tap-the-ghost on your board.
+// The hand tiles select (tap again to put the card back); the 🗑 badge on
+// a tile discards that card; the one switch below picks how the card lands.
 function ffRenderPlace(g, actions, pend) {
   const key = pend.cards.join(',');
-  if (FF.placeKey !== key) { FF.placeKey = key; FF.placeCard = null; }
+  if (FF.placeKey !== key) { FF.placeKey = key; FF.placeCard = null; FF.placeMode = 'c1'; }
   const head = document.createElement('div');
-  head.style.cssText = 'width:100%;font-weight:700;margin:2px 0 4px';
-  if (FF.placeCard === null) {
-    head.textContent = '🧵 Choose a card to stitch:';
-    actions.appendChild(head);
-    pend.cards.forEach((cid, i) => {
-      actions.appendChild(ffHtmlButton(
-        ffCardHtml(cid) + '<div class="ffpickcap">#' + (Number(cid) + 1) + '</div>',
-        'ffcardpick', () => { FF.placeCard = i; ffRender(); }));
-    });
-  } else {
-    const cid = pend.cards[FF.placeCard];
-    head.textContent = '🧵 Stitching #' + (Number(cid) + 1) + ' — tap where it goes:';
-    actions.appendChild(head);
-    actions.appendChild(ffButton('← Another card', () => { FF.placeCard = null; ffRender(); }));
-    const mine = (g.options || []).filter(o =>
-      Number(String(o.value).split(':')[0]) === FF.placeCard);
-    for (let row = 0; row < 3; row++) {
-      const rowOpts = mine.filter(o => Number(String(o.value).split(':')[1]) === row);
-      if (!rowOpts.length) continue;
-      const rh = document.createElement('div');
-      rh.className = 'ffrowhead';
-      rh.textContent = 'Row ' + (row + 1);
-      actions.appendChild(rh);
-      rowOpts.forEach(o => {
-        const parts = String(o.value).split(':');
-        const side = parts[2], cover = Number(parts[3]), needle = parts[4] === '1';
-        const how = needle ? 'with a needle' :
-          cover === 1 ? 'covers 1 half' : 'covers 2 halves';
-        const label = (side === 'left' ? 'Left' : 'Right') + ' end · ' + how;
-        actions.appendChild(ffHtmlButton(
-          '<div class="ffplacelabel">' + escapeHtml(label) + '</div>' +
-          ffPlacePreview(g, cid, row, side, cover, needle),
-          'ffplace', () => ffMove('choice', {value: o.value})));
-      });
-    }
-  }
+  head.className = 'ffhint';
+  head.textContent = FF.placeCard === null
+    ? '🧵 Tap a card to stitch it:'
+    : '🧵 Stitching #' + (Number(pend.cards[FF.placeCard]) + 1) +
+      ' — tap the ghost on your board where it goes. Tap the card again to put it back.';
+  actions.appendChild(head);
   pend.cards.forEach((cid, i) => {
-    actions.appendChild(ffHtmlButton(
-      ffCardHtml(cid) + '<div class="ffpickcap">🗑 Discard</div>',
-      'ffcardpick', () => ffMove('discard', {cards: [i]})));
+    const tile = document.createElement('div');
+    tile.className = 'ffcardpick' + (FF.placeCard === i ? ' ffselected' : '');
+    tile.innerHTML = ffCardHtml(cid) + '<div class="ffpickcap">#' + (Number(cid) + 1) + '</div>' +
+      '<span class="ffdiscard" title="Discard this card">🗑</span>';
+    tile.addEventListener('click', () => {
+      FF.placeCard = FF.placeCard === i ? null : i;
+      ffRender();
+    });
+    tile.querySelector('.ffdiscard').addEventListener('click', (e) => {
+      e.stopPropagation();
+      ffMove('discard', {cards: [i]});
+    });
+    actions.appendChild(tile);
   });
+  if (FF.placeCard !== null) {
+    const actor = g.players[g.actor];
+    const modes = [
+      ['c1', '1 half', 'Cover one half — the row grows by one'],
+      ['c2', '2 halves', 'Cover two halves'],
+      ['needle', '🪡 Needle', 'Place with a needle — the card sits next to the row'],
+    ];
+    const seg = document.createElement('div');
+    seg.className = 'ffseg';
+    modes.forEach(([mode, label, title]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.title = title;
+      if (FF.placeMode === mode) b.classList.add('on');
+      const has = (g.options || []).some(o => {
+        const p = String(o.value).split(':');
+        if (Number(p[0]) !== FF.placeCard) return false;
+        if (mode === 'needle') return p[4] === '1';
+        return p[4] === '0' && Number(p[3]) === (mode === 'c2' ? 2 : 1);
+      });
+      if (!has || (mode === 'needle' && (!actor || !actor.needles))) b.disabled = true;
+      b.addEventListener('click', () => { FF.placeMode = mode; ffRender(); });
+      seg.appendChild(b);
+    });
+    actions.appendChild(seg);
+  }
 }
-// Mirror of the engine's _placement_targets: where the card's two halves
-// (and a needle, if used) would land on this row.
-function ffPlacePreview(g, cid, row, side, cover, needle) {
-  const halves = (g.players[g.actor] && g.players[g.actor].rows[row]) || [];
-  const cols = halves.map(h => h.col).sort((a, b) => a - b);
-  const lo = cols[0], hi = cols[cols.length - 1];
-  let start, gap = null;
-  if (needle) {
-    gap = side === 'left' ? lo - 1 : hi + 1;
-    start = side === 'left' ? gap - 2 : gap + 1;
-  } else if (cover === 1) {
-    start = side === 'left' ? lo - 1 : hi;
-  } else {
-    start = side === 'left' ? lo : hi - 1;
-  }
-  const span = cols.concat([start, start + 1]);
-  if (gap !== null) span.push(gap);
-  const min = Math.min.apply(null, span), max = Math.max.apply(null, span);
-  let html = '<div class="ffrow" style="width:' + ((max - min + 1) * 46) + 'px">';
-  halves.forEach(h => {
-    const left = ((h.col - min) * 46) + 'px';
-    if (h.needle) {
-      html += '<span class="ffneedle" style="left:' + left + '"></span>';
-    } else if (h.start) {
-      html += '<span class="ffstart" style="left:' + left + ';' + ffStartStyle(h) + '"></span>';
-    } else {
-      html += '<span class="ffhalf" style="left:' + left + ';' + ffHalfStyle(h.id, h.h) + '"></span>';
-    }
+// FB-0126: keep is just tap-the-card — the drawn cards are the UI.
+function ffRenderKeep(g, actions, pend) {
+  const head = document.createElement('div');
+  head.className = 'ffhint';
+  head.textContent = '🧶 You traded 3 threads — tap a card to keep it. The others are discarded.';
+  actions.appendChild(head);
+  pend.cards.forEach((cid, i) => {
+    const tile = document.createElement('div');
+    tile.className = 'ffcardpick';
+    tile.innerHTML = ffCardHtml(cid) + '<div class="ffpickcap">Keep this card</div>';
+    tile.addEventListener('click', () => ffMove('choice', {value: String(i)}));
+    actions.appendChild(tile);
   });
-  for (let k = 0; k < 2; k++) {
-    html += '<span class="ffghost" style="left:' + ((start + k - min) * 46) + 'px;' +
-      ffHalfStyle(cid, k) + '"></span>';
-  }
-  if (gap !== null) {
-    html += '<span class="ffneedle" style="left:' + ((gap - min) * 46) + 'px"></span>';
-  }
-  return html + '</div>';
 }
 function ffRender() {
   const g = FF.board;
@@ -284,22 +321,82 @@ function ffRender() {
     g.phase === 'game_end' ? '🏆 ' + escapeHtml((g.players[g.winner] || {}).name || 'Winner') +
       ' wins! · ' + names :
     '🪡 Round ' + g.round + '/5 · ' + g.phase + ' · ' + names + turnSuffix);
-  goals.innerHTML = '🎯 ' + ['A', 'B', 'C', 'D'].map(k =>
-    '<span class="ffgoal" title="Goal ' + k + ': ' + g.goals[k] + '">' + k +
-    '<span class="ffscore" style="' + ffScoreStyle(g.goals[k]) + '"></span></span>').join('');
+  // FB-0126: in the bonus phase the B and C goal tiles are the choice —
+  // tap one to score it. Other goals dim while choosing.
+  const bonusPick = g.phase === 'bonus' && g.can_act;
+  goals.innerHTML = '🎯 ' + ['A', 'B', 'C', 'D'].map(k => {
+    const tap = bonusPick && (k === 'B' || k === 'C');
+    const cls = 'ffgoal' + (tap ? ' fftap' : bonusPick ? ' ffoff' : '');
+    return '<span class="' + cls + '"' + (tap ? ' data-goal="' + k + '"' : '') +
+      ' title="Goal ' + k + ': ' + g.goals[k] + '">' + k +
+      '<span class="ffscore" style="' + ffScoreStyle(g.goals[k]) + '"></span></span>';
+  }).join('');
+  if (bonusPick) {
+    goals.querySelectorAll('[data-goal]').forEach(el =>
+      el.addEventListener('click', () => ffMove('choice', {value: el.dataset.goal})));
+  }
+  // FB-0126: the market is the shopping UI — tap a material pile to take
+  // it, or tap an offer to take it and start stitching. No buttons.
   const m = g.market;
-  market.innerHTML = g.phase === 'lobby' ? '' : '🛒 Market: 🧵' + m.threads + ' 🪡' + m.needles +
-    (m.thimble ? ' 🟘' : '') + ' · ' + (m.offers || []).map((o, i) =>
-      '<span title="Offer ' + (i + 1) + '">' + o.map(ffCardHtml).join('') + '</span>').join(' ');
+  if (g.phase === 'lobby') {
+    market.innerHTML = '';
+  } else {
+    const shopping = g.phase === 'shopping' && g.can_act;
+    let mh = shopping ? '<div class="ffhint">👆 Tap a material to take it, or tap an offer to take it and start stitching.</div>' : '';
+    mh += '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">';
+    if (m.threads) {
+      mh += '<div class="ffpile' + (shopping ? '' : ' ffstatic') + '" data-mat="thread" title="' +
+        (shopping ? 'Tap to take a thread' : 'Threads in the market') + '"><span class="ffic">🧵</span><span class="ffcnt">×' + m.threads + '</span></div>';
+    }
+    if (m.needles) {
+      mh += '<div class="ffpile' + (shopping ? '' : ' ffstatic') + '" data-mat="needle" title="' +
+        (shopping ? 'Tap to take a needle' : 'Needles in the market') + '"><span class="ffic">🪡</span><span class="ffcnt">×' + m.needles + '</span></div>';
+    }
+    if (m.thimble) {
+      mh += '<div class="ffpile' + (shopping ? '' : ' ffstatic') + '" data-mat="thimble" title="' +
+        (shopping ? 'Tap to take the thimble' : 'Thimble in the market') + '"><span class="ffic">🟘</span><span class="ffcnt">Thimble</span></div>';
+    }
+    (m.offers || []).forEach((o, i) => {
+      mh += '<div class="ffoffer' + (shopping ? '' : ' ffstatic') + '" data-offer="' + i +
+        '" title="' + (shopping ? 'Tap to take this offer' : 'Offer ' + (i + 1)) + '">' +
+        o.map(ffCardHtml).join('') + '<span class="ffoffcap">Offer ' + (i + 1) + '</span></div>';
+    });
+    mh += '</div>';
+    market.innerHTML = mh;
+    if (shopping) {
+      market.querySelectorAll('[data-mat]').forEach(el =>
+        el.addEventListener('click', () => ffMove('material', {kind: el.dataset.mat})));
+      market.querySelectorAll('[data-offer]').forEach(el =>
+        el.addEventListener('click', () => ffMove('pass', {offer: Number(el.dataset.offer)})));
+    }
+  }
   players.innerHTML = g.phase === 'lobby' ? '' : g.players.map((p, i) => {
     const active = i === g.actor;
     const badge = active ? ' <span class="ffturnbadge">👉 ' +
       (p.user_id === FF.me ? 'your turn' : 'turn') + '</span>' : '';
+    // FB-0126: when a card is selected, the actor's own rows show the
+    // ghost where the card would land (only for placements the engine
+    // actually allows); tapping the ghost stitches the card there.
+    const rowGhosts = [[], [], []];
+    if (active && g.can_act && g.pending && g.pending.kind === 'place' && FF.placeCard !== null) {
+      const cid = g.pending.cards[FF.placeCard];
+      for (let r = 0; r < 3; r++) {
+        ['left', 'right'].forEach(side => {
+          const gh = ffGhostFor(p.rows[r], side, FF.placeMode);
+          if (!gh) return;
+          const value = ffPlaceValue(FF.placeCard, r, side, FF.placeMode);
+          if ((g.options || []).some(o => o.value === value))
+            rowGhosts[r].push({cols: gh.cols, gap: gh.gap, value: value, cid: cid});
+        });
+      }
+    }
     return '<div class="ffplayer' + (active ? ' ffturn' : '') + '"><b>' + escapeHtml(p.name) +
       '</b> · ' + p.score + ' VP · 🧵' + p.threads + ' 🪡' + p.needles +
       (p.thimble ? ' 🟘' : '') + ' · hand ' + p.supply_count + badge +
-      '<div>' + p.rows.map(ffRowHtml).join('') + '</div></div>';
+      '<div>' + p.rows.map((row, ri) => ffRowHtml(row, rowGhosts[ri])).join('') + '</div></div>';
   }).join('');
+  players.querySelectorAll('[data-place]').forEach(el =>
+    el.addEventListener('click', () => ffMove('choice', {value: el.dataset.place})));
   if (g.phase === 'lobby') {
     if (g.is_player) join.classList.remove('hidden');
     start.classList.remove('hidden');
@@ -309,32 +406,17 @@ function ffRender() {
   if (g.phase === 'game_end') { rematch.classList.remove('hidden'); return; }
   if (!g.can_act) return;
   if (!g.pending || g.pending.kind !== 'place') { FF.placeCard = null; FF.placeKey = ''; }
-  if (g.phase === 'shopping') {
-    if (g.market.threads && g.players[g.actor] && Object.keys(g.market).length) {
-      actions.appendChild(ffButton('🧵 Take thread', () => ffMove('material', {kind: 'thread'})));
-    }
-    if (g.market.needles) {
-      actions.appendChild(ffButton('🪡 Take needle', () => ffMove('material', {kind: 'needle'})));
-    }
-    if (g.market.thimble) {
-      actions.appendChild(ffButton('🟘 Take thimble', () => ffMove('material', {kind: 'thimble'})));
-    }
-    (g.market.offers || []).forEach((o, i) => {
-      actions.appendChild(ffButton('🙋 Take offer ' + (i + 1) + ' (' + o.length + ')',
-        () => ffMove('pass', {offer: i})));
-    });
-    return;
-  }
+  if (g.phase === 'shopping') return;
   const pend = g.pending;
   if (pend && pend.kind === 'place' && (pend.cards || []).length) {
     ffRenderPlace(g, actions, pend);
   } else if (pend && pend.kind === 'keep' && (pend.cards || []).length) {
-    // FB-0125: show the actual cards, not "Keep card 1/2/3".
-    pend.cards.forEach((cid, i) => {
-      actions.appendChild(ffHtmlButton(
-        ffCardHtml(cid) + '<div class="ffpickcap">Keep this card</div>',
-        'ffcardpick', () => ffMove('choice', {value: String(i)})));
-    });
+    ffRenderKeep(g, actions, pend);
+  } else if (pend && pend.kind === 'bonus') {
+    const hint = document.createElement('div');
+    hint.className = 'ffhint';
+    hint.textContent = '🎯 Tap goal B or C above to score it.';
+    actions.appendChild(hint);
   } else {
     (g.options || []).forEach(o => {
       actions.appendChild(ffButton(o.label, () => ffMove('choice', {value: o.value})));

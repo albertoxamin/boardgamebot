@@ -190,20 +190,36 @@ class EmbroideryTests(unittest.TestCase):
 
     def test_mini_app_embroidery_picker_is_visual(self):
         # FB-0125: the Mini App dumped up to ~45 placement options as
-        # cryptic text buttons. It now shows a two-step visual picker:
-        # pick the card (real BGA fabric art), then tap where it goes on
-        # a preview of the row with the card ghosted where it would land.
+        # cryptic text buttons. FB-0126 (Albert): a board beats buttons —
+        # the Mini App is now interactive: tap a material pile or an offer
+        # in the market, tap a card then the ghost where it goes on your
+        # own rows, tap a drawn card to keep it, tap goal B or C.
         js = open(os.path.join(ROOT, "assets", "fadenfroh", "scripts",
                                "fadenfroh.js")).read()
         self.assertIn("ffRenderPlace", js)
-        self.assertIn("Choose a card to stitch", js)
-        self.assertIn("ffPlacePreview", js)
+        self.assertIn("Tap a card to stitch it", js)
+        self.assertIn("ffGhostFor", js)
+        self.assertIn("data-place", js)
+        self.assertIn("Tap to stitch here", js)
         self.assertIn(".ffghost{", js)
-        self.assertIn("covers 1 half", js)
-        self.assertIn("covers 2 halves", js)
+        self.assertIn("Cover one half", js)
+        self.assertIn("Cover two halves", js)
         self.assertIn("with a needle", js)
         self.assertIn("Keep this card", js)
-        self.assertIn("🗑 Discard", js)
+        self.assertIn("Discard this card", js)
+        self.assertIn("ffdiscard", js)
+        # Shopping taps the market, not buttons.
+        self.assertIn("data-mat", js)
+        self.assertIn("data-offer", js)
+        self.assertIn("Tap a material to take it", js)
+        # Bonus taps the goal tiles.
+        self.assertIn("data-goal", js)
+        # No placement wall: the actions area holds at most the hand, the
+        # one 3-way "how it lands" switch and a hint — never a button per
+        # placement. The old per-placement buttons are gone.
+        self.assertNotIn("ffPlacePreview", js)
+        self.assertNotIn("Left end", js)
+        self.assertNotIn("Right end", js)
 
     def test_cover_one_cover_two_and_needle_placements(self):
         g, idx = self.begin_place()

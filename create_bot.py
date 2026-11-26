@@ -71,7 +71,7 @@ def configure_via_bot_api(token, name="Boardgame Bot"):
     print(bot_api(token, "setMyDescription",
                   description="Multi-game card bot for groups: /games lists startable games."))
     print(bot_api(token, "setMyShortDescription",
-                  short_description="Flip 7 group card game - first to 200 wins."))
+                  short_description="Board games in your Telegram group: /games to start one."))
     cmds = [{"command": c.split(" - ")[0], "description": c.split(" - ", 1)[1]}
             for c in COMMANDS.split("\n")]
     print(bot_api(token, "setMyCommands", commands=cmds))
@@ -80,19 +80,29 @@ def configure_via_bot_api(token, name="Boardgame Bot"):
     return bool(got.get("ok") and got["result"])
 COMMANDS = (
     "games - List the games you can start\n"
+    "flip7 - Press-your-luck Flip 7\n"
     "regicide - Co-op Regicide game\n"
     "odin - Card-shedding Odin game\n"
+    "leaves - Shed sets in 13 Leaves\n"
     "lsd - Let's Summon Demons dice game\n"
     "spots - Push-your-luck Spots dog dice\n"
+    "yahtzee - Dice scorecard Yahtzee\n"
+    "fliptoons - Grid-building Fliptoons\n"
+    "castlecombo - Tableau-building Castle Combo\n"
     "tornado - Jet-ski racing Tornado Splash\n"
     "artichokes - Deck-wrecking Abandon All Artichokes\n"
     "fotr - Co-op Lord of the Rings trick-taking\n"
     "azul - Tile-drafting Azul wall builder\n"
-    "games - List the games you can start\n"
+    "toybattle - Toy Battle on the Castle Field\n"
+    "tokaidoduo - Two-player Tokaido Duo\n"
+    "altay - Altay dawn of civilization\n"
+    "blackflag - Black Flag pirate battles\n"
+    "rumblenation - Rumble Nation castle wars\n"
+    "fadenfroh - Fadenfroh embroidery drafting\n"
     "join_npc - Add a mock player anyone can control\n"
-    "score - Show board and scores\n"
-    "rules - How to play Flip 7\n"
-    "cancel - Creator cancels the game\n"
+    "rules - How to play (reply to a board for that game's rules)\n"
+    "cancel - Cancel a game (reply to its board)\n"
+    "start - Start the bot\n"
     "help - Help"
 )
 

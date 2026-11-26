@@ -129,7 +129,7 @@ GAME_SPECS = (
         key="castlecombo", name="🏰 Castle Combo", command="/castlecombo", join_command="/castlecombo_join",
         description="deck-building tableau, 3×3 shields & sets",
         help_commands=("/castlecombo_join", "/castlecombo_start", "/castlecombo_buy", "/castlecombo_flip",
-                       "/castlecombo_key", "/castlecombo_choose", "/castlecombo_cancel", "/castlecombo_rules"),
+                       "/castlecombo_move", "/castlecombo_renew", "/castlecombo_choose", "/castlecombo_cancel", "/castlecombo_rules"),
         web_label="🎮 Play Castle Combo (HTML)", callback_prefix="cc",
         min_players=2, max_players=5, npc_full="⛔ Castle Combo is 2-5 players (full).",
         rematch_phases=("game_end",), cover="castlecombo.jpg",

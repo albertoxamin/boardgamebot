@@ -36,11 +36,13 @@ API = f"https://api.telegram.org/bot{TOKEN}" if TOKEN else ""
 STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "state.json")
 # HTML5 options (see assets/ and README):
-#  FLIP7_WEB_URL      https URL of assets/shared/flip7.html -> /web opens it as a Mini App
+#  FLIP7_WEB_URL      https URL of assets/shared/flip7.html -> board buttons
+#                     open it as the Mini App (no /web command exists)
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
-#                     -> /play sends a Telegram HTML5 Game (sendGame)
+#                     -> legacy Telegram HTML5 Game; currently unused (no
+#                     /play command sends a game message)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 96
+WEB_VER = 97
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 # Mini App assets: per-game scripts in assets/<game>/scripts/, per-game

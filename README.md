@@ -23,8 +23,10 @@ token in the BotFather chat.
 
 Configuration of **either** kind of bot uses the bot's own token with the
 Bot API `setMyName` / `setMyDescription` / `setMyShortDescription` /
-`setMyCommands` endpoints (`create_bot.py --configure`, verified via
-`getMyCommands` = 9 commands) — no BotFather chat needed for that step.
+`setMyCommands` endpoints (`create_bot.py --configure`, which registers the
+25 commands in `COMMANDS` — one create command per game plus `/games`,
+`/join_npc`, `/rules`, `/cancel`, `/start` and `/help`; verify with
+`getMyCommands`) — no BotFather chat needed for that step.
 
 `create_bot.py` implements both:
 
@@ -72,75 +74,80 @@ Add the bot to the group and make it **admin** (or @BotFather →
 
 ```
 /games              list the games you can start (with live chat status)
-/flip7              create a Flip 7 lobby (also /flip7_join /flip7_start /flip7_rules)
+/<game>             create a lobby, e.g. /flip7 /azul /odin (also /<game>_join /<game>_start /<game>_rules)
 /rules             how to play (reply to a board for that game's rules)
 /cancel            reply to a game's board message to cancel that game
-Flip 7 lobbies can also be joined/started from the Mini App button; the bot's
-own Hit/Stay/Score buttons work too. While a lobby has free seats it has an
-"Add NPC" button (same as /join_npc and /<game>_join_npc) to seat another mock
-player anyone can control; NPCs get unique negative ids and distinct names.
+/start /help       show the help text (all games and commands)
+/join_npc          add a mock player anyone can control (Flip 7; other games: /<game>_join_npc)
 ```
 
+Every game starts the same way: send its create command (or tap it in
+`/games`), friends join with `/<game>_join` or the lobby's Join button, then
+anyone taps Start (or `/<game>_start`). While a lobby has free seats it has
+an "Add NPC" button (same as `/join_npc` and `/<game>_join_npc`) to seat
+another mock player anyone can control; NPCs get unique negative ids and
+distinct names. Every lobby also has a "🎥 How to play" button linking to a
+tutorial video, and a Mini App button that opens the game in the Telegram
+Mini App (see below) — lobbies can be joined and started from there too.
+Flip 7 also has the bot's own Hit/Stay buttons in chat.
+
 Buttons enforce whose turn it is; action cards show target buttons to the
-player who flipped them. Lobby boards are sent as box-art photos (board text
-as the caption) and re-sent when the lobby changes; after that a single board
-message is edited in place and flip results are posted as event messages.
+player who flipped them. Lobby boards are sent as the game's box-art photo
+(board text as the caption, when it fits in the 1024-character caption limit)
+and re-sent when the lobby changes. During play the board message is edited
+in place when a move produces no events; when a turn does produce events
+(e.g. a Flip 7 flip result) the board is re-sent as a fresh message and the
+old one deleted, so the newest message always carries the buttons. (13
+Leaves has no box art yet, so its lobby is plain text.)
 
-## HTML5 game option (`/web` Mini App button)
+## Mini App (Telegram, synced)
 
-`assets/shared/flip7.html` + `assets/shared/scripts/flip7.js` is a dependency-free Flip 7 game with two modes:
-**Synced (default)** — the bot process itself serves the page + JSON API on
-`:8080` (`GET /api/games`, `GET /api/game?chat_id=`, `POST /api/move`
-Hit/Stay/action/Next/Join) sharing the *same* in-memory state as Telegram
-polling, so HTML and chat moves stay in sync (deck order never exposed).
-Mini App `initData` is verified with the bot token (HMAC) to get the user's
-id — **no user_id entry anywhere** (`/api/mygames` only returns your games,
-`/api/game`/`/api/move` 403 without valid initData). Groups open the Main
-Mini App via the `t.me/flip7groupbot?startapp=<chat_id>` URL button
-(BotFather: Bot Settings → Configure Mini App → URL set; verified
-"Success! Mini App settings updated"). Moves must be by the current
-player/chooser, same as text buttons.
+`assets/shared/flip7.html` is the single Mini App shell for all games
+(each game has its own view script under `assets/<game>/scripts/`). The bot
+process itself serves the page + JSON API on `:8080` (`GET /api/games`,
+`GET /api/game?chat_id=`, `POST /api/create`, `POST /api/move`, plus
+per-game `/api/<game>/...` endpoints) sharing the *same* in-memory state as
+Telegram polling, so Mini App and chat moves stay in sync (deck order never
+exposed). Mini App `initData` is verified with the bot token (HMAC) to get
+the user's id — **no user_id entry anywhere** (`/api/mygames` only returns
+your games, `/api/game`/`/api/move` 403 without valid initData). Moves must
+be by the current player/chooser, same as text buttons.
+
+There is no `/web` or `/play` command: the Mini App is opened from a board's
+Mini App button or from `/games`. In groups the button is a plain URL to the
+bot's Main Mini App direct link (`t.me/flip7groupbot?startapp=<chat_id>` for
+Flip 7, `?startapp=<game><chat_id>` for the other games — BotFather: Bot
+Settings → Configure Mini App → URL set; verified "Success! Mini App
+settings updated"); in private chats it is a `web_app` button (`web_app`
+inline buttons are private-chats-only — Telegram rejects them in groups with
+`BUTTON_TYPE_INVALID`). Opening it in a group with no game yet auto-creates
+one (you are the creator); friends tap *Join* in the lobby, anyone taps
+*Start game*.
 **Testing rule:** tests must use `FLIP7_STATE=/tmp/...` + a test port —
 never the live `state.json` (a previous test overwrote it; `save_state`
 now also keeps `state.json.bak`).
-**Hot-seat (offline)** — the original localStorage game, still below the synced panel.
-**Starting in groups from the Mini App:** open `/web` in the group (Main Mini App
-link, auto-login) → if no game exists there, *Create game in this chat* →
-friends tap *Join* (lobby seats show everyone) → anyone taps *Start game*.
 Card piles use generated SVG images (`assets/shared/images/cards/*.svg`, `web/make_cards.py` —
 numbers colour-coded 0–12, modifiers, Freeze/Flip Three/Second Chance, deck back). JS is external with `data-cfasync="false"` and no inline
 `onclick` handlers, because Cloudflare Rocket Loader (on `xamin.it`) rewrites
 inline scripts/handlers and breaks them — verified served HTML contains no
-Rocket-Loader-transformed scripts. Three ways to offer it:
+Rocket-Loader-transformed scripts.
 
-1. **File (always works):** `/web` or `/play` with no URL configured →
-   the bot sends `flip7.html` via `sendDocument`; open it in any browser.
-2. **Mini App (modern):** serve it over HTTPS and set `FLIP7_WEB_URL`:
-   ```bash
-   python3 web/server.py 8080        # or any static host
-   cloudflare tunnel --url http://localhost:8080   # or ngrok https
-   export FLIP7_WEB_URL=https://<tunnel>/flip7.html
-   ```
-   Restart `bot.py`: `/web` then shows a button. Telegram requires
-   HTTPS for Mini Apps, so a plain `http://localhost` URL won't open in-client.
-   **Groups:** `web_app` inline buttons are private-chats-only (Telegram
-   rejects them in groups with `BUTTON_TYPE_INVALID`), so the bot sends a
-   plain `url` button in groups/supergroups (opens the same page) and a
-   `web_app` button in private chats.
-    **Live instance:** a Cloudflare Tunnel (tunnel ID and `TUNNEL_TOKEN` in the
-    server's `.env`, never committed) forwards the tunnel hostname to
-    `http://localhost:8080`, exposing the game over HTTPS. `FLIP7_WEB_URL`
-    is set in `.env`. (Host this yourself: create a tunnel with
-    `cloudflared tunnel create`, point its hostname at `localhost:8080`,
-    and set `FLIP7_WEB_URL` to that HTTPS URL.)
-3. **Telegram HTML5 Game (legacy):** register a short name in @BotFather
-   (`/newgame` → name/description/photo), host the HTML over HTTPS, set
-   `FLIP7_GAME_URL=https://<tunnel>/flip7.html` and
-   `FLIP7_GAME_SHORT_NAME=<short name>`, restart `bot.py`. `/play` calls
-   `sendGame`; tapping Play triggers a callback that the bot answers with
-   `answerCallbackQuery(url=FLIP7_GAME_URL)`. Scores can be posted
-   server-side with `setGameScore` (not from the page).
+**Serving it:** the bot serves the Mini App itself on `:8080`, so the live
+setup is just the Cloudflare Tunnel (tunnel ID and `TUNNEL_TOKEN` in the
+server's `.env`, never committed) forwarding the tunnel hostname to
+`http://localhost:8080`, with `FLIP7_WEB_URL` set in `.env` to that HTTPS
+URL. (Host this yourself: create a tunnel with `cloudflared tunnel create`,
+point its hostname at `localhost:8080`, and set `FLIP7_WEB_URL` to that
+HTTPS URL.) Telegram requires HTTPS for Mini Apps, so a plain
+`http://localhost` URL won't open in-client. `web/server.py` is only a
+static-file server for local testing of the page — it does not serve the
+`/api/*` endpoints, so synced play through it does not work.
 
+**Legacy Telegram HTML5 Game:** `FLIP7_GAME_URL` +
+`FLIP7_GAME_SHORT_NAME` are still read (register a short name in @BotFather
+via `/newgame`), and the bot still answers `game_short_name` callbacks with
+the game URL — but nothing sends a game message any more (there is no
+`/play` command), so this path is currently unused.
 ## Flip 7 (2-6 players)
 
 BGG: https://boardgamegeek.com/boardgame/420087/flip-7
@@ -169,9 +176,14 @@ Flip 7", The Ludarium academy guide.
 
 *Bot adaptations:* cards are public/face-up (as in the physical game, so the
 group sees every flip); minimum 2 players to start (official game is 3+ —
-`/startgame` warns you); deferred Freeze/Flip Three are chosen by the
+`/flip7_start` just needs 2); deferred Freeze/Flip Three are chosen by the
 Flip-Three player; a Freeze during the initial deal removes that player
 from the rest of the initial deal.
+
+Text commands: `/flip7` (create), `/flip7_join`, `/flip7_join_npc`,
+`/flip7_start`, `/flip7_rules`, `/cancel` (reply to the board, creator).
+Mini App: board button = `?startapp=<chat_id>` (same Main Mini App).
+Engine: `game.py` + `tests/test_game.py`.
 
 A full 3-player game was also simulated end-to-end (hits/stays/actions/
 round rotation → a winner at 200+ in 13 rounds) with the Telegram layer
@@ -192,6 +204,70 @@ Mini App: Flip 7 board button = `?startapp=<chat>` (Flip 7 view), Regicide board
 `?startapp=regicide<chat>` — same Main Mini App, page routes by `start_param`. Engine:
 `regicide.py` + `test_regicide.py` (setup counts, combo validation, exact-kill, discard/lose,
 jester/yield).
+
+## Odin (2-6 players)
+
+BGG: https://boardgamegeek.com/boardgame/406854/odin
+
+Odin (Helvetiq), 2–6 players. A card-shedding game: lead with a set of
+same-colour or same-number cards whose digits, sorted high to low, form a
+number that beats the table — then take one card from the previous set.
+Everyone starts at 15 points and loses 1 per card left in hand at the end
+of each hand; first to 0 wins.
+Text commands: `/odin` (create), `/odin_join`, `/odin_join_npc`,
+`/odin_start`, `/odin_play <cards>`, `/odin_pickup <card>`, `/odin_pass`,
+`/odin_score`, `/odin_cancel` (creator), `/odin_rules`. Mini App: board
+button = `?startapp=odin<chat>` (same Main Mini App, routed by
+`start_param`). Engine: `odin.py` + `tests/odin/test_odin.py` (setup and
+deck, set values, lead/response rules, pickup and passing, going out and
+scoring).
+
+## 13 Leaves (3-6 players)
+
+BGG: https://boardgamegeek.com/boardgame/434442/13-leaves
+
+13 Leaves, 3–6 players. Shed your hand by playing sets onto the ends of the
+row: the first lead plays any set of the same value, then you play onto the
+left or right end — at least as many cards as that end stack, with a value
+below the lowest (left) or above the highest (right). First to empty your
+hand wins.
+Text commands: `/leaves` (create), `/leaves_join`, `/leaves_join_npc`,
+`/leaves_start`, `/leaves_play <value> <count>` (e.g. `/leaves_play 5 2`),
+`/leaves_pass`, `/leaves_cancel` (creator), `/leaves_rules`. Mini App:
+board button = `?startapp=leaves<chat>` (same Main Mini App, routed by
+`start_param`). Engine: `game_modules/leaves.py` +
+`tests/leaves/test_leaves.py` (deck and deal, lead and play, stack
+extension, passing, win on empty hand).
+
+## Let's Summon Demons (2-5 players)
+
+BGG: https://boardgamegeek.com/boardgame/325829/lets-summon-demons
+
+Let's Summon Demons (Cryptozoic, 2021), 2–5 players. Roll 2d6 to activate
+everyone's matching cards, buy Block cards for souls, and summon demons by
+discarding Block cards — first to 3 summoned demons AND 10 souls wins.
+Text commands: `/lsd` (create), `/lsd_join`, `/lsd_join_npc`, `/lsd_start`,
+`/lsd_roll`, `/lsd_buy <1-5>`, `/lsd_summon <demon> <sacrifices...>`,
+`/lsd_end`, `/lsd_score`, `/lsd_cancel` (creator), `/lsd_rules`. Mini App:
+board button = `?startapp=lsd<chat>` (same Main Mini App, routed by
+`start_param`). Engine: `lsd.py` + `tests/lsd/test_lsd.py` (setup, roll
+activations, buy and summon, win check).
+
+## Spots (1-4 players)
+
+BGG: https://boardgamegeek.com/boardgame/372559/spots
+
+Spots (CMYK), 1–4 players. A push-your-luck dog dice game: do tricks to roll
+dice and fill the spots on your dog cards, then score completed dogs — first
+to 6 scored wins. Bury too many dice in your yard (over 7) and you bust,
+losing the dice on your unscored dogs.
+Text commands: `/spots` (create), `/spots_join`, `/spots_join_npc`,
+`/spots_start`, `/spots_trick <tile>`, `/spots_place <die#> <dog> <spot#>`
+(or `/spots_place <die#> yard`), `/spots_reroll`, `/spots_score`,
+`/spots_cancel` (creator), `/spots_rules`. Mini App: board button =
+`?startapp=spots<chat>` (same Main Mini App, routed by `start_param`).
+Engine: `spots.py` + `tests/spots/test_spots.py` (setup, tricks/placement
+and bust, scoring and auto-score, reroll and win).
 
 ## Yahtzee (2-6 players)
 
@@ -225,6 +301,24 @@ Text commands: `/fliptoons` (create), `/fliptoons_join`,
 Mini App: board button = `?startapp=fliptoons<chat>` (same Main Mini App,
 routed by `start_param`). Engine: `fliptoons.py` + `test_fliptoons.py`
 (full card abilities, market, final flip).
+
+## Castle Combo (2-5 players)
+
+BGG: https://boardgamegeek.com/boardgame/416851/castle-combo
+
+Castle Combo (Grégory Grard & Mathieu Roussel, 2024), 2–5 players. Recruit
+characters from the Castle and Village markets into a 3×3 tableau: each
+card grants an immediate ability and scores from shields, sets, positions
+and stored gold, and the Messenger pawn decides which row you may buy from.
+Most points wins.
+Text commands: `/castlecombo` (create), `/castlecombo_join`,
+`/castlecombo_join_npc`, `/castlecombo_start`, `/castlecombo_buy <card id>`,
+`/castlecombo_flip <card id>`, `/castlecombo_move`, `/castlecombo_renew`,
+`/castlecombo_choose <value>`, `/castlecombo_cancel` (creator),
+`/castlecombo_rules`. Mini App: board button =
+`?startapp=castlecombo<chat>` (same Main Mini App, routed by `start_param`).
+Engine: `castlecombo.py` + `tests/castlecombo/test_castlecombo.py` (deck and
+start, messenger, placement, costs and discounts, buy and pending choices).
 
 ## Tornado Splash (2-5 players)
 
@@ -457,8 +551,8 @@ Board, card, dice and token art is extracted from Board Game Arena into
 `/rumblenation_deploy <die> <castle>`, `/rumblenation_tactic <option>`,
 `/rumblenation_rules`, `/rumblenation_cancel` (creator),
 `/rumblenation_rematch`. Mini App: board button = `?startapp=rumblenation<chat>`
-(same Main Mini App, routed by `start_param`). Engine: `rumblenation.py`; tests
-in `test_rumblenation.py`.
+(same Main Mini App, routed by `start_param`). Engine: `rumblenation.py`; tests in
+`tests/rumblenation/test_rumblenation.py`.
 
 ## Fadenfroh (2-4 players)
 
@@ -482,7 +576,7 @@ Game Arena into `assets/fadenfroh/images/fadenfroh-*.webp` (raw sheets also kept
 `/fadenfroh_discard <cards>`, `/fadenfroh_bonus <B|C>`, `/fadenfroh_rules`,
 `/fadenfroh_cancel` (creator) and `/fadenfroh_rematch`. Mini App: board button =
 `?startapp=fadenfroh<chat>`. Engine: `fadenfroh.py`; tests in
-`test_fadenfroh.py`.
+`tests/fadenfroh/test_fadenfroh.py`.
 
 ## Files
 
@@ -498,9 +592,24 @@ Game Arena into `assets/fadenfroh/images/fadenfroh-*.webp` (raw sheets also kept
 - `tornado.py` – pure engine: boats, decks, courses, ranks, movement, Grand Prix.
 - `artichokes.py` – pure engine: garden stack/row, harvesting, all vegetable powers, win check.
 - `fellowship.py` – pure engine: 37-card deck, chapter rosters/goals, setup exchanges, trick play, One Ring.
+- `regicide.py` – pure engine: co-op vs 12 royals, combos, jester, yield.
+- `odin.py` – pure engine: card shedding, set numbers, pickup, points race to 0.
+- `game_modules/leaves.py` – pure engine: 13 Leaves set shedding onto row ends.
+- `lsd.py` – pure engine: Let's Summon Demons dice activations, souls, demons.
+- `spots.py` – pure engine: Spots dog dice, tricks, buried dice, bust.
+- `castlecombo.py` – pure engine: Castle Combo 3×3 tableau, messenger, shields, sets.
+- `game_registry.py` – the game catalog: one spec per game (commands, players, covers, Mini App routing).
+- `web_assets.py` – Mini App static assets served by the bot.
 - `bot.py` – Telegram polling, inline keyboards, commands, JSON state.
 - `create_bot.py` – BotFather self-creation (MTProto, see above).
 - `tests/test_game.py` – unit tests: `python3 -m pytest tests/test_game.py`
+- `tests/regicide/test_regicide.py` – Regicide engine tests: `python3 -m pytest tests/regicide/test_regicide.py`
+- `tests/odin/test_odin.py` – Odin engine tests: `python3 -m pytest tests/odin/test_odin.py`
+- `tests/leaves/test_leaves.py` – 13 Leaves engine tests: `python3 -m pytest tests/leaves/test_leaves.py`
+- `tests/lsd/test_lsd.py` – Let's Summon Demons engine tests: `python3 -m pytest tests/lsd/test_lsd.py`
+- `tests/spots/test_spots.py` – Spots engine tests: `python3 -m pytest tests/spots/test_spots.py`
+- `tests/azul/test_azul.py` – Azul engine tests: `python3 -m pytest tests/azul/test_azul.py`
+- `tests/castlecombo/test_castlecombo.py` – Castle Combo engine tests: `python3 -m pytest tests/castlecombo/test_castlecombo.py`
 - `tests/yahtzee/test_yahtzee.py` – Yahtzee unit tests: `python3 -m pytest tests/yahtzee/test_yahtzee.py`
 - `tests/fliptoons/test_fliptoons.py` – Fliptoons unit tests: `python3 -m pytest tests/fliptoons/test_fliptoons.py`
 - `tests/tornado/test_tornado.py` – Tornado Splash unit tests: `python3 -m pytest tests/tornado/test_tornado.py`
@@ -512,8 +621,14 @@ Game Arena into `assets/fadenfroh/images/fadenfroh-*.webp` (raw sheets also kept
 - `tests/test_wiring.py` – registry, bot wiring and Black Flag engine tests: `python3 -m pytest tests/test_wiring.py`
 - `tests/rumblenation/test_rumblenation.py` – Rumble Nation engine tests: `python3 -m pytest tests/rumblenation/test_rumblenation.py`
 - `tests/fadenfroh/test_fadenfroh.py` – Fadenfroh engine tests: `python3 -m pytest tests/fadenfroh/test_fadenfroh.py`
-- `assets/shared/flip7.html` – standalone HTML5 Flip 7 game (hot-seat, Mini App-ready)
+- `assets/shared/flip7.html` – Mini App shell for all games (synced; one page, per-game view scripts)
 - `assets/yahtzee/scripts/yahtzee.js` – Yahtzee Mini App view (synced)
+- `assets/regicide/scripts/regicide.js` – Regicide Mini App view (synced, viewer-filtered hands)
+- `assets/odin/scripts/odin.js` – Odin Mini App view (synced)
+- `assets/leaves/scripts/leaves.js` – 13 Leaves Mini App view (synced)
+- `assets/lsd/scripts/lsd.js` – Let's Summon Demons Mini App view (synced)
+- `assets/spots/scripts/spots.js` – Spots Mini App view (synced)
+- `assets/castlecombo/scripts/castlecombo.js` (+ `castlecombo-faces.js`) – Castle Combo Mini App view (synced)
 - `assets/fliptoons/scripts/fliptoons.js` – Fliptoons Mini App view (synced)
 - `assets/tornado/scripts/tornado.js` – Tornado Splash Mini App view (synced)
 - `assets/artichokes/scripts/artichokes.js` – Abandon All Artichokes Mini App view (synced)
@@ -535,8 +650,8 @@ Game Arena into `assets/fadenfroh/images/fadenfroh-*.webp` (raw sheets also kept
 - `assets/fadenfroh/images/fadenfroh-*.webp` and `sources/fadenfroh/bga/` – BGA-extracted Fadenfroh fabric, scoring, starting-card and token art
 - `sources/tokaidoduo/bga/` – BGA sprite sheets for Tokaido Duo (dice, wares, waves, paintings, boutiques, character boards)
 - `assets/artichokes/images/artichokes_cards/` – BGA card art (0–9 vegetables, 10–14 Artichokes, 15 Rhubarb, 16 back)
-- `assets/shared/images/covers/*.jpg` – box art shown as the lobby photo for each game
-- `web/server.py` – static server for the HTML game (needs HTTPS tunnel for in-Telegram use)
+- `assets/shared/images/covers/*.{jpg,png}` – box art shown as the lobby photo for each game (13 Leaves has none yet)
+- `web/server.py` – static-file server for local testing of the Mini App page only (no `/api/*`, so no synced play; the live Mini App is served by `bot.py` itself on `:8080`)
 - `state.json` – created at runtime (per-chat games, decks, scores).
 
 ## Tests

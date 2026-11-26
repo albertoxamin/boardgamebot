@@ -1,12 +1,11 @@
 #!/usr/bin/env python3
 """Serve assets/shared/flip7.html locally:  python3 web/server.py [port=8080]
-Telegram Mini Apps / HTML5 Games require an HTTPS URL, so expose this
-with a tunnel (e.g. `cloudflare tunnel` / ngrok https) and set:
-  FLIP7_WEB_URL=https://<tunnel>/assets/shared/flip7.html  (for /web Mini App)
-  FLIP7_GAME_URL=https://<tunnel>/assets/shared/flip7.html (for /play sendGame)
-  FLIP7_GAME_SHORT_NAME=<short name from @BotFather /newgame>
-Restart bot.py after setting them. Without a tunnel, /web sends the
-HTML file itself via sendDocument - that always works.
+Static files only, for local testing of the Mini App page: it does NOT serve
+the /api/* endpoints, so synced play through it does not work (the live Mini
+App is served by bot.py itself on :8080). There is no /web or /play command;
+the Mini App is opened from a board's Mini App button or /games. Telegram
+Mini Apps require an HTTPS URL, so expose the bot with a tunnel (e.g.
+`cloudflare tunnel` / ngrok https) and set FLIP7_WEB_URL to the tunnel URL.
 
 Only files under assets/ are served (plus / and /flip7.html, which serve
 the shared shell) so the rest of the repo is never exposed.

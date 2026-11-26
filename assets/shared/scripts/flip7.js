@@ -177,7 +177,7 @@ function tgInit(){try{let id=Telegram.WebApp.initData||'';
 function api(path,opts){return fetch(path,opts).then(r=>r.json());}
 async function loadGames(){
  let tg=tgInit();
- if(!tg.id){document.getElementById('syncBoard').innerHTML='<div class="table lobby-note">Open as Telegram Mini App via the bot\'s /web link.</div>';return;}
+ if(!tg.id){document.getElementById('syncBoard').innerHTML='<div class="table lobby-note">Open this page as a Telegram Mini App from a game board in the group.</div>';return;}
  SYNC.user_id=tg.id; SYNC.name=tg.name; SYNC.init=tg.init;
  let r=await api('/api/mygames?init_data='+encodeURIComponent(tg.init));
  let mine=r.games||[];
@@ -191,7 +191,7 @@ async function loadGames(){
  else if(pref){ // no game in this chat yet: create it automatically (you are creator)
   let cr=await api('/api/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init})});
   if(cr.game) selectGame(cr.game.chat_id); else syncLog('⛔ '+(cr.error||'create failed'));
- } else document.getElementById('syncBoard').innerHTML='<div class="table lobby-note">No game for you yet — create one in Telegram with /newgame, then open /web here.</div>';
+ } else document.getElementById('syncBoard').innerHTML='<div class="table lobby-note">No game for you yet — create one in Telegram with /flip7, then open the Mini App from the board.</div>';
 }
 async function selectGame(chat_id){SYNC.chat_id=chat_id; await refreshBoard();
  if(SYNC.timer)clearInterval(SYNC.timer); SYNC.timer=setInterval(refreshBoard,3000);}
@@ -245,7 +245,7 @@ function renderSync(){let b=SYNC.board; if(!b)return;
  let seats='<div class="seats">'+b.players.map((p,i)=>seatHtml(p,i,b)).join('')+'</div>';
  let specBar=SYNC.spectating?'<div class="lobby-note">👁 Spectating — view only (join in Telegram to play)</div>':'';
  if(b.phase==='lobby'){
-  document.getElementById('syncBoard').innerHTML='<div class="table">'+specBar+'<div class="lobby-note"><b>🎴 Lobby</b> — '+b.players.length+' player(s) seated<br><span class="small">Anyone can tap Start (or send <b>/startgame</b> in Telegram).</span></div>'+seats+'</div>';
+  document.getElementById('syncBoard').innerHTML='<div class="table">'+specBar+'<div class="lobby-note"><b>🎴 Lobby</b> — '+b.players.length+' player(s) seated<br><span class="small">Anyone can tap Start (or send <b>/flip7_start</b> in Telegram).</span></div>'+seats+'</div>';
  } else {
   document.getElementById('syncBoard').innerHTML='<div class="table">'+specBar+'<div class="deckpile"><div class="fcard" title="deck" style="background-position:-44px -138px"></div><div><b>Deck</b> ×<span data-fx-count="f:deck">'+b.deck_count+'</span><br><span class="small">Round '+b.round+' · Dealer '+escapeHtml(b.dealer)+'</span></div></div>'+seats+'</div>';
  }

@@ -554,9 +554,15 @@ Board, card, dice and token art is extracted from Board Game Arena into
 (same Main Mini App, routed by `start_param`). Engine: `rumblenation.py`; tests in
 `tests/rumblenation/test_rumblenation.py`.
 
-## Fadenfroh (2-4 players)
+## Fadenfroh (1-4 players)
 
 BGG: https://boardgamegeek.com/boardgame/475685/fadenfroh
+
+In Fadenfroh, you place fabric cards in your display. You receive victory points for the colors and symbols on the fabric cards in your display. When and for what exactly you receive victory points depends on the scoring cards of the current round.
+
+However, your opponents are competing with you for fabric cards and useful materials. So, every round you have to decide anew: How long can I take materials before someone snatches up the ideal fabric cards?
+
+Whoever has the most victory points at the end of the game wins!
 
 A digital version of *Fadenfroh* (1 More Time Games): five rounds of drafting
 fabric from a market of offers, threads, needles and the thimble. Players trade
@@ -569,7 +575,9 @@ sequentially after the market for simpler bot play.
 
 Fabric, scoring, starting-card, material and token art is extracted from Board
 Game Arena into `assets/fadenfroh/images/fadenfroh-*.webp` (raw sheets also kept in
-`sources/fadenfroh/bga/`). Text commands: `/fadenfroh`,
+`sources/fadenfroh/bga/`). The official rulebook and scoring card overview are
+stored in `assets/fadenfroh/rulebook.pdf` and
+`assets/fadenfroh/scoring-overview.pdf`. Text commands: `/fadenfroh`,
 `/fadenfroh_join`, `/fadenfroh_join_npc`, `/fadenfroh_start`,
 `/fadenfroh_material <thread|needle|thimble>`, `/fadenfroh_pass <offer>`,
 `/fadenfroh_keep <1-3>`, `/fadenfroh_place <card> <row> <left|right> <1|2> [needle]`,

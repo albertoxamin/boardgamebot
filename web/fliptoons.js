@@ -206,23 +206,24 @@ function ftArt(c){
  function ftZoomClose(){let z=document.getElementById('ftZoom');if(z){z.classList.remove('open');z.innerHTML='';}}
 // FB-0097 + FB-0099: the official double-sided reference card (from the TTS
 // mod), consultable throughout the whole game. One side is ICONS (what the
-// ability icons mean), the other is HOW TO PLAY (the turn structure). Tap
-// the card to flip it, tap outside to dismiss.
-function ftRefIcons(){
+// ability icons mean), the other is HOW TO PLAY (the turn structure).
+// FB-0103 + FB-0104: Annalisa wants each side on its own button — pressing
+// Icons shows only the icons card, and the HOW TO PLAY card opens from its
+// own "HOW TO PLAY - reference card" button. No more tap-to-flip: each
+// button opens exactly the card it names, tap outside to dismiss.
+function ftRefCard(which){
   let z=document.getElementById('ftZoom');
-  let sides=[
-    {src:'/fliptoons/fl-reference-icons.webp',alt:'Icons reference card',cap:'📇 ICONS — what the ability icons on the cards mean.'},
-    {src:'/fliptoons/fl-reference-howto.webp',alt:'How to play reference card',cap:'📇 HOW TO PLAY — Flip, Check Fame, Market, Cleanup.'}
-  ];
-  let i=0;
-  function show(){
-    z.innerHTML='<div class="ftzcard"><img src="'+sides[i].src+'" alt="'+sides[i].alt+'" style="width:100%;border-radius:6px;display:block"></div>'+
-     '<div class="ftzdesc">'+sides[i].cap+' Tap the card to see the other side, tap outside to dismiss.</div>';
-    z.querySelector('img').addEventListener('click',ev=>{ev.stopPropagation();i=1-i;show();});
-  }
-  show();
+  let sides={
+    icons:{src:'/fliptoons/fl-reference-icons.webp',alt:'Icons reference card',cap:'📇 ICONS — what the ability icons on the cards mean.'},
+    howto:{src:'/fliptoons/fl-reference-howto.webp',alt:'How to play reference card',cap:'📇 HOW TO PLAY — Flip, Check Fame, Market, Cleanup.'}
+  };
+  let s=sides[which]||sides.icons;
+  z.innerHTML='<div class="ftzcard"><img src="'+s.src+'" alt="'+s.alt+'" style="width:100%;border-radius:6px;display:block"></div>'+
+   '<div class="ftzdesc">'+s.cap+' Tap outside to dismiss.</div>';
   z.classList.add('open');
 }
+function ftRefIcons(){ftRefCard('icons');}
+function ftRefHowTo(){ftRefCard('howto');}
 function ftRender(){
  let b=FLP.board; if(!b)return;
  let old=FLP.prevAll,oldCounts=old&&old.counts||{};
@@ -300,5 +301,6 @@ document.getElementById('ftHowTo').addEventListener('click', () => {
 document.getElementById('ftSkip').addEventListener('click',()=>ftMove('skip'));
 document.getElementById('ftZoom').addEventListener('click',ftZoomClose);
 document.getElementById('ftRefIcons').addEventListener('click',ftRefIcons);
+document.getElementById('ftRefHowTo').addEventListener('click',ftRefHowTo);
 document.getElementById('ftRematch').addEventListener('click',()=>ftMove('rematch'));
 if(!document.getElementById('fliptoons').classList.contains('hidden')) ftLoad();

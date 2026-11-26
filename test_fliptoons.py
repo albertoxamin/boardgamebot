@@ -536,10 +536,11 @@ def test_reference_icons_card():
     assert "hidden" not in line
 
 
-def test_reference_card_both_sides():
-    # FB-0099: Annalisa clarified the reference card is double-sided — the
-    # TTS mod deck12 has ICONS on the back and HOW TO PLAY on the face — so
-    # the overlay must show both sides and let the player flip between them.
+def test_reference_cards_are_two_buttons():
+    # FB-0103 + FB-0104: Annalisa wants one button per side — pressing Icons
+    # shows only the icons card, and the second card opens from its own
+    # "HOW TO PLAY - reference card" button. No more tap-to-flip: each
+    # button opens exactly the card it names.
     import os as _os
 
     base = _os.path.dirname(__file__) + "/web/fliptoons/"
@@ -551,9 +552,17 @@ def test_reference_card_both_sides():
     js = open(_os.path.dirname(__file__) + "/web/fliptoons.js").read()
     assert "fl-reference-howto.webp" in js
     assert "fl-reference-icons.webp" in js
-    # Tapping the card flips to the other side instead of dismissing it.
-    assert "stopPropagation" in js
-    assert "Tap the card to see the other side" in js
+    assert "ftRefHowTo" in js
+    # Each button opens its own card, and nothing flips between them.
+    assert "Tap the card to see the other side" not in js
+    html = open(_os.path.dirname(__file__) + "/web/flip7.html").read()
+    assert 'id="ftRefHowTo"' in html
+    assert "HOW TO PLAY - reference card" in html
+    # Both buttons always visible (no "hidden" class): consultable in
+    # lobby, game and end.
+    for bid in ('id="ftRefIcons"', 'id="ftRefHowTo"'):
+        line = [l for l in html.splitlines() if bid in l][0]
+        assert "hidden" not in line
 
 
 if __name__ == "__main__":

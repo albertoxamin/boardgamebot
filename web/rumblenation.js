@@ -73,9 +73,12 @@ function rnSprite(sheet, pos, w, h, sheetW, sheetH) {
 }
 function rnCard(c) {
   const pos = RN_TACTIC_POS[c.id] || [2, 722];
-  return '<button type="button" class="rncard btn' + (c.used_by !== null ? ' rnused' : '') +
+  return '<div class="rncardwrap"><button type="button" class="rncard btn' +
+    (c.used_by !== null ? ' rnused' : '') + (RNG.card === c.id ? ' rnselected' : '') +
     '" data-card="' + c.id + '" style="' + rnSprite('card', pos, 64, 87, 1350, 998) +
-    '" title="' + escapeHtml(c.name + ': ' + c.text) + '"></button>';
+    '" title="' + escapeHtml(c.name + ': ' + c.text) + '"></button>' +
+    '<div class="rncardcap"><b>' + escapeHtml(c.name) + '</b><br>' +
+    escapeHtml(c.text) + '</div></div>';
 }
 function rnRegion(r, g) {
   const castle = r.castle;

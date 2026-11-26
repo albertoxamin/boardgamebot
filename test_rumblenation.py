@@ -238,6 +238,25 @@ class ViewTests(unittest.TestCase):
                 dist = ((a["x"] - b["x"]) ** 2 + (a["y"] - b["y"]) ** 2) ** 0.5
                 self.assertGreaterEqual(dist, 10, (a["name"], b["name"]))
 
+    def test_card_description_under_card_and_zoom(self):
+        # FB-0062: each tactic card shows its name + description underneath,
+        # and hovering (or tapping, which selects it) zooms the card.
+        js = open(os.path.dirname(__file__) + "/web/rumblenation.js").read()
+        self.assertIn("rncardcap", js)
+        self.assertIn("c.name", js)
+        self.assertIn("c.text", js)
+        self.assertIn("rnselected", js)
+        css = open(os.path.dirname(__file__) + "/web/flip7.html").read()
+        m = re.search(r"\.rncardwrap\{([^}]+)\}", css)
+        self.assertIsNotNone(m)
+        m = re.search(r"\.rncardcap\{([^}]+)\}", css)
+        self.assertIsNotNone(m)
+        zoom = re.search(
+            r"\.rncard:hover[^{]*\{[^}]*transform:scale\(([\d.]+)\)", css)
+        self.assertIsNotNone(zoom)
+        self.assertGreaterEqual(float(zoom.group(1)), 1.5)
+        self.assertIn(".rncard.rnselected", css)
+
     def test_castle_token_sprites_match_their_numbers(self):
         # FB-0061: castle 7 and 11 were swapped in web/rumblenation.js, so
         # the token face did not match the castle value in the rules.

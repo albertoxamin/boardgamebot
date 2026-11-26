@@ -86,7 +86,9 @@ function azSourceLabel(source, index) {
 }
 // Printed board geometry (playerboard1.webp is 740x484). Cell rects measured
 // from the board art: pattern lines and wall share 5 rows, the wall sits
-// right of the gold arrows, the floor line is the 7 arched slots below.
+// right of the gold arrows, the floor line is the 7 arched slots below
+// (interiors y 400-480 — the old 345-425 band floated tiles above the
+// arches, over the penalty numbers).
 // Tiles are placed over the printed slots, like BGA does, so they land
 // exactly on the art instead of floating over a darkened backdrop.
 const AZ_BW = 740, AZ_BH = 484;
@@ -94,16 +96,25 @@ const AZ_COLS = [8, 77, 146, 215, 284, 353];
 const AZ_WALL_X = [387, 456, 525, 593, 661, 731];
 const AZ_ROWS = [5, 76, 143, 213, 282, 351];
 const AZ_FLOOR_X = [8, 61, 114, 167, 220, 273, 326, 379];
-const AZ_FLOOR_Y = [345, 425];
-function azPos(x0, y0, x1, y1, tile) {
+const AZ_FLOOR_Y = [400, 480];
+function azPos(x0, y0, x1, y1, tile, extraCls) {
   const left = ((x0 + 3) / AZ_BW * 100).toFixed(2);
   const top = ((y0 + 3) / AZ_BH * 100).toFixed(2);
   const w = ((x1 - x0 - 6) / AZ_BW * 100).toFixed(2);
   const h = ((y1 - y0 - 6) / AZ_BH * 100).toFixed(2);
-  return '<span class="azpos" style="left:' + left + '%;top:' + top +
+  return '<span class="azpos' + (extraCls ? ' ' + extraCls : '') + '" style="left:' + left + '%;top:' + top +
          '%;width:' + w + '%;height:' + h + '%">' + azTile(tile) + '</span>';
 }
-function azPlayer(p, b) {
+function azZone(x0, y0, x1, y1, row, label) {
+  const left = (x0 / AZ_BW * 100).toFixed(2);
+  const top = (y0 / AZ_BH * 100).toFixed(2);
+  const w = ((x1 - x0) / AZ_BW * 100).toFixed(2);
+  const h = ((y1 - y0) / AZ_BH * 100).toFixed(2);
+  return '<span class="azzone" data-az-row="' + row + '" title="' + escapeHtml(label || '') +
+         '" style="left:' + left + '%;top:' + top + '%;width:' + w + '%;height:' + h + '%">' +
+         (label ? '<span class="azzonelabel">' + escapeHtml(label) + '</span>' : '') + '</span>';
+}
+function azPlayer(p, b, idx) {
   let tiles = '';
   // Pattern lines: tiles fill each row from the right, against the wall.
   p.pattern.forEach((line, i) => {
@@ -124,6 +135,31 @@ function azPlayer(p, b) {
     const y0 = AZ_FLOOR_Y[0] + (AZ_FLOOR_Y[1] - AZ_FLOOR_Y[0] - side) / 2 - 3;
     tiles += azPos(x0, y0, x1, y0 + side + 6, t);
   });
+  // Tap-to-place: when this player has just picked tiles, the legal
+  // pattern lines and the floor line become tappable on their own
+  // board, with ghost tiles showing exactly where the pick would land
+  // — no Line/Floor buttons. Other players' boards stay view-only.
+  const placing = b.can_act && b.pending && idx === b.current &&
+    p.user_id === AZ.user_id;
+  if (placing) {
+    const pend = b.pending;
+    const rows = pend.rows || [];
+    rows.forEach(r => {
+      const line = p.pattern[r];
+      const free = (r + 1) - line.length;
+      const ghosts = Math.max(0, Math.min(pend.tiles.length, free));
+      for (let k = 0; k < ghosts; k++) {
+        const c = 4 - line.length - k;
+        tiles += azPos(AZ_COLS[c], AZ_ROWS[r], AZ_COLS[c + 1], AZ_ROWS[r + 1],
+                       pend.color, 'azghost');
+      }
+      tiles += azZone(AZ_COLS[0], AZ_ROWS[r], AZ_COLS[5], AZ_ROWS[r + 1], r,
+                      'Line ' + (r + 1));
+    });
+    tiles += azZone(AZ_FLOOR_X[0], AZ_FLOOR_Y[0],
+                    AZ_FLOOR_X[AZ_FLOOR_X.length - 1] + 53, AZ_FLOOR_Y[1], -1,
+                    '🧹 Floor');
+  }
   return '<div class="azplayer' + (p.is_current ? ' azcurrent' : '') + '">' +
     '<div class="azhead"><span>' + escapeHtml(p.name) + (p.npc ? ' 🤖' : '') +
     (p.winner ? ' 🏆' : '') + '</span><span class="azscore">' + p.score + ' pts</span></div>' +
@@ -158,7 +194,7 @@ function azRender() {
     ' · first: ' + escapeHtml(b.players[b.first_player] ? b.players[b.first_player].name : '?');
   if (b.phase === 'game_end') {
     turn.textContent = head + ' · 🏆 ' + (b.winners || []).map(i => escapeHtml(b.players[i].name)).join(' & ');
-    board.innerHTML = b.players.map(p => azPlayer(p, b)).join('');
+    board.innerHTML = b.players.map((p, i) => azPlayer(p, b, i)).join('');
     rematch.classList.remove('hidden');
     return;
   }
@@ -185,18 +221,18 @@ function azRender() {
     (centerTiles || '<span class="small">empty</span>') + '</div>';
   board.innerHTML = '<div class="table aztable"><div class="small">FACTORIES</div><div>' + (facs || '<span class="small">empty</span>') +
     '</div><div class="small" style="margin-top:8px">CENTER</div>' + centerHtml + '</div>' +
-    b.players.map(p => azPlayer(p, b)).join('');
+    b.players.map((p, i) => azPlayer(p, b, i)).join('');
   if (b.can_act && b.pending) {
-    const hint = '<div class="small">Picked: ' + b.pending.tiles.map(azTile).join('') +
-      (b.pending.marker ? azTile('first') : '') + ' — choose a line:</div>';
-    opts.innerHTML = hint + b.pending.rows.map(r =>
-      '<button class="azopt" data-az-act="place" data-az-row="' + r + '">Line ' + (r + 1) + '</button>').join('') +
-      '<button class="azopt" data-az-act="place" data-az-row="-1">🧹 Floor</button>';
+    // No Line/Floor buttons: tap a highlighted line (or the floor line)
+    // on your own board — the ghosts show where the tiles land.
+    opts.innerHTML = '<div class="small">Picked: ' + b.pending.tiles.map(azTile).join('') +
+      (b.pending.marker ? azTile('first') : '') +
+      ' — tap a highlighted line on your board, or the floor line.</div>';
   } else if (b.can_act) {
     if (AZ.pick) {
       opts.innerHTML = '<div class="small">Tap a tile in the highlighted ' +
         escapeHtml(azSourceLabel(AZ.pick.source, AZ.pick.index)) +
-        '.</div><button class="azopt" data-az-clear="1">Cancel</button>';
+        ' — or tap it again to cancel.</div>';
     } else {
       opts.innerHTML = '<div class="small">Tap a factory or the center, then tap a tile.</div>';
     }
@@ -211,6 +247,12 @@ function azRender() {
     if (btn && btn.dataset.azAct === 'place') azMove('place', {row: parseInt(btn.dataset.azRow, 10)});
   });
   document.getElementById('azBoard').addEventListener('click', e => {
+    // Tap a highlighted pattern line / floor line on your board to place.
+    const row = e.target.closest('[data-az-row]');
+    if (row) {
+      azMove('place', {row: parseInt(row.dataset.azRow, 10)});
+      return;
+    }
     const tile = e.target.closest('[data-az-color]');
     if (tile) {
       AZ.pick = null;
@@ -223,6 +265,12 @@ function azRender() {
     const source = card.dataset.azSrc;
     const index = parseInt(card.dataset.azIndex, 10);
     if (!azPickColors(AZ.board, source, index).length) return;
+    // Tap the selected factory/center again to cancel the pick.
+    if (AZ.pick && AZ.pick.source === source && AZ.pick.index === index) {
+      AZ.pick = null;
+      azRender();
+      return;
+    }
     AZ.pick = {source: source, index: index};
     azRender();
   });

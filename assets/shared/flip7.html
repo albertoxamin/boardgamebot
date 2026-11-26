@@ -335,6 +335,10 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .azboard{position:relative;width:100%;aspect-ratio:740/484;background:linear-gradient(#0f172a33,#0f172a33),url(/assets/azul/images/azul_assets/img/playerboard1.webp) center/100% 100% no-repeat;border-radius:8px}
 .azpos{position:absolute}
 .azpos .aztile{width:100%;height:100%}
+.azpos.azghost{opacity:.5}
+.azzone{position:absolute;z-index:3;border:2px dashed #f59e0b;background:#f59e0b1f;border-radius:6px;box-sizing:border-box;cursor:pointer;animation:azpulse 1.4s ease-in-out infinite}
+@keyframes azpulse{0%,100%{box-shadow:0 0 0 0 #f59e0b00}50%{box-shadow:0 0 10px 2px #f59e0b66}}
+.azzone .azzonelabel{position:absolute;right:3px;top:2px;font-size:10px;font-weight:800;background:#f59e0b;color:#111;border-radius:999px;padding:0 6px}
 .azhead{display:flex;justify-content:space-between;font-weight:800;margin-bottom:5px}
 .azscore{background:#f59e0b;color:#111;border-radius:999px;padding:1px 9px}
 .azopts{display:flex;flex-wrap:wrap;gap:5px;margin:8px 0}
@@ -857,7 +861,7 @@ window.PXSCROLL={
 <script data-cfasync="false" src="/assets/tornado/scripts/tornado.js?v=3"></script>
 <script data-cfasync="false" src="/assets/artichokes/scripts/artichokes.js?v=14"></script>
 <script data-cfasync="false" src="/assets/fellowship/scripts/fellowship.js?v=6"></script>
-<script data-cfasync="false" src="/assets/azul/scripts/azul.js?v=3"></script>
+<script data-cfasync="false" src="/assets/azul/scripts/azul.js?v=4"></script>
 <script data-cfasync="false" src="/assets/toybattle/scripts/toybattle.js?v=1"></script>
 <script data-cfasync="false" src="/assets/tokaidoduo/scripts/tokaidoduo.js?v=7"></script>
 <script data-cfasync="false" src="/assets/altay/scripts/altay.js?v=8"></script>

@@ -35,24 +35,36 @@ TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN") or os.environ.get("BOT_TOKEN", "")
 API = f"https://api.telegram.org/bot{TOKEN}" if TOKEN else ""
 STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "state.json")
-# HTML5 options (see web/ and README):
-#  FLIP7_WEB_URL      https URL of web/flip7.html -> /web opens it as a Mini App
+# HTML5 options (see assets/ and README):
+#  FLIP7_WEB_URL      https URL of assets/shared/flip7.html -> /web opens it as a Mini App
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 93
+WEB_VER = 94
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
-HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                         "web", "flip7.html")
-JS_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                       "web", "flip7.js")
+# Mini App assets: per-game scripts in assets/<game>/scripts/, per-game
+# images in assets/<game>/images/, shared shell + shared images in
+# assets/shared/. The "games" (Flip 7) spec's script is shared framework
+# too, so it lives in assets/shared/scripts/ with flip7.html.
+ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+HTML_PATH = os.path.join(ASSETS_DIR, "shared", "flip7.html")
 WEB_PORT = int(os.environ.get("FLIP7_WEB_PORT", "8080"))
 HEALTH_PATHS = ("/healthz", "/health")
+
+
+def _game_asset_dir(spec):
+    return "shared" if spec.key == "games" else spec.key
+
+
 GAME_JS_FILES = {
-    route: os.path.join(os.path.dirname(JS_PATH), name)
-    for route, name in GR.WEB_JS_ROUTES.items()
+    f"/assets/{_game_asset_dir(spec)}/scripts/{spec.web_module}.js":
+        os.path.join(ASSETS_DIR, _game_asset_dir(spec), "scripts",
+                     spec.web_module + ".js")
+    for spec in GR.GAME_SPECS
 }
+GAME_JS_FILES["/assets/castlecombo/scripts/castlecombo-faces.js"] = (
+    os.path.join(ASSETS_DIR, "castlecombo", "scripts", "castlecombo-faces.js"))
 STATE_LOCK = threading.Lock()  # polling loop + HTTP API share one state
 _STATE = {"state": None}
 
@@ -118,7 +130,7 @@ def send(chat_id, text, kb=None):
     return r
 
 
-COVERS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", "covers")
+COVERS_DIR = os.path.join(ASSETS_DIR, "shared", "images", "covers")
 COVERS = {"flip7": "flip7.jpg"}
 COVERS.update({spec.key: spec.cover for spec in GR.GAME_SPECS if spec.cover})
 
@@ -8451,14 +8463,14 @@ def start_web_server(state):
             if u.path in GAME_JS_FILES:
                 return self._send(200, open(GAME_JS_FILES[u.path], "rb").read(),
                                   "text/javascript")
-            if u.path == "/castlecombo-faces.js":
-                p = os.path.join(os.path.dirname(JS_PATH), "castlecombo-faces.js")
+            if u.path == "/assets/castlecombo/scripts/castlecombo-faces.js":
+                p = os.path.join(ASSETS_DIR, "castlecombo", "scripts", "castlecombo-faces.js")
                 return self._send(200, open(p, "rb").read(), "text/javascript")
-            if u.path == "/castlecombo-messenger.png":
-                p = os.path.join(os.path.dirname(JS_PATH), "castlecombo-messenger.png")
+            if u.path == "/assets/castlecombo/images/castlecombo-messenger.png":
+                p = os.path.join(ASSETS_DIR, "castlecombo", "images", "castlecombo-messenger.png")
                 return self._send(200, open(p, "rb").read(), "image/png", cache="public, max-age=86400")
-            if u.path.startswith("/cc-icons/") and u.path.endswith((".png", ".woff", ".jpg")):
-                p = os.path.join(os.path.dirname(JS_PATH), "cc-icons",
+            if u.path.startswith("/assets/castlecombo/images/cc-icons/") and u.path.endswith((".png", ".woff", ".jpg")):
+                p = os.path.join(ASSETS_DIR, "castlecombo", "images", "cc-icons",
                                  os.path.basename(u.path))
                 if os.path.exists(p):
                     ctype = ("font/woff" if u.path.endswith(".woff")
@@ -8466,97 +8478,98 @@ def start_web_server(state):
                              else "image/png")
                     return self._send(200, open(p, "rb").read(), ctype, cache="public, max-age=86400")
                 return self._send(404, {"ok": False})
-            if u.path in ("/spots-dogs.webp", "/spots-dogs-scored.webp"):
-                p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
+            if u.path in ("/assets/spots/images/spots-dogs.webp",
+                          "/assets/spots/images/spots-dogs-scored.webp"):
+                p = os.path.join(ASSETS_DIR, "spots", "images", os.path.basename(u.path))
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
-            if u.path == "/treat.png":
-                p = os.path.join(os.path.dirname(JS_PATH), "treat.png")
+            if u.path == "/assets/spots/images/treat.png":
+                p = os.path.join(ASSETS_DIR, "spots", "images", "treat.png")
                 return self._send(200, open(p, "rb").read(), "image/png", cache="public, max-age=86400")
-            if u.path == "/spots-dice.png":
-                p = os.path.join(os.path.dirname(JS_PATH), "spots-dice.png")
+            if u.path == "/assets/spots/images/spots-dice.png":
+                p = os.path.join(ASSETS_DIR, "spots", "images", "spots-dice.png")
                 return self._send(200, open(p, "rb").read(), "image/png", cache="public, max-age=86400")
-            if u.path.startswith("/spots-dice/") and u.path.endswith(".png"):
-                p = os.path.join(os.path.dirname(JS_PATH), "spots_dice", os.path.basename(u.path))
+            if u.path.startswith("/assets/spots/images/spots_dice/") and u.path.endswith(".png"):
+                p = os.path.join(ASSETS_DIR, "spots", "images", "spots_dice", os.path.basename(u.path))
                 if os.path.exists(p):
                     return self._send(200, open(p, "rb").read(), "image/png", cache="public, max-age=86400")
                 return self._send(404, {"ok": False})
-            if u.path == "/spots-yards.webp":
-                p = os.path.join(os.path.dirname(JS_PATH), "spots-yards.webp")
+            if u.path == "/assets/spots/images/spots-yards.webp":
+                p = os.path.join(ASSETS_DIR, "spots", "images", "spots-yards.webp")
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
-            if u.path.startswith("/spots-tiles/") and u.path.endswith(".jpg"):
-                p = os.path.join(os.path.dirname(JS_PATH), "spots_tiles", os.path.basename(u.path))
+            if u.path.startswith("/assets/spots/images/spots_tiles/") and u.path.endswith(".jpg"):
+                p = os.path.join(ASSETS_DIR, "spots", "images", "spots_tiles", os.path.basename(u.path))
                 if os.path.exists(p):
                     return self._send(200, open(p, "rb").read(), "image/jpeg", cache="no-store")
                 return self._send(404, {"ok": False})
-            if u.path.startswith("/lsd-cards/") and u.path.endswith(".jpg"):
-                p = os.path.join(os.path.dirname(JS_PATH), "lsd_cards", os.path.basename(u.path))
+            if u.path.startswith("/assets/lsd/images/lsd_cards/") and u.path.endswith(".jpg"):
+                p = os.path.join(ASSETS_DIR, "lsd", "images", "lsd_cards", os.path.basename(u.path))
                 if os.path.exists(p):
                     return self._send(200, open(p, "rb").read(), "image/jpeg", cache="public, max-age=86400")
                 return self._send(404, {"ok": False})
-            if u.path == "/flip7-cards.webp":
-                p = os.path.join(os.path.dirname(JS_PATH), "flip7-cards.webp")
+            if u.path == "/assets/flip7/images/flip7-cards.webp":
+                p = os.path.join(ASSETS_DIR, "flip7", "images", "flip7-cards.webp")
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
-            if u.path == "/regicide-cards.webp":
-                p = os.path.join(os.path.dirname(JS_PATH), "regicide-cards.webp")
+            if u.path == "/assets/regicide/images/regicide-cards.webp":
+                p = os.path.join(ASSETS_DIR, "regicide", "images", "regicide-cards.webp")
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
-            if u.path == "/odin-cards.webp":
-                p = os.path.join(os.path.dirname(JS_PATH), "odin-cards.webp")
+            if u.path == "/assets/odin/images/odin-cards.webp":
+                p = os.path.join(ASSETS_DIR, "odin", "images", "odin-cards.webp")
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
-            if u.path == "/13leaves.png":
-                p = os.path.join(os.path.dirname(JS_PATH), "13leaves.png")
+            if u.path == "/assets/leaves/images/13leaves.png":
+                p = os.path.join(ASSETS_DIR, "leaves", "images", "13leaves.png")
                 return self._send(200, open(p, "rb").read(), "image/png", cache="public, max-age=86400")
-            if u.path.startswith("/fliptoons/") and u.path.endswith(".webp"):
-                p = os.path.join(os.path.dirname(JS_PATH), "fliptoons", os.path.basename(u.path))
+            if u.path.startswith("/assets/fliptoons/images/fliptoons/") and u.path.endswith(".webp"):
+                p = os.path.join(ASSETS_DIR, "fliptoons", "images", "fliptoons", os.path.basename(u.path))
                 if os.path.exists(p):
                     return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
                 return self._send(404, {"ok": False})
-            if u.path == "/castlecombo-cards.webp":
-                p = os.path.join(os.path.dirname(JS_PATH), "castlecombo-cards.webp")
+            if u.path == "/assets/castlecombo/images/castlecombo-cards.webp":
+                p = os.path.join(ASSETS_DIR, "castlecombo", "images", "castlecombo-cards.webp")
                 return self._send(200, open(p, "rb").read(), "image/webp", cache="public, max-age=86400")
-            if u.path in ("/toybattle-board.webp", "/toybattle-tiles.webp", "/toybattle-medals.webp",
-                  "/tokaidoduo-board.webp", "/tokaidoduo-icons.webp",
-                  "/tokaidoduo-meeples.webp", "/tokaidoduo-dice.webp",
-                  "/tokaidoduo-pboards.webp", "/tokaidoduo-bg.webp",
-                  "/tokaidoduo-hotspring.webp", "/tokaidoduo-waves.webp",
-                  "/tokaidoduo-commerce.webp", "/tokaidoduo-paintings.webp",
-                  "/tokaidoduo-pieces.webp", "/tokaidoduo-marchandise.webp",
-                  "/altay-board.webp", "/altay-actions.webp",
-                  "/altay-achievements.webp", "/altay-markers.webp",
-                   "/altay-tokens.webp", "/altay-seafarers-actions.webp",
-                   "/altay-seafarers-achievements.webp", "/altay-seafarers-tokens.webp",
-                   "/altay-seafarers-ships.webp",
-                   "/blackflag-cards.webp", "/blackflag-ships.webp",
-                   "/blackflag-board.webp", "/blackflag-cardback.webp",
-                    "/rumblenation-board.webp", "/rumblenation-cards.webp",
-                    "/rumblenation-dice.webp", "/rumblenation-tokens.webp",
-                    "/fadenfroh-fabric.webp", "/fadenfroh-starting.webp",
-                    "/fadenfroh-scoring.webp", "/fadenfroh-threads.webp",
-                    "/fadenfroh-needle.webp", "/fadenfroh-thimble.webp",
-                    "/fadenfroh-round.webp", "/fadenfroh-marker.webp"):
-                p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
+            if u.path in ("/assets/toybattle/images/toybattle-board.webp", "/assets/toybattle/images/toybattle-tiles.webp", "/assets/toybattle/images/toybattle-medals.webp",
+                  "/assets/tokaidoduo/images/tokaidoduo-board.webp", "/assets/tokaidoduo/images/tokaidoduo-icons.webp",
+                  "/assets/tokaidoduo/images/tokaidoduo-meeples.webp", "/assets/tokaidoduo/images/tokaidoduo-dice.webp",
+                  "/assets/tokaidoduo/images/tokaidoduo-pboards.webp", "/assets/tokaidoduo/images/tokaidoduo-bg.webp",
+                  "/assets/tokaidoduo/images/tokaidoduo-hotspring.webp", "/assets/tokaidoduo/images/tokaidoduo-waves.webp",
+                  "/assets/tokaidoduo/images/tokaidoduo-commerce.webp", "/assets/tokaidoduo/images/tokaidoduo-paintings.webp",
+                  "/assets/tokaidoduo/images/tokaidoduo-pieces.webp", "/assets/tokaidoduo/images/tokaidoduo-marchandise.webp",
+                  "/assets/altay/images/altay-board.webp", "/assets/altay/images/altay-actions.webp",
+                  "/assets/altay/images/altay-achievements.webp", "/assets/altay/images/altay-markers.webp",
+                   "/assets/altay/images/altay-tokens.webp", "/assets/altay/images/altay-seafarers-actions.webp",
+                   "/assets/altay/images/altay-seafarers-achievements.webp", "/assets/altay/images/altay-seafarers-tokens.webp",
+                   "/assets/altay/images/altay-seafarers-ships.webp",
+                   "/assets/blackflag/images/blackflag-cards.webp", "/assets/blackflag/images/blackflag-ships.webp",
+                   "/assets/blackflag/images/blackflag-board.webp", "/assets/blackflag/images/blackflag-cardback.webp",
+                    "/assets/rumblenation/images/rumblenation-board.webp", "/assets/rumblenation/images/rumblenation-cards.webp",
+                    "/assets/rumblenation/images/rumblenation-dice.webp", "/assets/rumblenation/images/rumblenation-tokens.webp",
+                    "/assets/fadenfroh/images/fadenfroh-fabric.webp", "/assets/fadenfroh/images/fadenfroh-starting.webp",
+                    "/assets/fadenfroh/images/fadenfroh-scoring.webp", "/assets/fadenfroh/images/fadenfroh-threads.webp",
+                    "/assets/fadenfroh/images/fadenfroh-needle.webp", "/assets/fadenfroh/images/fadenfroh-thimble.webp",
+                    "/assets/fadenfroh/images/fadenfroh-round.webp", "/assets/fadenfroh/images/fadenfroh-marker.webp"):
+                p = os.path.join(ASSETS_DIR, u.path.lstrip("/").removeprefix("assets/"))
                 if os.path.exists(p):
                     return self._send(200, open(p, "rb").read(), "image/webp",
                                       cache="public, max-age=86400")
                 return self._send(404, {"ok": False})
-            if u.path.startswith("/tornado_cards/") and u.path.endswith((".png", ".jpg", ".jpeg")):
+            if u.path.startswith("/assets/tornado/images/tornado_cards/") and u.path.endswith((".png", ".jpg", ".jpeg")):
                 _name = os.path.basename(u.path)
                 _ext = os.path.splitext(_name)[1].lower()
                 _ctype = "image/jpeg" if _ext in (".jpg", ".jpeg") else "image/png"
-                p = os.path.join(os.path.dirname(JS_PATH), "tornado_cards", _name)
+                p = os.path.join(ASSETS_DIR, "tornado", "images", "tornado_cards", _name)
                 if os.path.exists(p):
                     return self._send(200, open(p, "rb").read(), _ctype, cache="public, max-age=86400")
                 return self._send(404, {"ok": False})
-            if u.path.startswith("/artichokes_cards/") and u.path.endswith((".jpg", ".jpeg")):
+            if u.path.startswith("/assets/artichokes/images/artichokes_cards/") and u.path.endswith((".jpg", ".jpeg")):
                 _name = os.path.basename(u.path)
                 _num = os.path.splitext(_name)[0]
                 if _num.isdigit() and 0 <= int(_num) <= 16:
-                    p = os.path.join(os.path.dirname(JS_PATH), "artichokes_cards", _name)
+                    p = os.path.join(ASSETS_DIR, "artichokes", "images", "artichokes_cards", _name)
                     if os.path.exists(p):
                         return self._send(200, open(p, "rb").read(), "image/jpeg",
                                           cache="public, max-age=86400")
                 return self._send(404, {"ok": False})
-            if u.path.startswith("/cards/") and u.path.endswith(".svg"):
-                p = os.path.join(os.path.dirname(JS_PATH), u.path.lstrip("/"))
+            if u.path.startswith("/assets/shared/images/cards/") and u.path.endswith(".svg"):
+                p = os.path.join(ASSETS_DIR, u.path.lstrip("/").removeprefix("assets/"))
                 if os.path.exists(p):
                     return self._send(200, open(p, "rb").read(), "image/svg+xml",
                                       cache="public, max-age=86400")

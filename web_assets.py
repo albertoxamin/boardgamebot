@@ -5,8 +5,11 @@ import re
 from functools import lru_cache
 from urllib.parse import unquote, urlparse
 
-WEB_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "web")
-HTML_PATH = os.path.join(WEB_DIR, "flip7.html")
+# Mini App assets live under assets/: per-game scripts in
+# assets/<game>/scripts/, per-game images in assets/<game>/images/,
+# shared shell + shared images in assets/shared/.
+ASSETS_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "assets")
+HTML_PATH = os.path.join(ASSETS_DIR, "shared", "flip7.html")
 ASSET_EXTENSIONS = (
     ".js", ".css", ".png", ".jpg", ".jpeg", ".webp", ".svg", ".woff", ".woff2",
 )
@@ -22,13 +25,15 @@ def _clean(value):
     if "+" in value or "${" in value or "<" in value:
         return ""
     path = unquote(urlparse(value).path).lstrip("/")
+    if path.startswith("assets/"):
+        path = path[len("assets/"):]
     if not path.lower().endswith(ASSET_EXTENSIONS):
         return ""
-    if "/" not in path and not os.path.isfile(os.path.join(WEB_DIR, path)):
-        matches = glob.glob(os.path.join(WEB_DIR, "**", os.path.basename(path)), recursive=True)
+    if "/" not in path and not os.path.isfile(os.path.join(ASSETS_DIR, path)):
+        matches = glob.glob(os.path.join(ASSETS_DIR, "**", os.path.basename(path)), recursive=True)
         files = [match for match in matches if os.path.isfile(match)]
         if len(files) == 1:
-            return os.path.relpath(files[0], WEB_DIR)
+            return os.path.relpath(files[0], ASSETS_DIR)
     return path
 
 
@@ -36,9 +41,10 @@ def _clean(value):
 def referenced_assets():
     found = set()
     sources = [HTML_PATH]
-    for name in os.listdir(WEB_DIR):
-        if name.endswith((".js", ".css")):
-            sources.append(os.path.join(WEB_DIR, name))
+    for root, _dirs, files in os.walk(ASSETS_DIR):
+        for name in files:
+            if name.endswith((".js", ".css")):
+                sources.append(os.path.join(root, name))
     for path in sources:
         try:
             with open(path, encoding="utf-8", errors="ignore") as handle:
@@ -73,9 +79,9 @@ def resolve(path):
     asset = _clean(path)
     if not asset or asset not in referenced_assets():
         return None
-    full = os.path.normpath(os.path.join(WEB_DIR, asset))
+    full = os.path.normpath(os.path.join(ASSETS_DIR, asset))
     try:
-        if os.path.commonpath((WEB_DIR, full)) != WEB_DIR:
+        if os.path.commonpath((ASSETS_DIR, full)) != ASSETS_DIR:
             return None
     except ValueError:
         return None

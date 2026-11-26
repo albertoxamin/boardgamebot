@@ -43,9 +43,9 @@ WARE_BAG = (["kimono"] * 5 + ["pottery"] * 6 + ["doll"] * 7 + ["fan"] * 8)
 WARE_EMOJI = {"kimono": "👘", "pottery": "🏺", "doll": "🎎", "fan": "🪭"}
 # WARE_EMOJI is still used in the Telegram chat board (board_lines).
 # The Mini App shows the real BGA commerce tokens instead (FB-0044):
-# spriteJetonCommerce.jpg -> web/tokaidoduo-commerce.webp, 6 panels
+# spriteJetonCommerce.jpg -> assets/tokaidoduo/images/tokaidoduo-commerce.webp, 6 panels
 # (pottery 4/3, fan 3/2, doll 3, kimono 4), picked by tdWare() in
-# web/tokaidoduo.js from the boutique's (ware, price).
+# assets/tokaidoduo/scripts/tokaidoduo.js from the boutique's (ware, price).
 CHARACTERS = ("pilgrim", "merchant", "artist")
 CHAR_EMOJI = {"pilgrim": "⛩️", "merchant": "💰", "artist": "🎨"}
 

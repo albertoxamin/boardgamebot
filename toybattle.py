@@ -25,7 +25,7 @@ TROOP_ABILITIES = {
 }
 
 # Base positions as (top %, left %) of the portrait board art
-# (web/toybattle-board.webp, 600x1000), measured off the art itself:
+# (assets/toybattle/images/toybattle-board.webp, 600x1000), measured off the art itself:
 # stone squares and tower platforms, verified with an overlay render.
 # The old values were measured on a landscape frame and landed up to a
 # full tile off the printed spaces (FB-0090 follow-up / msg 2411).
@@ -61,7 +61,7 @@ REGIONS = {
 }
 
 # Medal spots as (top %, left %, region) of the portrait board art
-# (web/toybattle-board.webp, 600x1000). Same landscape-frame error as
+# (assets/toybattle/images/toybattle-board.webp, 600x1000). Same landscape-frame error as
 # BASES before this fix: the old values put e.g. region-2/6 medals on top
 # of the towers. Spots sit on open grass inside their region's gap.
 MEDAL_SPOTS = {

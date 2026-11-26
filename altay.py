@@ -84,7 +84,7 @@ CARDS = {
                        "text": "Produce 1 wood."},
     "craftsman_stone": {"name": "Craftsman (Stone)", "kind": "produce", "resources": {"stone": 1},
                         "text": "Produce 1 stone."},
-    # Market cards: "sprite" is [col, row] into web/altay-actions.webp
+    # Market cards: "sprite" is [col, row] into assets/altay/images/altay-actions.webp
     # (10 cols x 15 rows). Rows 4-14 hold the BGA action cards, one type
     # per row, cols 1-8 (cols 0 and 9 are card backs); col 4 is used.
     # Every sprite below was checked against the sheet (FB-0018): the old
@@ -97,7 +97,7 @@ CARDS = {
     # (2 shields). Legacy ids stay as aliases so games saved before the
     # rename still load and play.
     # "sea_sprite" is the same card's [col, row] into the Seafarers sheet
-    # web/altay-seafarers-actions.webp (FB-0056): that sheet is 11 cols
+    # assets/altay/images/altay-seafarers-actions.webp (FB-0056): that sheet is 11 cols
     # x 19 rows, NOT 10 x 18 as the Seafarers code assumed — the action
     # rows sit one row lower (rows 5-15 instead of 4-14), the new row 4
     # holds extra starter art, and the sea cards are rows 16-18. The old
@@ -172,7 +172,7 @@ SEA_ACHIEVEMENTS = dict(ACHIEVEMENTS)
 # FB-0056: the Seafarers achievements sheet is 12 cols x 3 rows (same
 # rows as the base sheet, one extra column) — the old coords assumed
 # 4 rows, so Astronomy showed a blank cell and Lighthouse showed the
-# Triumphal Arch. Verified against web/altay-seafarers-achievements.webp:
+# Triumphal Arch. Verified against assets/altay/images/altay-seafarers-achievements.webp:
 # Astronomy (level 1, "Discard 1 card to sail") is at [6, 0] and the
 # new Lighthouse is at [11, 2]; the other achievements sit at their
 # base-sheet positions in both sheets.

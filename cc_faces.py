@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate web/castlecombo-faces.js from the engine's CARDS table.
+"""Generate assets/castlecombo/scripts/castlecombo-faces.js from the engine's CARDS table.
 
 Each card face is a list of segment lines for the ability area and the
 scoring area, in the spirit of BGA's HTML faces (icons + short text):
@@ -224,7 +224,7 @@ def main():
     js = "const CC_FACES=" + json.dumps(faces, ensure_ascii=False,
                                         separators=(",", ":")) + ";\n"
     path = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                        "web", "castlecombo-faces.js")
+                        "assets", "castlecombo", "scripts", "castlecombo-faces.js")
     with open(path, "w") as f:
         f.write(js)
     print("wrote", path, len(js), "bytes,", len(faces), "cards")

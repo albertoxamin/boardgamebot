@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """Generate our own Flip 7-style card images as SVG (no official art copied).
-Run: python3 web/make_cards.py  ->  web/cards/*.svg
+Run: python3 web/make_cards.py  ->  assets/shared/images/cards/*.svg
 Colors are distinct per number so piles are readable at a glance."""
 import os
 
-OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), "cards")
+OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                   "..", "assets", "shared", "images", "cards")
 COLORS = {0: "#64748b", 1: "#ef4444", 2: "#f97316", 3: "#eab308", 4: "#84cc16",
           5: "#22c55e", 6: "#14b8a6", 7: "#06b6d4", 8: "#3b82f6", 9: "#6366f1",
           10: "#8b5cf6", 11: "#d946ef", 12: "#ec4899"}

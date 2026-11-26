@@ -1,4 +1,4 @@
-"""Rebuild web/altay-markers.webp as 3 clean cells (values 1/2/3).
+"""Rebuild assets/altay/images/altay-markers.webp as 3 clean cells (values 1/2/3).
 
 Run from the repo root: python3 sources/altay/build_markers.py
 
@@ -15,7 +15,7 @@ import math
 
 import os
 # original BGA token strip (assorted tokens); this script rebuilds
-# web/altay-markers.webp from it. Run from the repo root.
+# assets/altay/images/altay-markers.webp from it. Run from the repo root.
 SRC = os.path.join('sources', 'altay', 'markers-strip.webp')
 src = Image.open(SRC).convert('RGBA')
 spx = src.load()
@@ -129,8 +129,8 @@ for i, sh in enumerate([s1, s2, s3]):
     w = max(1, int(sh.width * scale))
     sh2 = sh.resize((w, CELL_H), Image.LANCZOS)
     sheet.paste(sh2, (i * CELL_W + (CELL_W - w) // 2, 0), sh2)
-sheet.save('web/altay-markers.webp')
-print('saved web/altay-markers.webp', sheet.size)
+sheet.save('assets/altay/images/altay-markers.webp')
+print('saved assets/altay/images/altay-markers.webp', sheet.size)
 bg = Image.new('RGBA', sheet.size, (15, 23, 42, 255))
 bg.paste(sheet, (0, 0), sheet)
 bg.resize((720, 160), Image.NEAREST).convert('RGB').save('/tmp/markers_sheet_big.png')

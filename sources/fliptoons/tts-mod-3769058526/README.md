@@ -83,7 +83,7 @@ Also: `preview.png` (832×600) — the Workshop thumbnail.
 
 - The Season 1 sheet (`deck4-face.png`) matches the card table already in
   `fliptoons-notes.md` / `fliptoons.py` (ranks 1–25, same names/fame) — the
-  repo's existing `web/fliptoons/fl-toon-cards.webp` was already derived from
+  repo's existing `assets/fliptoons/images/fliptoons/fl-toon-cards.webp` was already derived from
   this sheet; this folder now preserves the full-resolution original.
 - New material vs. what the repo already has: the Season 2 toon sheet
   (25 new toons + Season 2 starters Spider/Grasshopper/Ladybug/Firefly/

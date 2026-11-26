@@ -118,7 +118,7 @@ message is edited in place and flip results are posted as event messages.
 
 ## HTML5 game option (`/web` Mini App button)
 
-`web/flip7.html` + `web/flip7.js` is a dependency-free Flip 7 game with two modes:
+`assets/shared/flip7.html` + `assets/shared/scripts/flip7.js` is a dependency-free Flip 7 game with two modes:
 **Synced (default)** — the bot process itself serves the page + JSON API on
 `:8080` (`GET /api/games`, `GET /api/game?chat_id=`, `POST /api/move`
 Hit/Stay/action/Next/Join) sharing the *same* in-memory state as Telegram
@@ -137,7 +137,7 @@ now also keeps `state.json.bak`).
 **Starting in groups from the Mini App:** open `/web` in the group (Main Mini App
 link, auto-login) → if no game exists there, *Create game in this chat* →
 friends tap *Join* (lobby seats show everyone) → anyone taps *Start game*.
-Card piles use generated SVG images (`web/cards/*.svg`, `web/make_cards.py` —
+Card piles use generated SVG images (`assets/shared/images/cards/*.svg`, `web/make_cards.py` —
 numbers colour-coded 0–12, modifiers, Freeze/Flip Three/Second Chance, deck back). JS is external with `data-cfasync="false"` and no inline
 `onclick` handlers, because Cloudflare Rocket Loader (on `xamin.it`) rewrites
 inline scripts/handlers and breaks them — verified served HTML contains no
@@ -269,7 +269,7 @@ Source reference: `sources/fellowship_of_the_ring_tts_scripted.tts`, a scripted
 Tabletop Simulator mod save (v13.3) downloaded from
 `https://cdn.steamusercontent.com/ugc/16687564503860619417/1E3511BEE3071CC159ABF49A2ECF013D501BDA2F/`.
 The Mini App uses card and character art extracted from that save's sprite
-sheets into `web/fellowship_cards/`; playable card names and character names
+sheets into `assets/fellowship/images/fellowship_cards/`; playable card names and character names
 are taken from the save's card nicknames.
 
 Text commands: `/fotr` (create), `/fotr_join`, `/fotr_join_npc`,
@@ -378,7 +378,7 @@ Text commands: `/altay`, `/altay_join`, `/altay_join_npc`,
 `/altay_develop <id>`, `/altay_trade <give[:count] ...> <receive>`,
 `/altay_end`, `/altay_score`, `/altay_rules`, `/altay_cancel` (creator),
 `/altay_rematch`. Mini App: board button = `?startapp=altay<chat>` (same Main
-Mini App, routed by `start_param`). Engine: `altay.py` + `test_altay.py`.
+Mini App, routed by `start_param`). Engine: `altay.py` + `tests/altay/test_altay.py`.
 
 ## Black Flag! (same bot, 4-8 player naval card game)
 
@@ -396,15 +396,15 @@ Some card and ship abilities are deliberately simplified; this is a
 playable approximation, not a full rules conversion.
 
 Card, Captain, Ship and board art is extracted from the Tabletop Simulator
-component sheets into `web/blackflag-cards.webp`, `web/blackflag-ships.webp`,
-`web/blackflag-board.webp` and `web/blackflag-cardback.webp`. Text commands:
+component sheets into `assets/blackflag/images/blackflag-cards.webp`, `assets/blackflag/images/blackflag-ships.webp`,
+`assets/blackflag/images/blackflag-board.webp` and `assets/blackflag/images/blackflag-cardback.webp`. Text commands:
 `/blackflag`, `/blackflag_join`, `/blackflag_join_npc`, `/blackflag_start`,
 `/blackflag_ship <row|deck>`, `/blackflag_play <card#> [target#]`,
 `/blackflag_defend <card#>`, `/blackflag_pass`, `/blackflag_end`,
 `/blackflag_ability`, `/blackflag_rules`, `/blackflag_cancel` (creator),
 `/blackflag_rematch`. Mini App: board button = `?startapp=blackflag<chat>`
 (same Main Mini App, routed by `start_param`). Engine: `blackflag.py`; tests
-live in `test_wiring.py`.
+live in `tests/test_wiring.py`.
 
 ## Rumble Nation (same bot, 2-player castle battles)
 
@@ -421,8 +421,8 @@ The 11th castle and half the sword chips are removed for 2 players, and only
 3 tactic cards are in play.
 
 Board, card, dice and token art is extracted from Board Game Arena into
-`web/rumblenation-board.webp`, `web/rumblenation-cards.webp`,
-`web/rumblenation-dice.webp` and `web/rumblenation-tokens.webp`. Text commands:
+`assets/rumblenation/images/rumblenation-board.webp`, `assets/rumblenation/images/rumblenation-cards.webp`,
+`assets/rumblenation/images/rumblenation-dice.webp` and `assets/rumblenation/images/rumblenation-tokens.webp`. Text commands:
 `/rumblenation`, `/rumblenation_join`, `/rumblenation_join_npc`,
 `/rumblenation_start`, `/rumblenation_roll`, `/rumblenation_reroll`,
 `/rumblenation_deploy <die> <castle>`, `/rumblenation_tactic <option>`,
@@ -443,7 +443,7 @@ Ties are broken by the higher starting number. The engine resolves embroidery
 sequentially after the market for simpler bot play.
 
 Fabric, scoring, starting-card, material and token art is extracted from Board
-Game Arena into `web/fadenfroh-*.webp` (raw sheets also kept in
+Game Arena into `assets/fadenfroh/images/fadenfroh-*.webp` (raw sheets also kept in
 `sources/fadenfroh/bga/`). Text commands: `/fadenfroh`,
 `/fadenfroh_join`, `/fadenfroh_join_npc`, `/fadenfroh_start`,
 `/fadenfroh_material <thread|needle|thimble>`, `/fadenfroh_pass <offer>`,
@@ -469,61 +469,49 @@ Game Arena into `web/fadenfroh-*.webp` (raw sheets also kept in
 - `fellowship.py` – pure engine: 37-card deck, chapter rosters/goals, setup exchanges, trick play, One Ring.
 - `bot.py` – Telegram polling, inline keyboards, commands, JSON state.
 - `create_bot.py` – BotFather self-creation (MTProto, see above).
-- `test_game.py` – unit tests: `python3 test_game.py`
-- `test_yahtzee.py` – Yahtzee unit tests: `python3 test_yahtzee.py`
-- `test_fliptoons.py` – Fliptoons unit tests: `python3 test_fliptoons.py`
-- `test_tornado.py` – Tornado Splash unit tests: `python3 test_tornado.py`
-- `test_artichokes.py` – Abandon All Artichokes unit tests: `python3 test_artichokes.py`
-- `test_fellowship.py` – Fellowship engine tests: `python3 test_fellowship.py`
-- `test_toybattle.py` – Toy Battle engine tests: `python3 test_toybattle.py`
-- `test_tokaidoduo.py` – Tokaido Duo engine tests: `python3 test_tokaidoduo.py`
-- `test_altay.py` – Altay engine tests: `python3 test_altay.py`
-- `test_wiring.py` – registry, bot wiring and Black Flag engine tests: `python3 test_wiring.py`
-- `test_rumblenation.py` – Rumble Nation engine tests: `python3 test_rumblenation.py`
-- `test_fadenfroh.py` – Fadenfroh engine tests: `python3 test_fadenfroh.py`
-- `web/flip7.html` – standalone HTML5 Flip 7 game (hot-seat, Mini App-ready)
-- `web/yahtzee.js` – Yahtzee Mini App view (synced)
-- `web/fliptoons.js` – Fliptoons Mini App view (synced)
-- `web/tornado.js` – Tornado Splash Mini App view (synced)
-- `web/artichokes.js` – Abandon All Artichokes Mini App view (synced)
-- `web/fellowship.js` – Fellowship Mini App view (synced, viewer-filtered hands)
-- `web/fellowship_cards/` – Fellowship card/character sprite sheets from the TTS save
-- `web/azul.js` – Azul Mini App view (synced)
-- `web/toybattle.js` – Toy Battle Mini App view (synced, viewer-filtered racks)
-- `web/toybattle-board.webp`, `web/toybattle-tiles.webp`, `web/toybattle-medals.webp` – BGA-extracted Toy Battle art
-- `web/tokaidoduo.js` – Tokaido Duo Mini App view (synced, board + seats)
-- `web/tokaidoduo-board.webp` – BGA board art for Tokaido Duo
-- `web/altay.js` – Altay Mini App view (synced, viewer-filtered hands)
-- `web/altay-board.webp`, `web/altay-actions.webp`, `web/altay-achievements.webp`, `web/altay-markers.webp`, `web/altay-tokens.webp` – BGA-extracted Altay art
-- `web/altay-seafarers-*.webp` – BGA Seafarers action/achievement/token/ship art served directly as WEBP
-- `web/blackflag.js` – Black Flag Mini App view (synced, viewer-filtered hands)
-- `web/blackflag-cards.webp`, `web/blackflag-ships.webp`, `web/blackflag-board.webp`, `web/blackflag-cardback.webp` – TTS-extracted Black Flag art
-- `web/rumblenation.js` – Rumble Nation Mini App view (synced, real BGA sprites)
-- `web/rumblenation-board.webp`, `web/rumblenation-cards.webp`, `web/rumblenation-dice.webp`, `web/rumblenation-tokens.webp` – BGA-extracted Rumble Nation art
-- `web/fadenfroh.js` – Fadenfroh Mini App view (synced, viewer-filtered hands and BGA sprites)
-- `web/fadenfroh-*.webp` and `sources/fadenfroh/bga/` – BGA-extracted Fadenfroh fabric, scoring, starting-card and token art
+- `tests/test_game.py` – unit tests: `python3 -m pytest tests/test_game.py`
+- `tests/yahtzee/test_yahtzee.py` – Yahtzee unit tests: `python3 -m pytest tests/yahtzee/test_yahtzee.py`
+- `tests/fliptoons/test_fliptoons.py` – Fliptoons unit tests: `python3 -m pytest tests/fliptoons/test_fliptoons.py`
+- `tests/tornado/test_tornado.py` – Tornado Splash unit tests: `python3 -m pytest tests/tornado/test_tornado.py`
+- `tests/artichokes/test_artichokes.py` – Abandon All Artichokes unit tests: `python3 -m pytest tests/artichokes/test_artichokes.py`
+- `tests/fellowship/test_fellowship.py` – Fellowship engine tests: `python3 -m pytest tests/fellowship/test_fellowship.py`
+- `tests/toybattle/test_toybattle.py` – Toy Battle engine tests: `python3 -m pytest tests/toybattle/test_toybattle.py`
+- `tests/tokaidoduo/test_tokaidoduo.py` – Tokaido Duo engine tests: `python3 -m pytest tests/tokaidoduo/test_tokaidoduo.py`
+- `tests/altay/test_altay.py` – Altay engine tests: `python3 -m pytest tests/altay/test_altay.py`
+- `tests/test_wiring.py` – registry, bot wiring and Black Flag engine tests: `python3 -m pytest tests/test_wiring.py`
+- `tests/rumblenation/test_rumblenation.py` – Rumble Nation engine tests: `python3 -m pytest tests/rumblenation/test_rumblenation.py`
+- `tests/fadenfroh/test_fadenfroh.py` – Fadenfroh engine tests: `python3 -m pytest tests/fadenfroh/test_fadenfroh.py`
+- `assets/shared/flip7.html` – standalone HTML5 Flip 7 game (hot-seat, Mini App-ready)
+- `assets/yahtzee/scripts/yahtzee.js` – Yahtzee Mini App view (synced)
+- `assets/fliptoons/scripts/fliptoons.js` – Fliptoons Mini App view (synced)
+- `assets/tornado/scripts/tornado.js` – Tornado Splash Mini App view (synced)
+- `assets/artichokes/scripts/artichokes.js` – Abandon All Artichokes Mini App view (synced)
+- `assets/fellowship/scripts/fellowship.js` – Fellowship Mini App view (synced, viewer-filtered hands)
+- `assets/fellowship/images/fellowship_cards/` – Fellowship card/character sprite sheets from the TTS save
+- `assets/azul/scripts/azul.js` – Azul Mini App view (synced)
+- `assets/toybattle/scripts/toybattle.js` – Toy Battle Mini App view (synced, viewer-filtered racks)
+- `assets/toybattle/images/toybattle-board.webp`, `assets/toybattle/images/toybattle-tiles.webp`, `assets/toybattle/images/toybattle-medals.webp` – BGA-extracted Toy Battle art
+- `assets/tokaidoduo/scripts/tokaidoduo.js` – Tokaido Duo Mini App view (synced, board + seats)
+- `assets/tokaidoduo/images/tokaidoduo-board.webp` – BGA board art for Tokaido Duo
+- `assets/altay/scripts/altay.js` – Altay Mini App view (synced, viewer-filtered hands)
+- `assets/altay/images/altay-board.webp`, `assets/altay/images/altay-actions.webp`, `assets/altay/images/altay-achievements.webp`, `assets/altay/images/altay-markers.webp`, `assets/altay/images/altay-tokens.webp` – BGA-extracted Altay art
+- `assets/altay/images/altay-seafarers-*.webp` – BGA Seafarers action/achievement/token/ship art served directly as WEBP
+- `assets/blackflag/scripts/blackflag.js` – Black Flag Mini App view (synced, viewer-filtered hands)
+- `assets/blackflag/images/blackflag-cards.webp`, `assets/blackflag/images/blackflag-ships.webp`, `assets/blackflag/images/blackflag-board.webp`, `assets/blackflag/images/blackflag-cardback.webp` – TTS-extracted Black Flag art
+- `assets/rumblenation/scripts/rumblenation.js` – Rumble Nation Mini App view (synced, real BGA sprites)
+- `assets/rumblenation/images/rumblenation-board.webp`, `assets/rumblenation/images/rumblenation-cards.webp`, `assets/rumblenation/images/rumblenation-dice.webp`, `assets/rumblenation/images/rumblenation-tokens.webp` – BGA-extracted Rumble Nation art
+- `assets/fadenfroh/scripts/fadenfroh.js` – Fadenfroh Mini App view (synced, viewer-filtered hands and BGA sprites)
+- `assets/fadenfroh/images/fadenfroh-*.webp` and `sources/fadenfroh/bga/` – BGA-extracted Fadenfroh fabric, scoring, starting-card and token art
 - `sources/tokaidoduo/bga/` – BGA sprite sheets for Tokaido Duo (dice, wares, waves, paintings, boutiques, character boards)
-- `web/artichokes_cards/` – BGA card art (0–9 vegetables, 10–14 Artichokes, 15 Rhubarb, 16 back)
-- `web/covers/*.jpg` – box art shown as the lobby photo for each game
+- `assets/artichokes/images/artichokes_cards/` – BGA card art (0–9 vegetables, 10–14 Artichokes, 15 Rhubarb, 16 back)
+- `assets/shared/images/covers/*.jpg` – box art shown as the lobby photo for each game
 - `web/server.py` – static server for the HTML game (needs HTTPS tunnel for in-Telegram use)
 - `state.json` – created at runtime (per-chat games, decks, scores).
 
 ## Tests
 
 ```bash
-python3 test_game.py        # 8 engine tests
-python3 test_yahtzee.py     # 6 Yahtzee tests
-python3 test_fliptoons.py   # Fliptoons engine/ability tests
-python3 test_tornado.py     # Tornado Splash engine tests
-python3 test_artichokes.py  # Abandon All Artichokes engine tests
-python3 test_fellowship.py  # Fellowship engine tests
-python3 test_azul.py        # Azul engine tests
-python3 test_toybattle.py   # Toy Battle engine tests
-python3 test_tokaidoduo.py  # Tokaido Duo engine tests
-python3 test_altay.py       # Altay engine tests
-python3 test_wiring.py      # registry, bot wiring and Black Flag tests
-python3 test_rumblenation.py # Rumble Nation engine tests
-python3 test_fadenfroh.py    # Fadenfroh engine tests
+python3 -m pytest tests/    # full suite (pytest; tests live in tests/, per game)
 ```
 A full 3-player game was also simulated end-to-end (hits/stays/actions/
 round rotation → a winner at 200+ in 13 rounds) with the Telegram layer

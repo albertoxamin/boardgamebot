@@ -354,7 +354,8 @@ The Garden Stack holds 6 copies of each of the 10 vegetables; when 4+ of the
 same vegetable appear in the row, that kind is reshuffled into the stack and
 the row is refilled. Vegetables let you swap, draw, force discards, reveal
 opponents' hands, and more. You win at the end of your turn only when the
-refill leaves your hand with no Artichokes.
+refill leaves your hand with no Artichokes. The official rulebook is stored
+in `assets/artichokes/rulebook.pdf`.
 Text commands: `/artichokes` (create), `/artichokes_join`,
 `/artichokes_join_npc`, `/artichokes_start`, `/artichokes_harvest <1-5>`,
 `/artichokes_skip`, `/artichokes_play <card id or name>`, `/artichokes_end`,
@@ -430,7 +431,8 @@ troops. Effects: Skully draw 2, Cap'N place 1 extra, Jumbo discard an adjacent
 enemy troop, Hook ignore connection for bases, XB-42 discard a random enemy
 rack troop, Star draw 1, Roxy none. Special bases return one of your troops to
 your rack. Surround a region to permanently claim its medals; capture the
-enemy HQ or reach 7 medals to win. Racks are private.
+enemy HQ or reach 7 medals to win. Racks are private. The official rulebook
+is stored in `assets/toybattle/rulebook.pdf`.
 
 Board/troop/medal art is extracted from the BGA game client and the Castle
 Field layout comes from the BGA tutorial data. Text commands: `/toybattle`
@@ -545,7 +547,8 @@ The 11th castle and half the sword chips are removed for 2 players, and only
 
 Board, card, dice and token art is extracted from Board Game Arena into
 `assets/rumblenation/images/rumblenation-board.webp`, `assets/rumblenation/images/rumblenation-cards.webp`,
-`assets/rumblenation/images/rumblenation-dice.webp` and `assets/rumblenation/images/rumblenation-tokens.webp`. Text commands:
+`assets/rumblenation/images/rumblenation-dice.webp` and `assets/rumblenation/images/rumblenation-tokens.webp`. The official rulebook
+is stored in `assets/rumblenation/rulebook.pdf`. Text commands:
 `/rumblenation`, `/rumblenation_join`, `/rumblenation_join_npc`,
 `/rumblenation_start`, `/rumblenation_roll`, `/rumblenation_reroll`,
 `/rumblenation_deploy <die> <castle>`, `/rumblenation_tactic <option>`,

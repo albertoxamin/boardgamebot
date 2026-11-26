@@ -139,8 +139,12 @@ function azPlayer(p, b, idx) {
   // pattern lines and the floor line become tappable on their own
   // board, with ghost tiles showing exactly where the pick would land
   // — no Line/Floor buttons. Other players' boards stay view-only.
-  const placing = b.can_act && b.pending && idx === b.current &&
-    p.user_id === AZ.user_id;
+  // NB: when the current player is the NPC you play for them (the
+  // server sets can_act), so the zones go on the current player's
+  // board — not only when its user_id is yours. FB-0161: on the NPC's
+  // turn the "tap a highlighted line" hint showed but no line was
+  // highlighted, because the NPC's user_id never matches the viewer.
+  const placing = b.can_act && b.pending && idx === b.current;
   if (placing) {
     const pend = b.pending;
     const rows = pend.rows || [];

@@ -238,7 +238,7 @@ GAME_SPECS = (
                        "/rumblenation_tactic", "/rumblenation_rules", "/rumblenation_cancel",
                        "/rumblenation_rematch"),
         web_label="🎮 Play Rumble Nation (HTML)", callback_prefix="rn",
-        min_players=2, max_players=2, npc_full="⛔ Rumble Nation is 2 players (full).",
+        min_players=2, max_players=4, npc_full="⛔ Rumble Nation is 2-4 players (full).",
         rematch_phases=("game_end",), cover="rumblenation.png",
         module="rumblenation", web_module="rumblenation",
         static_assets=("rumblenation.js", "rumblenation-board.webp", "rumblenation-cards.webp",

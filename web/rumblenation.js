@@ -8,7 +8,14 @@ const RN_TACTIC_POS = {1: [737, 2], 2: [737, 280], 3: [942, 2], 4: [942, 280],
 const RN_CASTLE_POS = {2: [2, 383], 3: [110, 383], 4: [218, 383], 5: [326, 383],
   6: [494, 2], 7: [218, 489], 8: [494, 320], 9: [110, 489], 10: [494, 108],
   11: [2, 489], 12: [494, 214]};
-const RN_SOLDIER_POS = [472, 489, 387, 289, 399, 489];
+const RN_SOLDIER_POS = [399, 489, 387, 289, 387, 200, 472, 489];
+// Player colours, in seat order: red, blue, orange, white. Each pair is the
+// top-left of the small soldier meeple in rumblenation-tokens.webp (104px
+// cells), measured off the sheet: red (399,489), blue (387,289),
+// orange (387,200), white (472,489). FB-0066: the old array had only
+// red/blue and the first entry (472,489) was actually the white meeple,
+// so player 0's icon was white.
+const RN_COLORS = ['red', 'blue', 'orange', 'white'];
 const RN_DIE_POS = {1: [1, 1], 2: [78, 1], 3: [1, 78], 4: [78, 78], 5: [155, 1], 6: [155, 78]};
 
 function rnLog(s) { const e = document.getElementById('rnLog'); if (e) e.textContent += s + '\n'; }
@@ -87,7 +94,7 @@ function rnReserve(g) {
     const pos = [RN_SOLDIER_POS[i * 2], RN_SOLDIER_POS[i * 2 + 1]];
     return '<span class="rnreserve"><span class="rnmeeple" style="' +
       rnSprite('token', pos, 22, 22, 687, 593) + '"></span> <span class="rn' +
-      (i ? 'blue' : 'red') + '">' + escapeHtml(p.name) + '</span>: <b>' + p.stock +
+      RN_COLORS[i] + '">' + escapeHtml(p.name) + '</span>: <b>' + p.stock +
       '</b> soldier' + (p.stock === 1 ? '' : 's') + ' in reserve</span>';
   }).join('') + '</div>';
 }
@@ -97,13 +104,13 @@ function rnRegion(r, g) {
     ? '<span class="rncastle" style="' + rnSprite('token', RN_CASTLE_POS[castle], 44, 43, 687, 593) + '"></span>'
     : '<span class="rncastle rnempty"></span>';
   let troops = '';
-  for (let p = 0; p < 2; p++) {
+  for (let p = 0; p < g.players.length; p++) {
     const n = r.troops[p] + r.reinforce[p];
     if (!n) continue;
     const pos = [RN_SOLDIER_POS[p * 2], RN_SOLDIER_POS[p * 2 + 1]];
     troops += '<span class="rnmeeples" title="' + escapeHtml(g.players[p].name + ': ' + n) + '">' +
       '<span class="rnmeeple" style="' + rnSprite('token', pos, 22, 22, 687, 593) + '"></span>' +
-      '<b class="rncount rn' + (p ? 'blue' : 'red') + '">' + n + '</b></span>';
+      '<b class="rncount rn' + RN_COLORS[p] + '">' + n + '</b></span>';
   }
   return '<div class="rnregion" style="left:' + r.x + '%;top:' + r.y + '%" title="' +
     escapeHtml(r.name + ' (' + r.title + ') · castle ' + (castle || '—')) + '">' +
@@ -124,9 +131,9 @@ function rnRender() {
   [join, start, howto, rematch, roll, reroll].forEach(el => el.classList.add('hidden'));
   actions.innerHTML = '';
   document.getElementById('rnLog').textContent = (g.log || []).join('\n');
-  const names = g.players.map((p, i) => '<span class="rn' + (i ? 'blue' : 'red') + '">' +
+  const names = g.players.map((p, i) => '<span class="rn' + RN_COLORS[i] + '">' +
     escapeHtml(p.name) + '</span> ' + p.score + ' pts · ' + p.stock + ' left · ⚔️' + p.sword).join(' vs ');
-  turn.innerHTML = g.phase === 'lobby' ? '⚔️ Rumble Nation lobby — ' + g.players.length + '/2 · ' + names :
+  turn.innerHTML = g.phase === 'lobby' ? '⚔️ Rumble Nation lobby — ' + g.players.length + '/4 · ' + names :
     g.phase === 'game_end' ? '🏆 ' + (g.winner === null ? 'Draw' :
       escapeHtml((g.players[g.winner] || {}).name || 'Winner')) + ' wins! · ' + names :
     '⚔️ Turn ' + g.turn + ' · ' + names + (g.can_act ? ' · <b>your move</b>' : '');

@@ -40,7 +40,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 74
+WEB_VER = 75
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -4730,7 +4730,7 @@ def toybattle_api_move(state, chat_id, user_id, body):
 
 
 RUMBLENATION_RULES = RN.RULES
-RN_LEN = 2
+RN_LEN = 4
 
 
 def rumblenation_get(state, chat_id):
@@ -4766,7 +4766,7 @@ def rumblenation_keyboard(g):
         if can_add_npc("rumblenation", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "rn:npc"}])
         kb.append([{"text": "▶️ Start game", "callback_data": "rn:start"}])
-        kb.append([{"text": "▶️ How to play", "url": RN_HOW_TO_PLAY_URL}])
+        kb.append([{"text": "🎥 How to play", "url": RN_HOW_TO_PLAY_URL}])
         return kb + (wk or [])
     kb = []
     sel = g.get("sel_card")
@@ -4851,7 +4851,7 @@ def handle_rumblenation(state, msg, cmd, text, uid, name):
         elif any(p["user_id"] == uid for p in g["players"]):
             send(chat_id, "You're already in!")
         elif len(g["players"]) >= RN_LEN:
-            send(chat_id, "⛔ Rumble Nation is 2 players (full).")
+            send(chat_id, "⛔ Rumble Nation is 2-4 players (full).")
         else:
             g["players"].append(RN.new_player(uid, name))
             send(chat_id, f"🙋 <b>{html.escape(name)}</b> joined Rumble Nation.")

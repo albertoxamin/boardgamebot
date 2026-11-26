@@ -24,6 +24,16 @@ def game(dice=None):
     return g, ev
 
 
+def game_n(n, dice=None):
+    """A started game with n players (2-4)."""
+    g = RN.new_game(7, 1, "Alice", rng=FixedRng(dice))
+    for i, name in enumerate(["Bob", "Carol", "Dave"][:n - 1]):
+        g["players"].append(RN.new_player(i + 2, name))
+    ev = []
+    assert RN.start_game(g, ev) is None
+    return g, ev
+
+
 def setup_castles(g, overrides=None):
     mapping = {v: v - 2 for v in RN.CASTLE_VALUES}
     mapping.update(overrides or {})
@@ -51,7 +61,47 @@ class SetupTests(unittest.TestCase):
 
     def test_start_rejects_wrong_player_count(self):
         g = RN.new_game(7, 1, "Alice")
-        self.assertEqual(RN.start_game(g, []), "Rumble Nation needs exactly 2 players")
+        self.assertEqual(RN.start_game(g, []), "Rumble Nation needs 2-4 players")
+        for _ in range(4):
+            g["players"].append(RN.new_player(len(g["players"]) + 1, "Extra"))
+        self.assertEqual(RN.start_game(g, []), "Rumble Nation needs 2-4 players")
+
+    def test_three_and_four_player_starts_deal_more_tactics(self):
+        # FB-0066: the display holds players + 1 tactic cards.
+        g3, _ = game_n(3)
+        self.assertEqual(len(g3["tactics"]), 4)
+        self.assertEqual(len(set(g3["tactics"])), 4)
+        g4, _ = game_n(4)
+        self.assertEqual(len(g4["tactics"]), 5)
+        self.assertEqual(len(set(g4["tactics"])), 5)
+
+    def test_finishing_order_awards_swords_for_three_and_four_players(self):
+        # FB-0066: first out takes the highest sword chip (3, then 2, then 1).
+        g, ev = game_n(3, [1, 1, 1])
+        for idx in range(3):
+            g["players"][idx]["stock"] = 1
+            RN.roll(g, idx)
+            g["dice"] = [1, 1, 1]
+            RN.deploy(g, idx, 1, 2, ev)
+        self.assertEqual([p["sword"] for p in g["players"]], [3, 2, 1])
+        self.assertEqual(g["phase"], "game_end")
+
+        g, ev = game_n(4, [1, 1, 1])
+        for idx in range(4):
+            g["players"][idx]["stock"] = 1
+            RN.roll(g, idx)
+            g["dice"] = [1, 1, 1]
+            RN.deploy(g, idx, 1, 2, ev)
+        self.assertEqual([p["sword"] for p in g["players"]], [4, 3, 2, 1])
+
+    def test_lobby_allows_up_to_four_players(self):
+        # FB-0066: the registry and the bot's lobby cap must allow 2-4.
+        import game_registry as GR
+        spec = next(s for s in GR.GAME_SPECS if s.key == "rumblenation")
+        self.assertEqual((spec.min_players, spec.max_players), (2, 4))
+        self.assertEqual(GR.NPC_MAX["rumblenation"], 4)
+        import bot as BOT
+        self.assertEqual(BOT.RN_LEN, 4)
 
 
 class DeploymentTests(unittest.TestCase):
@@ -141,6 +191,25 @@ class TacticTests(unittest.TestCase):
         self.assertEqual(g["players"][0]["stock"], RN.SOLDIERS - 1)
         self.assertEqual(g["players"][1]["stock"], RN.SOLDIERS + 1)
 
+    def test_rebel_targets_the_chosen_foe_in_three_player_game(self):
+        # FB-0066: in 3-4 player games an enemy-targeting card must let the
+        # player pick which opponent it hits.
+        g, ev = game_n(3)
+        g["tactics"] = [8]
+        g["troops"]["3"]["0"] = 1
+        g["troops"]["3"]["1"] = 1
+        g["troops"]["3"]["2"] = 1
+        opts = RN.tactic_options(g, 0, 8)
+        foes = sorted(int(o["value"].split("|")[3]) for o in opts)
+        self.assertEqual(foes, [1, 2])
+        self.assertTrue(all("vs " in o["label"] for o in opts))
+        vs_carol = next(o for o in opts if o["value"].endswith("|2"))
+        self.assertIsNone(RN.play_tactic(g, 0, vs_carol["value"], ev))
+        self.assertEqual((g["troops"]["3"]["0"], g["troops"]["3"]["1"],
+                          g["troops"]["3"]["2"]), (2, 1, 0))
+        self.assertEqual(g["players"][1]["stock"], RN.SOLDIERS)
+        self.assertEqual(g["players"][2]["stock"], RN.SOLDIERS + 1)
+
     def test_retreat_returns_three_soldiers(self):
         g, ev = game()
         g["tactics"] = [12]
@@ -190,6 +259,29 @@ class WarTests(unittest.TestCase):
         g["troops"]["1"]["0"] = 3
         RN.resolve_war(g, ev)
         self.assertEqual(g["reinforce"]["2"]["0"], 0)
+
+    def test_three_player_war_gives_runner_up_small_token(self):
+        # FB-0066: in 3-4 player games the runner-up takes a small castle
+        # token worth half the value, rounded down.
+        g, ev = game_n(3)
+        g["troops"]["0"]["0"] = 3
+        g["troops"]["0"]["1"] = 2
+        g["troops"]["0"]["2"] = 1
+        RN.resolve_war(g, ev)
+        self.assertEqual(g["players"][0]["castles"], [2])
+        self.assertEqual(g["players"][1]["small_castles"], [2])
+        self.assertEqual(g["players"][0]["score"], 2)
+        self.assertEqual(g["players"][1]["score"], 1)
+        self.assertEqual(g["players"][2]["score"], 0)
+        self.assertEqual(g["winner"], 0)
+
+    def test_three_player_war_places_two_reinforcements(self):
+        # FB-0066: 3-4 player games place 2 reinforcements per adjacent area.
+        g, ev = game_n(3)
+        g["troops"]["0"]["0"] = 3
+        g["troops"]["1"]["0"] = 1  # region 1 is adjacent to region 0
+        RN.resolve_war(g, ev)
+        self.assertEqual(g["reinforce"]["1"]["0"], 2)
 
     def test_empty_areas_are_skipped(self):
         g, ev = game()
@@ -290,7 +382,7 @@ class ViewTests(unittest.TestCase):
         g["chat_type"] = "supergroup"
         kb = BOT.rumblenation_keyboard(g)
         flat = [b for row in kb for b in row]
-        howto = [b for b in flat if b.get("text") == "▶️ How to play"]
+        howto = [b for b in flat if b.get("text") == "🎥 How to play"]
         self.assertEqual(len(howto), 1)
         self.assertEqual(howto[0].get("url"), BOT.RN_HOW_TO_PLAY_URL)
         self.assertIn("youtu.be/l89gewMT6uQ", howto[0]["url"])
@@ -302,7 +394,34 @@ class ViewTests(unittest.TestCase):
         self.assertIn("openLink", js)
         html = open(os.path.dirname(__file__) + "/web/flip7.html").read()
         self.assertIn('id="rnHowTo"', html)
-        self.assertIn("▶️ How to play", html)
+        self.assertIn("🎥 How to play", html)
+
+    def test_mini_app_supports_four_players_and_four_colours(self):
+        # FB-0066: the Mini App lobby allows 4 players, and each seat has
+        # its own meeple colour (red, blue, orange, white).
+        js = open(os.path.dirname(__file__) + "/web/rumblenation.js").read()
+        m = re.search(r"RN_SOLDIER_POS = \[([0-9, ]+)\]", js)
+        self.assertIsNotNone(m)
+        pos = [int(v) for v in m.group(1).split(",")]
+        self.assertEqual(len(pos), 8)  # 4 meeples x 2 coords
+        self.assertEqual(len({tuple(pos[i:i + 2]) for i in range(0, 8, 2)}), 4)
+        m = re.search(r"RN_COLORS = \[([^\]]+)\]", js)
+        self.assertIsNotNone(m)
+        self.assertEqual([c.strip().strip("'\"") for c in m.group(1).split(",")],
+                         ["red", "blue", "orange", "white"])
+        self.assertIn("'/4 · '", js)
+        self.assertNotIn("p < 2", js)
+        self.assertNotIn("'/2 · '", js)
+        css = open(os.path.dirname(__file__) + "/web/flip7.html").read()
+        for colour in ("red", "blue", "orange", "white"):
+            self.assertIn(f".rn{colour}{{", css)
+        g, _ = game_n(4)
+        board = RN.board_json(g, 1)
+        self.assertEqual(len(board["players"]), 4)
+        self.assertEqual([len(r["troops"]) for r in board["regions"].values()],
+                         [4] * 11)
+        self.assertTrue(any("/4" in line for line in
+                            RN.board_lines(RN.new_game(7, 1, "Alice"))))
 
     def test_reserve_row_shows_soldiers_left(self):
         # FB-0067: each player must see how many soldiers they still have

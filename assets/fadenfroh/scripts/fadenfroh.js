@@ -1,4 +1,4 @@
-const FF = {chat_id: null, init: '', board: null, timer: null, me: 0, placeCard: null, placeKey: '', placeMode: 'c1'};
+const FF = {chat_id: null, init: '', board: null, timer: null, me: 0, placeCard: null, placeKey: '', placeMode: 'c1', soloPick: [], soloKey: ''};
 const FF_HOW_TO_PLAY_URL = 'https://www.youtube.com/watch?v=ezMd-IwlTyA';
 
 // FB-0126 (Albert): the Mini App is an interactive board, not a wall of
@@ -124,7 +124,13 @@ function ffTurnStyle() {
     '.ffseg button.on{background:#f59e0b;border-color:#f59e0b;color:#111}' +
     '.ffseg button:disabled{opacity:.35;cursor:default}' +
     '.ffgoal.fftap{cursor:pointer;border-color:#f59e0b;box-shadow:0 0 0 2px #f59e0b55}' +
-    '.ffgoal.ffoff{opacity:.45}';
+    '.ffgoal.ffoff{opacity:.45}' +
+    // FB-0127: solo passing picks 1-2 adjacent market cards — the
+    // picked cards get an amber outline, one ✓ pill confirms the take.
+    '.ffsolo-pick{display:inline-flex;border-radius:3px;cursor:pointer}' +
+    '.ffsolo-pick.on{outline:2px solid #f59e0b;outline-offset:1px;box-shadow:0 0 0 2px #f59e0b55}' +
+    '.fftake{display:inline-block;margin-top:6px;background:#f59e0b;color:#111;' +
+    'border-radius:999px;padding:7px 14px;font-size:13px;font-weight:900;cursor:pointer}';
   if (document.head) document.head.appendChild(s);
 }
 function ffIsMyTurn(g) {
@@ -333,8 +339,11 @@ function ffRender() {
   const turnSuffix = myTurn ? ' · <b>your move</b>' : npcTurn ? ' · <b>NPC\'s turn</b>' :
     actorP ? ' · <b>' + escapeHtml(actorP.name) + '\'s turn</b>' : '';
   turn.innerHTML = specBar + ffTurnBanner(g) + (g.phase === 'lobby' ? '🪡 Fadenfroh lobby — ' + g.players.length + '/4 · ' + names :
-    g.phase === 'game_end' ? '🏆 ' + escapeHtml((g.players[g.winner] || {}).name || 'Winner') +
-      ' wins! · ' + names :
+    g.phase === 'game_end' ? (g.solo ?
+      '🏁 Solo: ' + escapeHtml((g.players[0] || {}).name || '') + ' — ' +
+      (g.players[0] || {}).score + ' VP · ' + escapeHtml(g.solo_band || '') :
+      '🏆 ' + escapeHtml((g.players[g.winner] || {}).name || 'Winner') +
+      ' wins! · ' + names) :
     '🪡 Round ' + g.round + '/5 · ' + g.phase + ' · ' + names + turnSuffix);
   // FB-0126: in the bonus phase the B and C goal tiles are the choice —
   // tap one to score it. Other goals dim while choosing.
@@ -360,7 +369,18 @@ function ffRender() {
     market.innerHTML = '';
   } else {
     const shopping = g.phase === 'shopping' && g.can_act;
-    let mh = shopping ? '<div class="ffhint">👆 Tap a material to take it, or tap an offer to take it and start stitching.</div>' : '';
+    const soloShop = shopping && !!g.solo;
+    // FB-0127: solo passing takes 1-2 adjacent market cards — the
+    // selection lives on the market cards themselves, confirmed with
+    // one ✓ pill. Reset the selection whenever the market changes.
+    const soloKey = g.round + ':' + JSON.stringify(m.offers || []);
+    if (FF.soloKey !== soloKey) { FF.soloKey = soloKey; FF.soloPick = []; }
+    let mh = '';
+    if (soloShop) {
+      mh = '<div class="ffhint">👆 Solo: tap 1 or 2 adjacent cards, then ✓ Take them. The rest of the market is cleared.</div>';
+    } else if (shopping) {
+      mh = '<div class="ffhint">👆 Tap a material to take it, or tap an offer to take it and start stitching.</div>';
+    }
     mh += '<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">';
     if (m.threads) {
       mh += '<div class="ffpile' + (shopping ? '' : ' ffstatic') + '" data-mat="thread" title="' +
@@ -374,18 +394,43 @@ function ffRender() {
       mh += '<div class="ffpile' + (shopping ? '' : ' ffstatic') + '" data-mat="thimble" title="' +
         (shopping ? 'Tap to take the thimble' : 'Thimble in the market') + '"><span class="ffic">🟘</span><span class="ffcnt">Thimble</span></div>';
     }
+    let flat = 0;
     (m.offers || []).forEach((o, i) => {
-      mh += '<div class="ffoffer' + (shopping ? '' : ' ffstatic') + '" data-offer="' + i +
-        '" title="' + (shopping ? 'Tap to take this offer' : 'Offer ' + (i + 1)) + '">' +
-        o.map(ffCardHtml).join('') + '<span class="ffoffcap">Offer ' + (i + 1) + '</span></div>';
+      const cardsHtml = o.map(cid => {
+        const idx = flat++;
+        if (!soloShop) return ffCardHtml(cid);
+        const sel = FF.soloPick.indexOf(idx) !== -1;
+        return '<span class="ffsolo-pick' + (sel ? ' on' : '') + '" data-solo-card="' + idx +
+          '" title="Tap to pick this card">' + ffCardHtml(cid) + '</span>';
+      }).join('');
+      mh += '<div class="ffoffer' + (shopping && !soloShop ? '' : ' ffstatic') + '"' +
+        (soloShop ? '' : ' data-offer="' + i + '"') +
+        ' title="' + (soloShop ? 'Tap the cards to pick them' : shopping ? 'Tap to take this offer' : 'Offer ' + (i + 1)) + '">' +
+        cardsHtml + '<span class="ffoffcap">Offer ' + (i + 1) + '</span></div>';
     });
     mh += '</div>';
+    if (soloShop) {
+      const n = FF.soloPick.length;
+      mh += '<div class="fftake" data-take="1" title="Take the selected cards and start stitching">' +
+        (n ? '✓ Take selected (' + n + ')' : '✓ Pass — take no cards') + '</div>';
+    }
     market.innerHTML = mh;
     if (shopping) {
       market.querySelectorAll('[data-mat]').forEach(el =>
         el.addEventListener('click', () => ffMove('material', {kind: el.dataset.mat})));
       market.querySelectorAll('[data-offer]').forEach(el =>
         el.addEventListener('click', () => ffMove('pass', {offer: Number(el.dataset.offer)})));
+      market.querySelectorAll('[data-solo-card]').forEach(el =>
+        el.addEventListener('click', () => {
+          const idx = Number(el.dataset.soloCard);
+          const at = FF.soloPick.indexOf(idx);
+          if (at !== -1) { FF.soloPick.splice(at, 1); }
+          else if (FF.soloPick.length === 0) { FF.soloPick.push(idx); }
+          else if (FF.soloPick.length === 1 && Math.abs(FF.soloPick[0] - idx) === 1) { FF.soloPick.push(idx); }
+          ffRender();
+        }));
+      const take = market.querySelector('[data-take]');
+      if (take) take.addEventListener('click', () => ffMove('pass', {cards: FF.soloPick.slice()}));
     }
   }
   players.innerHTML = g.phase === 'lobby' ? '' : g.players.map((p, i) => {

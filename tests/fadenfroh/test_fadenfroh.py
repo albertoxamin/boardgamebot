@@ -112,10 +112,197 @@ class SetupTests(unittest.TestCase):
 
     def test_start_rejects_bad_player_counts(self):
         g = FD.new_game(7, 1, "Alice")
-        self.assertEqual(FD.start_game(g, []), "Fadenfroh needs 2-4 players")
-        for _ in range(4):
+        g["players"] = []
+        self.assertEqual(FD.start_game(g, []), "Fadenfroh needs 1-4 players")
+        for _ in range(5):
             g["players"].append(FD.new_player(2, "Bob"))
-        self.assertEqual(FD.start_game(g, []), "Fadenfroh needs 2-4 players")
+        self.assertEqual(FD.start_game(g, []), "Fadenfroh needs 1-4 players")
+
+
+class SoloTests(unittest.TestCase):
+    def solo_game(self):
+        g = FD.new_game(7, 1, "Alice")
+        events = []
+        assert FD.start_game(g, events, scoring="beginner") is None
+        return g
+
+    def reveal_card(self, same_color, special=None):
+        # Deterministic reveal card: same/different half colours, with or
+        # without a feather/hoop symbol. Card 5 has a feather, 41 a hoop.
+        if special == "feather":
+            return 5
+        if special == "hoop":
+            return 41
+        for c in FD.CARDS:
+            halves = c["h"]
+            if any(s in ("feather", "hoop") for h in halves for s in h["s"]):
+                continue
+            if (halves[0]["c"] == halves[1]["c"]) == same_color:
+                return c["id"]
+        raise AssertionError("no such card")
+
+    def rig_reveal(self, g, cid):
+        # draw() pops from the end of the deck.
+        g["deck"] = [0, 1, 2, cid]
+
+    def test_solo_starts_with_one_player(self):
+        # FB-0127: Annalisa wants to start Fadenfroh alone; Albert said yes.
+        g = FD.new_game(7, 1, "Alice")
+        ev = []
+        self.assertIsNone(FD.start_game(g, ev, scoring="beginner"))
+        self.assertTrue(g["solo"])
+        self.assertEqual(g["phase"], "shopping")
+        self.assertEqual(len(g["market"]["offers"]), 1)
+        self.assertEqual(len(g["market"]["offers"][0]), 3)
+        self.assertEqual(g["market"]["threads"], 4)
+        self.assertEqual(g["market"]["needles"], 1)
+        self.assertTrue(any("Solo mode" in e for e in ev))
+
+    def test_solo_reveal_same_color_discards_leftmost(self):
+        g = self.solo_game()
+        g["market"]["offers"] = [[10, 20, 30]]
+        self.rig_reveal(g, self.reveal_card(same_color=True))
+        ev = []
+        self.assertIsNone(FD.take_material(g, 0, "thread", ev))
+        self.assertEqual(g["market"]["offers"], [[20, 30]])
+        self.assertIn(10, g["discard"])
+        self.assertTrue(any("leftmost" in e for e in ev))
+
+    def test_solo_reveal_different_colors_discards_rightmost(self):
+        g = self.solo_game()
+        g["market"]["offers"] = [[10, 20, 30]]
+        self.rig_reveal(g, self.reveal_card(same_color=False))
+        ev = []
+        self.assertIsNone(FD.take_material(g, 0, "thread", ev))
+        self.assertEqual(g["market"]["offers"], [[10, 20]])
+        self.assertIn(30, g["discard"])
+        self.assertTrue(any("rightmost" in e for e in ev))
+
+    def test_solo_reveal_special_returns_material_needle_first(self):
+        g = self.solo_game()
+        g["market"]["offers"] = [[10, 20, 30]]
+        g["market"]["threads"] = 5
+        g["market"]["needles"] = 1
+        g["market"]["thimble"] = True
+        g["deck"] = [5, 5, 5]
+        ev = []
+        # Feather reveal: needle goes back first.
+        self.assertIsNone(FD.take_material(g, 0, "thread", ev))
+        self.assertEqual(g["market"]["needles"], 0)
+        self.assertTrue(g["market"]["thimble"])
+        self.assertEqual(g["market"]["threads"], 4)
+        # Next feather reveal: the thimble goes back.
+        self.assertIsNone(FD.take_material(g, 0, "thread", ev))
+        self.assertFalse(g["market"]["thimble"])
+        self.assertEqual(g["market"]["threads"], 3)
+        # Next feather reveal: a thread goes back.
+        self.assertIsNone(FD.take_material(g, 0, "thread", ev))
+        self.assertEqual(g["market"]["threads"], 1)
+        self.assertTrue(any("goes back to the supply" in e for e in ev))
+
+    def test_solo_pre_turn_reveal_when_thimble_not_taken(self):
+        g = self.solo_game()
+        # Round 2, thimble not taken last round: one reveal before the
+        # first turn discards a market card.
+        g["round"] = 2
+        g["players"][0]["thimble"] = False
+        g["deck"] = [self.reveal_card(same_color=False), 10, 20, 30]
+        ev = []
+        FD._market_phase(g, ev)
+        self.assertEqual(len(g["market"]["offers"][0]), 2)
+        self.assertTrue(any("before your first turn" in e for e in ev))
+        # With the thimble taken, no pre-turn reveal happens.
+        g["players"][0]["thimble"] = True
+        g["deck"] = [self.reveal_card(same_color=False), 10, 20, 30]
+        ev = []
+        FD._market_phase(g, ev)
+        self.assertEqual(len(g["market"]["offers"][0]), 3)
+        self.assertFalse(any("before your first turn" in e for e in ev))
+
+    def test_solo_pass_takes_adjacent_cards_and_clears_market(self):
+        g = self.solo_game()
+        g["market"]["offers"] = [[10, 20, 30]]
+        self.assertEqual(FD.pass_offer(g, 0, -1, [], cards=[0, 2]),
+                         "the two cards must be adjacent")
+        self.assertEqual(FD.pass_offer(g, 0, -1, [], cards=[0, 1, 2]),
+                         "choose 1 or 2 adjacent market cards")
+        self.assertEqual(FD.pass_offer(g, 0, -1, [], cards=[]),
+                         "choose 1 or 2 adjacent market cards")
+        ev = []
+        self.assertIsNone(FD.pass_offer(g, 0, -1, ev, cards=[1, 2]))
+        self.assertEqual(g["phase"], "embroidery")
+        self.assertEqual(g["market"], {"threads": 0, "needles": 0,
+                                       "thimble": False, "offers": []})
+        self.assertEqual(g["pending"]["kind"], "place")
+        self.assertEqual(g["pending"]["cards"], [20, 30])
+        self.assertIn(10, g["discard"])
+
+    def test_solo_pass_with_empty_market_is_allowed(self):
+        g = self.solo_game()
+        g["market"]["offers"] = []
+        g["market"]["threads"] = 2
+        # 3 threads forces a thread-exchange pending, so embroidery stops
+        # instead of auto-advancing through scoring into round 2.
+        g["players"][0]["threads"] = 3
+        ev = []
+        self.assertIsNone(FD.pass_offer(g, 0, -1, ev, cards=[]))
+        self.assertEqual(g["phase"], "embroidery")
+        self.assertEqual(g["pending"]["kind"], "keep")
+
+    def test_solo_full_game_finishes_with_band(self):
+        g = self.solo_game()
+        ev = []
+        for _ in range(5000):
+            if g["phase"] == "game_end":
+                break
+            idx = FD.current_index(g)
+            assert idx is not None, (g["phase"], g.get("pending"))
+            pend = g.get("pending")
+            if g["phase"] == "shopping":
+                if g["market"]["offers"]:
+                    err = FD.pass_offer(g, idx, -1, ev, cards=[0])
+                else:
+                    err = FD.pass_offer(g, idx, -1, ev, cards=[])
+            elif pend["kind"] == "keep":
+                err = FD.apply_choice(g, idx, 0, ev)
+            elif pend["kind"] == "place":
+                options = FD.pending_options(g, idx)
+                assert options
+                err = FD.apply_choice(g, idx, options[0]["value"], ev)
+            elif pend["kind"] == "bonus":
+                err = FD.apply_choice(g, idx, "B", ev)
+            else:
+                raise AssertionError((g["phase"], pend))
+            assert err is None, err
+        else:
+            raise AssertionError("solo game did not finish")
+        self.assertEqual(g["phase"], "game_end")
+        self.assertEqual(g["round"], 5)
+        self.assertEqual(g["winner"], 0)
+        self.assertIsNotNone(g["solo_band"])
+        self.assertIn(g["solo_band"], [b for _, b in FD.SOLO_BANDS])
+        self.assertTrue(any("Solo result" in e for e in ev))
+        self.assertTrue(FD.board_json(g)["solo"])
+        self.assertEqual(FD.board_json(g)["solo_band"], g["solo_band"])
+
+    def test_solo_bands(self):
+        self.assertEqual(FD.solo_band(0), "A stitch in time saves nine - keep at it!")
+        self.assertEqual(FD.solo_band(99), "A stitch in time saves nine - keep at it!")
+        self.assertEqual(FD.solo_band(100), "You've found the thread of it!")
+        self.assertEqual(FD.solo_band(130), "Sew Impressive - a cut above the rest.")
+        self.assertEqual(FD.solo_band(150), "You're the needle in a haystack!")
+
+    def test_solo_board_json_and_mini_app(self):
+        g = self.solo_game()
+        board = FD.board_json(g)
+        self.assertTrue(board["solo"])
+        self.assertIsNone(board["solo_band"])
+        js = open(os.path.join(ROOT, "assets", "fadenfroh", "scripts",
+                               "fadenfroh.js")).read()
+        self.assertIn("g.solo", js)
+        self.assertIn("data-solo-card", js)
+        self.assertIn("Take selected", js)
+        self.assertIn("Solo:", js)
 
 
 class MarketTests(unittest.TestCase):

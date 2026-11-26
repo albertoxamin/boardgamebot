@@ -12,6 +12,19 @@ import random
 MIN_PLAYERS = 2
 MAX_PLAYERS = 4
 ROUNDS = 5
+
+# Solo (1-player) market — the rulebook's "Changes for the 1-player game"
+# does not print the market size, and the 1-player market card is not in
+# the repo. Assumption, mirroring the 2-player material counts with a
+# single offer (the number of offers corresponds to the number of players):
+# 4 threads, 1 needle, thimble, one offer of 3 cards. FB-0127.
+SOLO_MARKET = {"threads": 4, "needles": 1, "offers": (3,)}
+SOLO_BANDS = (
+    (150, "You're the needle in a haystack!"),
+    (130, "Sew Impressive - a cut above the rest."),
+    (100, "You've found the thread of it!"),
+    (1, "A stitch in time saves nine - keep at it!"),
+)
 COLORS = ("white", "yellow", "purple")
 COLOR_CODE = {"W": "white", "Y": "yellow", "P": "purple"}
 BERRIES = ("blueberry", "strawberry")
@@ -69,12 +82,13 @@ SCORING_CARDS = {
 ROUND_CARDS = {2: ("A", "B"), 3: ("B", "C"), 4: ("C", "D"), 5: ("D", "A")}
 ROUND_PAIRS = (("A", "B"), ("B", "C"), ("C", "D"), ("D", "A"))
 
-RULES = """🪡 <b>Fadenfroh rules</b> (2-4 players, five rounds): draft fabric and materials, stitch three overlapping rows, score the rotating goals.
+RULES = """🪡 <b>Fadenfroh rules</b> (1-4 players, five rounds): draft fabric and materials, stitch three overlapping rows, score the rotating goals.
 • <b>Market:</b> each round the market has one offer per player (1-3 cards), threads, needles and the thimble. On your turn take one material (thread / needle / thimble) or pass and take an offer; taking an offer ends your shopping. If everyone else has passed, you get all remaining material and must take the last offer.
+• <b>Solo (1 player):</b> start alone to play the rulebook solo variant. After each shopping turn reveal a fabric card: same-colour halves discard the leftmost market card, different colours the rightmost, a feather circle or embroidery hoop returns one material instead (needle, thimble, then thread). If you did not take the thimble last round, reveal once before your first turn. Passing takes up to 2 adjacent market cards, then the rest of the market is cleared. At the end your total VP is rated: 100+ / 130+ / 150+.
 • <b>Embroidery:</b> trade 3 threads for a draw of 3 cards and keep 1, repeatedly. Then place every card in one of your three rows: it must cover at least one half of an already placed card. Spend a needle to place a card next to a row without covering anything. Discard what you do not place.
 • <b>Scoring:</b> rounds 2-5 score goal pairs A+B, B+C, C+D, D+A; every scored round also gives 2 VP per visible feather circle. Only visible halves and symbols count. Groups use orthogonal adjacency and ignore needles.
 • <b>Round 5:</b> also choose goal B or C, score 2 VP per remaining material, and score each embroidery hoop (VP per matching symbol shown on the hoop). Ties are broken by the higher starting-card number.
-• Commands: /fadenfroh_material &lt;thread|needle|thimble&gt;, /fadenfroh_pass &lt;offer&gt;, /fadenfroh_keep &lt;n&gt;, /fadenfroh_place &lt;card&gt; &lt;row&gt; &lt;side&gt; &lt;cover&gt; [needle], /fadenfroh_discard &lt;cards&gt;, /fadenfroh_bonus &lt;B|C&gt; (or use buttons/Mini App)."""
+• Commands: /fadenfroh_material &lt;thread|needle|thimble&gt;, /fadenfroh_pass &lt;offer&gt; (solo: &lt;card#&gt; [&lt;card#&gt;]), /fadenfroh_keep &lt;n&gt;, /fadenfroh_place &lt;card&gt; &lt;row&gt; &lt;side&gt; &lt;cover&gt; [needle], /fadenfroh_discard &lt;cards&gt;, /fadenfroh_bonus &lt;B|C&gt; (or use buttons/Mini App)."""
 
 
 def _build_cards():
@@ -134,6 +148,14 @@ def _start_rows(player, start_no):
         player["rows"].append({"3": a, "4": b})
 
 
+def solo_band(score):
+    """Solo end-of-game rating from the rulebook (total VP)."""
+    for threshold, text in SOLO_BANDS:
+        if score >= threshold:
+            return text
+    return SOLO_BANDS[-1][1]
+
+
 def new_game(chat_id, creator_id, creator_name, rng=None):
     g = {"chat_id": int(chat_id), "created_by": int(creator_id),
          "players": [new_player(creator_id, creator_name)],
@@ -141,7 +163,7 @@ def new_game(chat_id, creator_id, creator_name, rng=None):
          "market": {}, "deck": [], "discard": [], "goals": {},
          "active": [], "pass_order": [], "embroidery_order": [], "embroidery_pos": 0,
          "pending": None, "winner": None, "log": [], "board_message_id": None,
-         "chat_type": "private"}
+         "chat_type": "private", "solo": False, "solo_band": None}
     return g
 
 
@@ -167,8 +189,11 @@ def start_game(g, events=None, rng=None, scoring="random"):
     if g["phase"] != "lobby":
         return "game already started"
     n = len(g["players"])
-    if not MIN_PLAYERS <= n <= MAX_PLAYERS:
-        return f"Fadenfroh needs {MIN_PLAYERS}-{MAX_PLAYERS} players"
+    if not 1 <= n <= MAX_PLAYERS:
+        return f"Fadenfroh needs 1-{MAX_PLAYERS} players"
+    # FB-0127: starting alone plays the rulebook solo variant.
+    g["solo"] = (n == 1)
+    g["solo_band"] = None
     ev = events if events is not None else []
     rnd = rng or _rng(g)
     g["deck"] = list(range(len(CARDS)))
@@ -189,7 +214,7 @@ def start_game(g, events=None, rng=None, scoring="random"):
         p["score"] = 0
         p["bonus"] = None
         _start_rows(p, i + 1)
-    ev.append(f"🪡 Fadenfroh started! Goals: " + ", ".join(
+    ev.append(f"🪡 Fadenfroh started!{' Solo mode — the rulebook solo variant.' if g['solo'] else ''} Goals: " + ", ".join(
         f"{k}={v}" for k, v in sorted(g["goals"].items())))
     _market_phase(g, ev, rnd)
     return None
@@ -198,10 +223,19 @@ def start_game(g, events=None, rng=None, scoring="random"):
 def _market_phase(g, events, rnd=None):
     rnd = rnd or _rng(g)
     n = len(g["players"])
-    threads = {2: 4, 3: 7, 4: 10}[n]
-    needles = {2: 1, 3: 2, 4: 2}[n]
+    # FB-0127: solo market (see SOLO_MARKET — the 1-player market card
+    # is not in the repo, so this mirrors the 2-player material counts
+    # with a single offer).
+    solo_had_thimble = bool(g.get("solo") and g["players"] and g["players"][0]["thimble"])
+    if g.get("solo"):
+        threads = SOLO_MARKET["threads"]
+        needles = SOLO_MARKET["needles"]
+        sizes = SOLO_MARKET["offers"]
+    else:
+        threads = {2: 4, 3: 7, 4: 10}[n]
+        needles = {2: 1, 3: 2, 4: 2}[n]
+        sizes = {2: (3, 2), 3: (3, 2, 1), 4: (3, 2, 2, 1)}[n]
     offers = []
-    sizes = {2: (3, 2), 3: (3, 2, 1), 4: (3, 2, 2, 1)}[n]
     for size in sizes:
         cards = []
         for _ in range(size):
@@ -224,11 +258,67 @@ def _market_phase(g, events, rnd=None):
     g["phase"] = "shopping"
     events.append(f"🛒 Round {g['round']} market: {threads} threads, {needles} needles, "
                   f"thimble, {len(offers)} offers. {g['players'][starter]['name']} starts.")
+    if g.get("solo") and g["round"] > 1 and not solo_had_thimble:
+        # Solo variant: not the starting player this round (the thimble
+        # was not taken last round) — reveal once before the first turn.
+        _solo_reveal(g, events, pre_turn=True)
     _shopping_auto(g, events)
+
+
+def _solo_reveal(g, events, pre_turn=False):
+    """Solo variant: reveal the top fabric card onto the discard pile.
+    Same-colour halves discard the leftmost market card, different colours
+    the rightmost; a feather circle or embroidery hoop returns one market
+    material instead (needle, thimble, then thread)."""
+    cid = draw(g)
+    if cid is None:
+        return
+    discard(g, cid)
+    card = CARDS[cid]
+    when = "before your first turn" if pre_turn else "after your turn"
+    halves = card["h"]
+    special = any(s in ("feather", "hoop") for h in halves for s in h["s"])
+    m = g["market"]
+    if special:
+        for key, label in (("needles", "a needle"), ("thimble", "the thimble"),
+                           ("threads", "a thread")):
+            if m.get(key):
+                if key == "thimble":
+                    m["thimble"] = False
+                else:
+                    m[key] -= 1
+                events.append(f"🎴 Solo reveal {when}: {card_label(cid)} shows a "
+                              f"special symbol — {label} goes back to the supply.")
+                return
+        events.append(f"🎴 Solo reveal {when}: {card_label(cid)} shows a special "
+                      f"symbol, but the market has no material left.")
+        return
+    flat = [c for offer in m["offers"] for c in offer]
+    if not flat:
+        events.append(f"🎴 Solo reveal {when}: {card_label(cid)} — "
+                      f"the market has no cards left.")
+        return
+    if halves[0]["c"] == halves[1]["c"]:
+        gone = m["offers"][0].pop(0)
+        if not m["offers"][0]:
+            m["offers"].pop(0)
+        side = "leftmost"
+    else:
+        gone = m["offers"][-1].pop()
+        if not m["offers"][-1]:
+            m["offers"].pop()
+        side = "rightmost"
+    discard(g, gone)
+    events.append(f"🎴 Solo reveal {when}: {card_label(cid)} — the {side} market "
+                  f"card ({card_label(gone)}) is discarded.")
 
 
 def _shopping_auto(g, events):
     """Last active player gets the leftover material, then must take an offer."""
+    if g.get("solo"):
+        # Solo has no "last player takes the leftovers" rule — the solo
+        # player takes materials freely and passes on their own terms.
+        return
     m = g["market"]
     if len(g["active"]) == 1 and m["offers"]:
         idx = g["active"][0]
@@ -270,7 +360,7 @@ def _material_left(m):
 def take_material(g, idx, kind, events=None):
     if g["phase"] != "shopping" or idx != g["current"] or idx not in g["active"]:
         return "not your turn in the market"
-    if len(g["active"]) == 1:
+    if len(g["active"]) == 1 and not g.get("solo"):
         return "you must take the last offer now"
     m = g["market"]
     key = {"thread": "threads", "needle": "needles", "thimble": "thimble"}.get(kind)
@@ -288,14 +378,52 @@ def take_material(g, idx, kind, events=None):
         g["players"][idx][key] += 1
     ev = events if events is not None else []
     ev.append(f"🧶 {g['players'][idx]['name']} took a {kind}.")
+    if g.get("solo"):
+        _solo_reveal(g, ev)
     g["active"].append(g["active"].pop(0))
     _advance_shopping(g, ev)
     return None
 
 
-def pass_offer(g, idx, offer, events=None):
+def _solo_pass(g, idx, cards, ev):
+    """Solo 'Pass and take offer': take up to 2 adjacent cards from the
+    market, then discard the rest of the market and return its material
+    to the general supply. Positions are 0-based in the flattened market."""
+    flat = [c for offer in g["market"]["offers"] for c in offer]
+    try:
+        picks = sorted(int(c) for c in (cards or []))
+    except (TypeError, ValueError):
+        return "choose 1 or 2 adjacent market cards"
+    if not flat:
+        # The reveals ate the whole market — passing with no cards is fine.
+        picks = []
+    elif not 1 <= len(picks) <= 2 or any(p < 0 or p >= len(flat) for p in picks):
+        return "choose 1 or 2 adjacent market cards"
+    if len(picks) == 2 and picks[1] - picks[0] != 1:
+        return "the two cards must be adjacent"
+    taken = [flat[p] for p in picks]
+    g["players"][idx]["supply"].extend(taken)
+    for cid in flat:
+        if cid not in taken:
+            discard(g, cid)
+    g["market"] = {"threads": 0, "needles": 0, "thimble": False, "offers": []}
+    g["players"][idx]["passed"] = True
+    g["active"].remove(idx)
+    g["pass_order"].append(idx)
+    if taken:
+        ev.append(f"🙋 {g['players'][idx]['name']} took {len(taken)} card(s) from "
+                  f"the market (solo) and the rest of the market is cleared.")
+    else:
+        ev.append(f"🙋 {g['players'][idx]['name']} passed with an empty market (solo).")
+    _advance_shopping(g, ev)
+    return None
+
+
+def pass_offer(g, idx, offer, events=None, cards=None):
     if g["phase"] != "shopping" or idx != g["current"] or idx not in g["active"]:
         return "not your turn in the market"
+    if g.get("solo"):
+        return _solo_pass(g, idx, cards, events if events is not None else [])
     m = g["market"]
     try:
         offer = int(offer)
@@ -724,6 +852,14 @@ def _bonus_auto(g, events):
         events.append(f"🏁 {p['name']} scored {extra} final bonus (B/C, {material} material, "
                       f"{hoop_pts} hoop points).")
     best = max(p["score"] for p in g["players"])
+    if g.get("solo"):
+        # Solo has no winner — the total VP is rated by the rulebook bands.
+        g["solo_band"] = solo_band(best)
+        g["winner"] = 0
+        g["phase"] = "game_end"
+        g["pending"] = None
+        events.append(f"🏁 Solo result: {best} VP — {g['solo_band']}")
+        return
     tied = [i for i, p in enumerate(g["players"]) if p["score"] == best]
     g["winner"] = max(tied, key=lambda i: g["players"][i]["start_no"]) if len(tied) > 1 else tied[0]
     g["phase"] = "game_end"
@@ -766,8 +902,10 @@ def board_lines(g):
         yield f"🪡 Fadenfroh lobby: {len(g['players'])}/{MAX_PLAYERS} players."
         for p in g["players"]:
             yield f"• {p['name']}"
+        if len(g["players"]) == 1:
+            yield "▶️ Start now to play solo."
         return
-    yield f"🪡 Fadenfroh - round {g['round']}/5 · phase: {g['phase']}"
+    yield f"🪡 Fadenfroh{' (solo)' if g.get('solo') else ''} - round {g['round']}/5 · phase: {g['phase']}"
     yield "🎯 Goals: " + " ".join(f"{k}={g['goals'][k]}" for k in "ABCD")
     m = g["market"]
     yield (f"🛒 Market: 🧵{m['threads']} 🪡{m['needles']} "
@@ -782,6 +920,9 @@ def board_lines(g):
                f"{p['score']} VP · 🧵{p['threads']} 🪡{p['needles']} "
                f"{'🟘' if p['thimble'] else ''} · cards: {len(p['supply'])}")
         yield "   " + (" | ".join(rows) if rows else "empty")
+    if g["phase"] == "game_end" and g.get("solo"):
+        p = g["players"][0]
+        yield f"🏁 Solo: {p['score']} VP — {g.get('solo_band') or ''}"
     if g.get("log"):
         yield "📜 " + " · ".join(html.escape(e) for e in g["log"][-3:])
 
@@ -790,6 +931,7 @@ def board_json(g, viewer_id=None):
     """Public board with private hands filtered to the viewer."""
     out = {"chat_id": g["chat_id"], "phase": g["phase"], "round": g["round"],
            "turn": g["turn"], "actor": current_index(g), "goals": dict(g["goals"]),
+           "solo": bool(g.get("solo")), "solo_band": g.get("solo_band"),
            "market": {"threads": g["market"].get("threads", 0),
                       "needles": g["market"].get("needles", 0),
                       "thimble": bool(g["market"].get("thimble")),

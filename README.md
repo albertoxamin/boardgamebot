@@ -565,7 +565,9 @@ In Fadenfroh, you place fabric cards in your display. You receive victory points
 
 However, your opponents are competing with you for fabric cards and useful materials. So, every round you have to decide anew: How long can I take materials before someone snatches up the ideal fabric cards?
 
-Whoever has the most victory points at the end of the game wins!
+Whoever has the most victory points at the end of the game wins! A solo mode
+is included: start alone to play the rulebook's 1-player variant, rated by
+total VP.
 
 In this digital version of *Fadenfroh* (1 More Time Games): five rounds of drafting
 fabric from a market of offers, threads, needles and the thimble. Players trade
@@ -573,8 +575,10 @@ three threads to draw and keep one card, stitch cards into three overlapping
 rows (covering at least one placed half), and score rotating berry, animal,
 flower and colour goals. Feather circles score for every active goal each
 round; round five adds a B/C goal choice, remaining material and hoop points.
-Ties are broken by the higher starting number. The engine resolves embroidery
-sequentially after the market for simpler bot play.
+Ties are broken by the higher starting number. Solo games follow the rulebook
+solo variant: a reveal after each shopping turn trims the market, passing
+takes up to 2 adjacent cards, and the final VP total is rated 100+/130+/150+.
+The engine resolves embroidery sequentially after the market for simpler bot play.
 
 Fabric, scoring, starting-card, material and token art is extracted from Board
 Game Arena into `assets/fadenfroh/images/fadenfroh-*.webp` (raw sheets also kept in
@@ -582,7 +586,7 @@ Game Arena into `assets/fadenfroh/images/fadenfroh-*.webp` (raw sheets also kept
 stored in `assets/fadenfroh/rulebook.pdf` and
 `assets/fadenfroh/scoring-overview.pdf`. Text commands: `/fadenfroh`,
 `/fadenfroh_join`, `/fadenfroh_join_npc`, `/fadenfroh_start`,
-`/fadenfroh_material <thread|needle|thimble>`, `/fadenfroh_pass <offer>`,
+`/fadenfroh_material <thread|needle|thimble>`, `/fadenfroh_pass <offer>` (solo: `<card#> [<card#>]`),
 `/fadenfroh_keep <1-3>`, `/fadenfroh_place <card> <row> <left|right> <1|2> [needle]`,
 `/fadenfroh_discard <cards>`, `/fadenfroh_bonus <B|C>`, `/fadenfroh_rules`,
 `/fadenfroh_cancel` (creator) and `/fadenfroh_rematch`. Mini App: board button =

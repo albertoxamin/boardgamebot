@@ -42,7 +42,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #                     -> legacy Telegram HTML5 Game; currently unused (no
 #                     /play command sends a game message)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 104
+WEB_VER = 105
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 # Mini App assets: per-game scripts in assets/<game>/scripts/, per-game
@@ -5078,8 +5078,12 @@ def fadenfroh_board_text(g):
     lines = list(FD.board_lines(g))
     pend = g.get("pending")
     if g["phase"] == "shopping":
-        lines.append("🎮 /fadenfroh_material &lt;thread|needle|thimble&gt; or "
-                     "/fadenfroh_pass &lt;offer&gt; (or tap buttons).")
+        if g.get("solo"):
+            lines.append("🎮 /fadenfroh_material &lt;thread|needle|thimble&gt; or "
+                         "/fadenfroh_pass &lt;card#&gt; [&lt;card#&gt;] (or tap the market).")
+        else:
+            lines.append("🎮 /fadenfroh_material &lt;thread|needle|thimble&gt; or "
+                         "/fadenfroh_pass &lt;offer&gt; (or tap buttons).")
     elif pend and pend["kind"] == "keep":
         lines.append("🎮 /fadenfroh_keep &lt;1-3&gt; (or tap a card).")
     elif pend and pend["kind"] == "place":
@@ -5114,7 +5118,9 @@ def fadenfroh_keyboard(g):
     if g["phase"] == "shopping":
         m = g["market"]
         row = []
-        if len(g["active"]) > 1:
+        # FB-0127: solo has a single active player, so the "more than one
+        # active player" gate would hide the material buttons entirely.
+        if len(g["active"]) > 1 or g.get("solo"):
             if m["threads"]:
                 row.append({"text": f"🧵 Thread ({m['threads']})", "callback_data": "ff:m:thread"})
             if m["needles"]:
@@ -5123,9 +5129,12 @@ def fadenfroh_keyboard(g):
                 row.append({"text": "🟘 Thimble", "callback_data": "ff:m:thimble"})
         if row:
             kb.append(row)
-        for off, cards in enumerate(m["offers"]):
-            kb.append([{"text": f"🛒 Offer {off + 1} ({len(cards)} cards)",
-                        "callback_data": f"ff:p:{off}"}])
+        # FB-0127: in solo, passing takes 1-2 adjacent cards, not a whole
+        # offer — the Mini App / command picks the cards, so no offer buttons.
+        if not g.get("solo"):
+            for off, cards in enumerate(m["offers"]):
+                kb.append([{"text": f"🛒 Offer {off + 1} ({len(cards)} cards)",
+                            "callback_data": f"ff:p:{off}"}])
     elif pend:
         for opt in FD.pending_options(g, idx)[:30]:
             kb.append([{"text": opt["label"][:60], "callback_data": "ff:o:" + opt["value"]}])
@@ -5219,12 +5228,21 @@ def handle_fadenfroh(state, msg, cmd, text, uid, name):
                if idx is None else FD.take_material(g, idx, " ".join(parts).lower(), ev))
     elif cmd == "/fadenfroh_pass":
         idx = fadenfroh_actor_idx(g, uid)
-        try:
-            offer = int(parts[0])
-        except (IndexError, ValueError):
-            offer = -1
-        err = ("Usage: /fadenfroh_pass &lt;offer&gt;" if idx is None
-               else FD.pass_offer(g, idx, offer, ev))
+        if g.get("solo"):
+            # Solo: pass takes up to 2 adjacent market cards by position.
+            try:
+                cards = [int(x) - 1 for x in parts]
+            except ValueError:
+                cards = []
+            err = ("Usage: /fadenfroh_pass &lt;card#&gt; [&lt;card#&gt;]" if idx is None
+                   else FD.pass_offer(g, idx, -1, ev, cards=cards))
+        else:
+            try:
+                offer = int(parts[0])
+            except (IndexError, ValueError):
+                offer = -1
+            err = ("Usage: /fadenfroh_pass &lt;offer&gt;" if idx is None
+                   else FD.pass_offer(g, idx, offer, ev))
     elif cmd in ("/fadenfroh_keep", "/fadenfroh_place", "/fadenfroh_discard", "/fadenfroh_bonus"):
         pend = g.get("pending")
         idx = fadenfroh_actor_idx(g, uid)
@@ -5311,7 +5329,8 @@ def fadenfroh_api_move(state, chat_id, user_id, body):
         if action == "material":
             err = FD.take_material(g, actor, str(body.get("kind", "")), ev)
         elif action == "pass":
-            err = FD.pass_offer(g, actor, body.get("offer", -1), ev)
+            err = FD.pass_offer(g, actor, body.get("offer", -1), ev,
+                                cards=body.get("cards"))
         elif action == "choice":
             err = FD.apply_choice(g, actor, body.get("value", ""), ev)
         elif action == "discard":

@@ -42,7 +42,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #                     -> legacy Telegram HTML5 Game; currently unused (no
 #                     /play command sends a game message)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 108
+WEB_VER = 109
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 # Mini App assets: per-game scripts in assets/<game>/scripts/, per-game

@@ -162,7 +162,9 @@ function azPlayer(p, b, idx) {
   }
   return '<div class="azplayer' + (p.is_current ? ' azcurrent' : '') + '">' +
     '<div class="azhead"><span>' + escapeHtml(p.name) + (p.npc ? ' 🤖' : '') +
-    (p.winner ? ' 🏆' : '') + '</span><span class="azscore">' + p.score + ' pts</span></div>' +
+    (p.winner ? ' 🏆' : '') +
+    (p.is_current && b.phase === 'draft' ? ' <span class="azturnbadge">👉 TURNO</span>' : '') +
+    '</span><span class="azscore">' + p.score + ' pts</span></div>' +
     '<div class="azboard">' + tiles + '</div></div>';
 }
 function azRender() {
@@ -176,6 +178,7 @@ function azRender() {
   const start = document.getElementById('azStart');
   const rematch = document.getElementById('azRematch');
   const howto = document.getElementById('azHowTo');
+  const banner = document.getElementById('azTurnBanner');
   const pickKey = [b.phase, b.round, b.current, b.pending ? 'p' : 'd', b.can_act].join(':');
   if (AZ.pickKey !== pickKey) { AZ.pick = null; AZ.pickKey = pickKey; }
   [join, start, howto, rematch].forEach(el => el.classList.add('hidden'));
@@ -183,6 +186,7 @@ function azRender() {
   actions.innerHTML = '';
   if (b.phase === 'lobby') {
     turn.textContent = '🔷 Azul lobby — ' + b.players.length + '/4 players';
+    banner.classList.add('hidden');
     board.innerHTML = '<div class="table azlobby lobby-note">Join, then anyone taps Start.</div>' +
       b.players.map(p => '<div class="azplayer"><div class="azhead">' + escapeHtml(p.name) + '</div></div>').join('');
     if (!b.is_player) join.classList.remove('hidden');
@@ -193,14 +197,31 @@ function azRender() {
   const head = '🔷 Round ' + b.round + ' · bag ' + b.bag + ' · lid ' + b.lid +
     ' · first: ' + escapeHtml(b.players[b.first_player] ? b.players[b.first_player].name : '?');
   if (b.phase === 'game_end') {
-    turn.textContent = head + ' · 🏆 ' + (b.winners || []).map(i => escapeHtml(b.players[i].name)).join(' & ');
+    turn.textContent = head;
+    const winNames = (b.winners || []).map(i => b.players[i] ? b.players[i].name : '?');
+    banner.className = 'azturnbanner azwin';
+    banner.textContent = '🏆 ' + winNames.join(' & ') +
+      (winNames.length === 1 ? ' wins the game!' : ' win the game!');
     board.innerHTML = b.players.map((p, i) => azPlayer(p, b, i)).join('');
     rematch.classList.remove('hidden');
     return;
   }
   const cur = b.players[b.current];
-  turn.textContent = head + ' · ' + (cur ? escapeHtml(cur.name) : '?') + "'s turn" +
-    (b.can_act ? ' (you)' : '');
+  // Whose turn it is gets its own big banner — it used to hide at the
+  // end of the small info line and was easy to miss.
+  turn.textContent = head;
+  banner.classList.remove('hidden');
+  if (cur && cur.user_id === AZ.user_id) {
+    banner.className = 'azturnbanner azmine';
+    banner.textContent = '👉 Your turn!';
+  } else if (cur) {
+    banner.className = 'azturnbanner azwait';
+    banner.textContent = '⏳ ' + cur.name + "'s turn" +
+      (cur.npc && b.can_act ? ' — you play for them' : '');
+  } else {
+    banner.className = 'azturnbanner azwait';
+    banner.textContent = '⏳ Waiting…';
+  }
   const picking = b.can_act && !b.pending;
   const facs = b.factories.map(f => {
     const avail = azPickColors(b, 'factory', f.index);

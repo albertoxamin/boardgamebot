@@ -17,6 +17,35 @@ function tbLog(s) {
   const e = document.getElementById('tbLog');
   if (e) e.textContent += s + '\n';
 }
+// FB-0095/FB-0096: styling lives here, not in flip7.html (shared file).
+// Turn banner, current-player badge, recent-moves box, wait note.
+function tbInjectStyle() {
+  if (document.getElementById('tbStyle')) return;
+  const st = document.createElement('style');
+  st.id = 'tbStyle';
+  st.textContent = '.tbbanner{font-size:18px;font-weight:800;border-radius:10px;padding:9px 12px;' +
+    'margin-bottom:8px;text-align:center}.tbbanner.tbmyturn{background:#14532d;color:#dcfce7;' +
+    'border:2px solid #22c55e}.tbbanner.tbnpc{background:#3b0764;color:#f3e8ff;border:2px solid #a855f7}' +
+    '.tbbanner.tbwait{background:#1e293b;color:#cbd5e1;border:2px solid #475569}' +
+    '.tbturnbadge{display:inline-block;font-size:11px;font-weight:800;border-radius:999px;' +
+    'padding:1px 8px;margin-left:6px;background:#f59e0b;color:#111;vertical-align:middle}' +
+    '.tbturnbadge.tbmine{background:#22c55e;color:#052e16}' +
+    '.tbrecent{background:#0f172a99;border:1px solid #334155;border-radius:10px;padding:7px 10px;' +
+    'margin-bottom:8px;font-size:13px;line-height:1.45}.tbrecent b{display:block;font-size:12px;' +
+    'color:#94a3b8;margin-bottom:2px}.tbackrow.tbnotmine .tbrack{opacity:.55}' +
+    '.tbwaitnote{font-size:12px;font-weight:700;color:#fbbf24;margin-top:5px}';
+  document.head.appendChild(st);
+}
+// The viewer is the actor only when the current/pending player is them.
+// NOTE: bot.py sets can_act true while the NPC acts too (anyone may play
+// for the NPC), so can_act alone must NOT gate the viewer's rack —
+// otherwise during the NPC's turn the viewer can "select" their own toys
+// and the app tries to place the NPC's troop at that index (FB-0096c).
+function tbIsMyTurn(g) {
+  const a = g.actor;
+  return a !== null && a !== undefined && g.players[a] &&
+         g.players[a].user_id === TBG.user_id;
+}
 function tbApi(path, opts) { return fetch(path, opts).then(r => r.json()); }
 function tbChatId(raw) {
   let s = String(raw || '');
@@ -112,9 +141,13 @@ function tbMedal(m, data) {
 function tbRack(p, me, g, idx) {
   const tiles = [];
   const n = Math.max(8, p.rack_count);
+  const myTurn = tbIsMyTurn(g);
   for (let i = 0; i < n; i++) {
     const type = p.rack[i];
-    const can = me && g.can_act && !g.pending && (g.legal[String(i)] || []).length;
+    // FB-0096 (c): only the viewer's own turn makes their toys tappable.
+    // During the NPC's turn (incl. its pending choice) the rack is plain
+    // display — no buttons, no tap-to-place.
+    const can = me && myTurn && !g.pending && (g.legal[String(i)] || []).length;
     if (type === undefined) tiles.push('<span class="tback"></span>');
     else if (!me) tiles.push('<span class="track"><span class="tback"></span></span>');
     else {
@@ -134,6 +167,7 @@ function tbRack(p, me, g, idx) {
 function tbRender() {
   const g = TBG.board;
   if (!g) return;
+  tbInjectStyle();
   const turn = document.getElementById('tbTurn');
   const board = document.getElementById('tbBoard');
   const actions = document.getElementById('tbActions');
@@ -145,12 +179,66 @@ function tbRender() {
   [join, start, howto, rematch, draw].forEach(el => el.classList.add('hidden'));
   actions.innerHTML = '';
   document.getElementById('tbLog').textContent = (g.log || []).join('\n');
+  // FB-0095: who is to move, stated plainly. can_act is also true while
+  // the NPC acts (anyone may play for it), so the old header said
+  // "your move" on the NPC's turn too — that was the confusion.
+  const actorP = (g.actor !== null && g.actor !== undefined) ? g.players[g.actor] : null;
+  const myTurn = tbIsMyTurn(g);
+  const npcTurn = !!(actorP && actorP.npc);
+  const actorName = actorP ? actorP.name : '';
+  // A selection made on my turn must not survive into someone else's
+  // turn (the poll refreshes every 3s): it would offer 📍 Base buttons
+  // for the other player's legal spots.
+  if (!myTurn) TBG.selected = null;
   const names = g.players.map(p => escapeHtml(p.name) + (p.npc ? ' 🤖' : '') +
     ' <b class="tb' + (p.color === 'red' ? 'red' : 'blue') + '">' + p.medals + '/' + g.medal_target + ' 🏅</b>').join(' vs ');
+  const turnSuffix = g.phase === 'play'
+    ? (myTurn ? ' · <b>your move</b>' : npcTurn ? ' · <b>NPC\'s turn</b>' :
+       ' · <b>' + escapeHtml(actorName) + '\'s turn</b>')
+    : '';
   turn.innerHTML = g.phase === 'lobby' ? '🎯 Toy Battle lobby — ' + g.players.length + '/2 · ' + names :
                    g.phase === 'game_end' ? '🏆 ' + (g.winner === null ? 'Draw' :
                      escapeHtml((g.players[g.winner] || {}).name || 'Winner')) + ' wins! · ' + names :
-                   '🎯 Turn ' + g.turn + ' · ' + names + (g.can_act ? ' · <b>your move</b>' : '');
+                   '🎯 Turn ' + g.turn + ' · ' + names + turnSuffix;
+  // Prominent turn banner + recent moves (FB-0095, FB-0096 b): the log at
+  // the bottom is easy to miss, so the last moves and whose turn it is
+  // sit above the board instead.
+  let banner = document.getElementById('tbBanner');
+  if (!banner) {
+    banner = document.createElement('div');
+    banner.id = 'tbBanner';
+    turn.parentNode.insertBefore(banner, turn.nextSibling);
+  }
+  let recent = document.getElementById('tbRecent');
+  if (!recent) {
+    recent = document.createElement('div');
+    recent.id = 'tbRecent';
+    banner.parentNode.insertBefore(recent, banner.nextSibling);
+  }
+  if (g.phase === 'play') {
+    if (myTurn) {
+      banner.className = 'tbbanner tbmyturn';
+      banner.textContent = '👉 Tocca a te — your move!';
+    } else if (npcTurn) {
+      banner.className = 'tbbanner tbnpc';
+      banner.textContent = g.pending
+        ? '🤖 Tocca a NPC — scegli per lui qui sotto 👇'
+        : '🤖 Tocca a NPC — gioca per lui: 🎁 pesca o piazza un suo giocattolo';
+    } else {
+      banner.className = 'tbbanner tbwait';
+      banner.textContent = '⏳ Tocca a ' + actorName + ' — aspetta il tuo turno';
+    }
+    banner.classList.remove('hidden');
+    const last = (g.log || []).slice(-3);
+    recent.className = 'tbrecent';
+    recent.innerHTML = last.length
+      ? '<b>📜 Ultime mosse</b>' + last.map(e => '<div>' + escapeHtml(e) + '</div>').join('')
+      : '';
+    recent.classList.toggle('hidden', !last.length);
+  } else {
+    banner.classList.add('hidden');
+    recent.classList.add('hidden');
+  }
   if (g.phase === 'lobby') {
     board.innerHTML = '<div class="tblobby">Join, then anyone taps Start.</div>';
     if (!g.is_player) join.classList.remove('hidden');
@@ -165,10 +253,25 @@ function tbRender() {
     Object.entries(g.medal_spots).forEach(([m, d]) => { html += tbMedal(m, d); });
     html += '</div><div class="tbracks">';
     g.players.forEach((p, i) => {
-      html += '<div class="tbackrow' + (p.is_current ? ' tbcurrent' : '') + '">' +
+      const isMe = p.user_id === TBG.user_id;
+      // FB-0095: a badge on the current player's row, not just the thin
+      // amber border (.tbcurrent) that was easy to miss.
+      const badge = p.is_current
+        ? '<span class="tbturnbadge' + (isMe && myTurn ? ' tbmine' : '') + '">' +
+          (isMe && myTurn ? '👉 TOCCA A TE' : npcTurn && p.npc ? '🤖 TURNO NPC' : '▶️ DI TURNO') + '</span>'
+        : '';
+      const rowCls = 'tbackrow' + (p.is_current ? ' tbcurrent' : '') +
+                     (isMe && !myTurn && g.phase === 'play' ? ' tbnotmine' : '');
+      html += '<div class="' + rowCls + '">' +
               '<div class="tbhead">' + (i === 0 ? '🔵 ' : '🔴 ') + escapeHtml(p.name) +
               (p.npc ? ' 🤖' : '') + ' · 🎒' + p.rack_count + ' · 📦' + p.reserve +
-              ' · 🗑' + p.discard + '</div><div class="tbrack">' + tbRack(p, p.user_id === TBG.user_id, g, i) + '</div></div>';
+              ' · 🗑' + p.discard + badge + '</div><div class="tbrack">' + tbRack(p, isMe, g, i) + '</div>' +
+              // FB-0096 (c): say so on the viewer's own row while waiting,
+              // including during the NPC's pending choice.
+              (isMe && !myTurn && g.phase === 'play'
+                ? '<div class="tbwaitnote">⏳ Aspetta il tuo turno — i tuoi giocattoli non si possono selezionare ora</div>'
+                : '') +
+              '</div>';
     });
     html += '</div>';
     board.innerHTML = html;
@@ -178,7 +281,7 @@ function tbRender() {
     // Tap-to-place (FB-0090): with a troop selected, tapping a legal base
     // on the board places it there. The 📍 Base buttons below stay as-is.
     board.querySelectorAll('[data-base]').forEach(el => el.addEventListener('click', () => {
-      if (TBG.selected === null || g.pending) return;
+      if (TBG.selected === null || g.pending || !myTurn) return;
       const base = Number(el.dataset.base);
       if ((g.legal[String(TBG.selected)] || []).map(Number).includes(base))
         tbMove('place', {index: TBG.selected, base: base});
@@ -193,8 +296,11 @@ function tbRender() {
         actions.appendChild(b);
       });
     } else if (g.can_act) {
+      // 🎁 Draw stays available on the NPC's turn: the NPC has no AI, the
+      // viewer draws for it. Only the rack-selection buttons below need
+      // myTurn — a selection cannot exist off-turn any more.
       draw.classList.remove('hidden');
-      if (TBG.selected !== null && (g.legal[String(TBG.selected)] || []).length) {
+      if (myTurn && TBG.selected !== null && (g.legal[String(TBG.selected)] || []).length) {
         const back = document.createElement('button');
         back.type = 'button';
         back.className = 'tbopt';

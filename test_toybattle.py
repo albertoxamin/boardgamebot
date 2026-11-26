@@ -256,5 +256,54 @@ class EngineTests(unittest.TestCase):
         self.assertIn(".tbmedal.tbclaimed", html)
 
 
+    def test_miniapp_turn_banner_npc_log_rack_lock(self):
+        # FB-0095: a prominent turn banner + a badge on the current
+        # player's row — the old header ("Turn 2 · Annalisa 0/7 vs NPC 0/7
+        # · your move") and the thin .tbcurrent border were easy to miss.
+        # FB-0096 (b): the NPC's moves surface above the board (last 3 log
+        # lines), not only in the small log at the bottom. FB-0096 (c): the
+        # viewer's rack is only tappable on their own turn — never while
+        # the NPC acts, including during the NPC's pending choice.
+        js = open(os.path.dirname(__file__) + "/web/toybattle.js").read()
+        self.assertIn("tbBanner", js)
+        self.assertIn("tbbanner", js)
+        self.assertIn("Tocca a te", js)
+        self.assertIn("Tocca a NPC", js)
+        self.assertIn("tbturnbadge", js)
+        self.assertIn("TOCCA A TE", js)
+        self.assertIn("TURNO NPC", js)
+        self.assertIn("tbRecent", js)
+        self.assertIn("Ultime mosse", js)
+        self.assertIn("tbwaitnote", js)
+        self.assertIn("Aspetta il tuo turno", js)
+        self.assertIn("tbIsMyTurn(g)", js)
+        self.assertIn("me && myTurn && !g.pending", js)
+        self.assertIn("if (TBG.selected === null || g.pending || !myTurn) return;", js)
+        self.assertIn("if (!myTurn) TBG.selected = null;", js)
+        self.assertIn("NPC\\'s turn", js)
+        # The 🎁 Draw button stays available on the NPC's turn: the NPC
+        # has no AI, the viewer draws for it.
+        self.assertIn("the NPC has no AI", js)
+
+    def test_board_json_can_act_true_on_npc_turn(self):
+        # FB-0096 (c): bot.py reports can_act True while the NPC acts
+        # (anyone may play for it), so the Mini App must gate the rack on
+        # the actor, not on can_act — otherwise the viewer can "select"
+        # their own toys on the NPC's turn and the app would try to place
+        # the NPC's troop at that rack index.
+        import bot as BOT
+
+        g = TB.new_game(-7, 100, "Annalisa")
+        assert BOT.add_npc("toybattle", g) is None
+        ev = []
+        assert TB.start_game(g, ev, random.Random(4)) is None
+        g["current"] = 1
+        b = BOT.toybattle_board_json(g, 100)
+        self.assertTrue(b["can_act"])
+        self.assertEqual(b["actor"], 1)
+        self.assertTrue(b["players"][1]["npc"])
+        self.assertEqual(b["players"][1]["rack"], g["players"][1]["rack"])
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

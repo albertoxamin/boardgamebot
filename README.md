@@ -410,8 +410,7 @@ Mini App, routed by `start_param`). Engine: `altay.py` + `tests/altay/test_altay
 
 BGG: https://boardgamegeek.com/boardgame/472803/black-flag
 
-A simplified digital version of *Black Flag!* (Robert Burke, Matt Forbeck and
-James Ernest, 2018). Everyone gets a Captain, its Ship, a hidden Role and 4
+A simplified digital version of *Black Flag!* (Emiliano Sciarra, 2026). Everyone gets a Captain, its Ship, a hidden Role and 4
 cards (6th-8th players get 5); the Admiral is revealed. On your turn take a
 Ship if you have none, draw 2, play any number of cards, then keep at most 5.
 Shots hit within your Ship's Range; Sails add 1 to your effective distance,

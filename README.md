@@ -171,6 +171,10 @@ group sees every flip); minimum 2 players to start (official game is 3+ —
 Flip-Three player; a Freeze during the initial deal removes that player
 from the rest of the initial deal.
 
+A full 3-player game was also simulated end-to-end (hits/stays/actions/
+round rotation → a winner at 200+ in 13 rounds) with the Telegram layer
+mocked out.
+
 ## Regicide (same bot, second game)
 
 Co-op vs 12 royals (J 10/20, Q 15/30, K 20/40), 2–4 players, hand limit 7/6/5.
@@ -513,6 +517,3 @@ Game Arena into `assets/fadenfroh/images/fadenfroh-*.webp` (raw sheets also kept
 ```bash
 python3 -m pytest tests/    # full suite (pytest; tests live in tests/, per game)
 ```
-A full 3-player game was also simulated end-to-end (hits/stays/actions/
-round rotation → a winner at 200+ in 13 rounds) with the Telegram layer
-mocked out.

@@ -1,4 +1,6 @@
 // Regicide Mini App (synced, initData auto-login). Loaded by flip7.html router.
+
+const RG_HOW_TO_PLAY_URL = 'https://youtu.be/l2MhBVsfxr0?si=KjuojBZisaPyrAoT';
 const RG={user_id:0,chat_id:null,board:null,timer:null,init:'',selected:[],prevPlayed:[],prevHand:[],prevEnemyKey:'',prevDamage:0,prevCounts:{},prevAll:null};
 function rgHp(b){let e=b.enemy,max=e?(e.rank==='K'?40:e.rank==='Q'?30:20):0;return max-(b.enemy_damage||0);}
 function rgCounts(b){let c={'g:castle':(b.castle||[]).length,'g:tavern':b.tavern_count,'g:discard':b.discard_count,'g:kills':b.kills,'g:hp':rgHp(b)};
@@ -80,6 +82,7 @@ function rgRender(){let b=RG.board; if(!b)return;
  document.getElementById('rgYield').classList.toggle('hidden',!myTurn);
  document.getElementById('rgDiscard').classList.toggle('hidden',!myDiscard);
  document.getElementById('rgStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.players.some(p=>p.user_id===RG.user_id)));
+ document.getElementById('rgHowTo').classList.toggle('hidden', b.phase !== 'lobby');
  document.getElementById('rgRematch').classList.toggle('hidden',!((b.phase==='won'||b.phase==='lost')&&b.is_player));
  let t=document.getElementById('rgTurn'),ab=document.getElementById('rgActions'); ab.innerHTML='';
  if(b.phase==='playing') t.textContent=myTurn?'👉 Your turn - select card(s) and Play, or Yield':'👉 '+b.players[b.current_index].name+"'s turn";
@@ -125,6 +128,13 @@ document.getElementById('rgPlay').addEventListener('click',()=>{
  rgMove('play',{cards:cards});});
 document.getElementById('rgYield').addEventListener('click',()=>rgMove('yield'));
 document.getElementById('rgStart').addEventListener('click',()=>rgMove('start'));
+document.getElementById('rgHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(RG_HOW_TO_PLAY_URL);
+    else window.open(RG_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(RG_HOW_TO_PLAY_URL, '_blank'); }
+});
 document.getElementById('rgRematch').addEventListener('click',()=>rgMove('rematch'));
 document.getElementById('rgDiscard').addEventListener('click',()=>{
  let cards=RG.selected.map(i=>RG.board.my_hand[i]);

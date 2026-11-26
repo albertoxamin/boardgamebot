@@ -120,3 +120,25 @@ if __name__ == "__main__":
             fn()
             print(f"PASS {name}")
     print("all lsd tests passed")
+
+
+def test_lobby_has_how_to_play_button():
+    # FB-0075: the Let's Summon Demons lobby has a "🎥 How to play" button that opens the
+    # how-to-play video, both on the Telegram board and in the Mini App lobby.
+    import bot as BOT
+
+    g = L.new_game(-1004393094474, 1, "Alice")
+    kb = BOT.lsd_keyboard(g)
+    flat = [b for row in kb for b in row]
+    howto = [b for b in flat if b.get("text") == "🎥 How to play"]
+    assert len(howto) == 1
+    assert howto[0].get("url") == BOT.LSD_HOW_TO_PLAY_URL
+    assert "youtu.be/RFJhMRZ3lpE" in howto[0]["url"]
+    js = open(os.path.dirname(__file__) + "/web/lsd.js").read()
+    assert "LSD_HOW_TO_PLAY_URL" in js
+    assert "youtu.be/RFJhMRZ3lpE" in js
+    assert "openLink" in js
+    assert "lsdHowTo" in js
+    html = open(os.path.dirname(__file__) + "/web/flip7.html").read()
+    assert 'id="lsdHowTo"' in html
+    assert "🎥 How to play" in html

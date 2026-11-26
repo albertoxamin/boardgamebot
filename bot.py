@@ -40,7 +40,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 75
+WEB_VER = 76
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -661,11 +661,15 @@ def turn_ping(g):
     return None
 
 
+F7_HOW_TO_PLAY_URL = "https://youtu.be/PZcjfZJwx4w?si=-CAUqXc0peWOL5x1"
+
+
 def keyboard(g):
     if g["phase"] == "lobby":
         kb = [[{"text": "🙋 Join game", "callback_data": "f7:join"}]]
         if can_add_npc("games", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "f7:npc"}])
+        kb.append([{"text": "🎥 How to play", "url": F7_HOW_TO_PLAY_URL}])
         ct = g.get("chat_type") or ("supergroup" if int(g["chat_id"]) < 0 else "private")
         wk = web_keyboard(ct, g["chat_id"])
         if wk:
@@ -794,6 +798,9 @@ def rg_board_text(g):
     return "\n".join(lines)
 
 
+RG_HOW_TO_PLAY_URL = "https://youtu.be/l2MhBVsfxr0?si=KjuojBZisaPyrAoT"
+
+
 def rg_keyboard(g):
     if g["phase"] in ("won", "lost"):
         return [[{"text": "🔄 Rematch!", "callback_data": "rg:rematch"}]]
@@ -803,6 +810,7 @@ def rg_keyboard(g):
         kb = [[{"text": "🙋 Join Regicide", "callback_data": "rg:join"}]]
         if can_add_npc("regicide", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "rg:npc"}])
+        kb.append([{"text": "🎥 How to play", "url": RG_HOW_TO_PLAY_URL}])
         return kb + (wk or [])
     kb = []
     cur = g["players"][g["current_index"]] if g["players"] else None
@@ -1026,6 +1034,9 @@ def odin_board_text(g):
     return "\n".join(lines)
 
 
+ODIN_HOW_TO_PLAY_URL = "https://youtu.be/c4Mufd5xY3Q?si=KmjD-GRMoGB2_Wve"
+
+
 def odin_keyboard(g):
     if g["phase"] == "game_end":
         return [[{"text": "🔄 Rematch!", "callback_data": "od:rematch"}]]
@@ -1035,6 +1046,7 @@ def odin_keyboard(g):
         kb = [[{"text": "🙋 Join Odin", "callback_data": "od:join"}]]
         if can_add_npc("odin", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "od:npc"}])
+        kb.append([{"text": "🎥 How to play", "url": ODIN_HOW_TO_PLAY_URL}])
         return kb + (wk or [])
     kb = []
     if g["phase"] == "playing" and g["table"]:
@@ -1243,6 +1255,9 @@ def leaves_board_text(g):
     return "\n".join(lines)
 
 
+LEAVES_HOW_TO_PLAY_URL = "https://youtu.be/s_pJ2p1Zjew?si=nIVNTKu1QTiW4j6S"
+
+
 def leaves_keyboard(g):
     if g.get("phase") == "game_end":
         return [[{"text": "🔄 Rematch!", "callback_data": "lv:rematch"}]]
@@ -1252,6 +1267,7 @@ def leaves_keyboard(g):
         kb = [[{"text": "🙋 Join 13 Leaves", "callback_data": "lv:join"}]]
         if can_add_npc("leaves", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "lv:npc"}])
+        kb.append([{"text": "🎥 How to play", "url": LEAVES_HOW_TO_PLAY_URL}])
         return kb + (wk or [])
     kb = []
     if g.get("phase") == "playing":
@@ -1909,6 +1925,9 @@ def lsd_pending_options(g):
     return []
 
 
+LSD_HOW_TO_PLAY_URL = "https://youtu.be/RFJhMRZ3lpE?si=nKoy2Yg4Rzqep-8Y"
+
+
 def lsd_keyboard(g):
     if g["phase"] == "game_end":
         return [[{"text": "🔄 Rematch!", "callback_data": "lsd:rematch"}]]
@@ -1918,6 +1937,7 @@ def lsd_keyboard(g):
         kb = [[{"text": "🙋 Join Summon Demons", "callback_data": "lsd:join"}]]
         if can_add_npc("lsd", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "lsd:npc"}])
+        kb.append([{"text": "🎥 How to play", "url": LSD_HOW_TO_PLAY_URL}])
         return kb + (wk or [])
     kb = []
     if g["pending"]:
@@ -2189,6 +2209,9 @@ def spots_pending_options(g):
     return []
 
 
+SPOTS_HOW_TO_PLAY_URL = "https://youtu.be/I5c3HI46qpM?si=JeiYy8wfRDMUBAPG"
+
+
 def spots_keyboard(g):
     if g["phase"] == "game_end":
         return [[{"text": "🔄 Rematch!", "callback_data": "spots:rematch"}]]
@@ -2198,6 +2221,7 @@ def spots_keyboard(g):
         kb = [[{"text": "🙋 Join Spots", "callback_data": "spots:join"}]]
         if can_add_npc("spots", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "spots:npc"}])
+        kb.append([{"text": "🎥 How to play", "url": SPOTS_HOW_TO_PLAY_URL}])
         return kb + (wk or [])
     kb = []
     if g["pending"]:
@@ -2954,6 +2978,9 @@ def fliptoons_board_text(g):
     return "\n".join(lines)
 
 
+FT_HOW_TO_PLAY_URL = "https://youtu.be/BP-DW0KpinA?si=1nrdo7uzt6ANssLd"
+
+
 def fliptoons_keyboard(g):
     if g["phase"] == "game_end":
         return [[{"text": "🔄 Rematch!", "callback_data": "ft:rematch"}]]
@@ -2963,6 +2990,7 @@ def fliptoons_keyboard(g):
         kb = [[{"text": "🙋 Join Fliptoons", "callback_data": "ft:join"}]]
         if can_add_npc("fliptoons", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "ft:npc"}])
+        kb.append([{"text": "🎥 How to play", "url": FT_HOW_TO_PLAY_URL}])
         return kb + (wk or [])
     kb = []
     pend = g.get("pending")
@@ -3425,6 +3453,9 @@ def castlecombo_board_text(g):
     return "\n".join(lines)
 
 
+CC_HOW_TO_PLAY_URL = "https://youtu.be/W7D1JK_-HvU?si=sbc2HwRdyPHuV1p0"
+
+
 def castlecombo_keyboard(g):
     if g["phase"] == "game_end":
         return [[{"text": "🔄 Rematch!", "callback_data": "cc:rematch"}]]
@@ -3434,6 +3465,7 @@ def castlecombo_keyboard(g):
         kb = [[{"text": "🙋 Join Castle Combo", "callback_data": "cc:join"}]]
         if can_add_npc("castlecombo", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "cc:npc"}])
+        kb.append([{"text": "🎥 How to play", "url": CC_HOW_TO_PLAY_URL}])
         return kb + (wk or [])
     kb = []
     pend = g.get("pending")
@@ -4158,6 +4190,9 @@ def _az_choice_text(opt):
     return f"{label} {icon}×{opt['count']}"
 
 
+AZ_HOW_TO_PLAY_URL = "https://youtu.be/byHjDCxF5WU?si=aTYP9yfTQMTcqRXY"
+
+
 def azul_keyboard(g):
     if g["phase"] == "game_end":
         return [[{"text": "🔄 Rematch!", "callback_data": "az:rematch"}]]
@@ -4168,6 +4203,7 @@ def azul_keyboard(g):
         if can_add_npc("azul", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "az:npc"}])
         kb.append([{"text": "▶️ Start game", "callback_data": "az:start"}])
+        kb.append([{"text": "🎥 How to play", "url": AZ_HOW_TO_PLAY_URL}])
         return kb + (wk or [])
     kb = []
     pend = g.get("pending")

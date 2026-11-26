@@ -1,4 +1,6 @@
 // Castle Combo Mini App (synced, initData auto-login). Loaded by flip7.html router.
+
+const CC_HOW_TO_PLAY_URL = 'https://youtu.be/W7D1JK_-HvU?si=sbc2HwRdyPHuV1p0';
 const CCAPP={user_id:0,chat_id:null,board:null,timer:null,init:'',err:'',prev:null};
 function ccCounts(b){let c={};(b.players||[]).forEach((p,i)=>{c['c:'+i+':gold']=p.gold;c['c:'+i+':keys']=p.keys;c['c:'+i+':cards']=p.cards;});return c;}
 function ccZones(b){let z={};[1,2].forEach(loc=>{let sec=b.rows&&b.rows[String(loc)];if(sec&&sec.live)(sec.cards||[]).forEach(c=>z[ccKey(c)]='row:'+loc);});
@@ -278,6 +280,7 @@ function ccRender(){
  ccFit(board);
  document.getElementById('ccJoin').classList.toggle('hidden',!(b.phase==='lobby'&&!b.is_player));
  document.getElementById('ccStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.is_player));
+ document.getElementById('ccHowTo').classList.toggle('hidden', b.phase !== 'lobby');
  document.getElementById('ccRematch').classList.toggle('hidden',!(b.phase==='game_end'&&b.is_player));
  board.querySelectorAll('[data-buy]').forEach(el=>el.addEventListener('click',ev=>{ev.stopPropagation();ccMove('buy',{iid:parseInt(el.dataset.buy)});}));
  board.querySelectorAll('[data-flip]').forEach(el=>el.addEventListener('click',ev=>{ev.stopPropagation();ccMove('flip',{iid:parseInt(el.dataset.flip)});}));
@@ -299,6 +302,13 @@ function ccRender(){
 }
 document.getElementById('ccJoin').addEventListener('click',()=>ccMove('join'));
 document.getElementById('ccStart').addEventListener('click',()=>ccMove('start'));
+document.getElementById('ccHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(CC_HOW_TO_PLAY_URL);
+    else window.open(CC_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(CC_HOW_TO_PLAY_URL, '_blank'); }
+});
 document.getElementById('ccRematch').addEventListener('click',()=>ccMove('rematch'));
 document.getElementById('ccZoom').addEventListener('click',ccZoomClose);
 if(!document.getElementById('castlecombo').classList.contains('hidden')) ccLoad();

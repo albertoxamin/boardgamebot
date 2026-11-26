@@ -1,4 +1,6 @@
 const WIN=200;
+
+const F7_HOW_TO_PLAY_URL = 'https://youtu.be/PZcjfZJwx4w?si=-CAUqXc0peWOL5x1';
 let G=null;
 let guideKey='games';
 // Router: same Main Mini App serves both games. startapp=regicide<chat_id>
@@ -251,6 +253,7 @@ function renderSync(){let b=SYNC.board; if(!b)return;
  document.getElementById('syncHit').classList.toggle('hidden',!myTurn);
  document.getElementById('syncStay').classList.toggle('hidden',!myTurn);
  document.getElementById('syncStart').classList.toggle('hidden',!(b.phase==='lobby'&&me));
+ document.getElementById('syncHowTo').classList.toggle('hidden', b.phase !== 'lobby');
  document.getElementById('syncJoin').classList.toggle('hidden',!(b.phase==='lobby'&&me&&!b.is_player));
  document.getElementById('syncRematch').classList.toggle('hidden',!(b.phase==='game_end'&&b.is_player));
  let t=document.getElementById('syncTurn'),ab=document.getElementById('syncActions'); ab.innerHTML='';
@@ -276,6 +279,13 @@ document.getElementById('syncHit').addEventListener('click',()=>move('hit'));
 document.getElementById('syncStay').addEventListener('click',()=>move('stay'));
 document.getElementById('syncJoin').addEventListener('click',()=>move('join'));
 document.getElementById('syncStart').addEventListener('click',()=>move('start'));
+document.getElementById('syncHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(F7_HOW_TO_PLAY_URL);
+    else window.open(F7_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(F7_HOW_TO_PLAY_URL, '_blank'); }
+});
 document.getElementById('syncRematch').addEventListener('click',()=>move('rematch'));
 (function autoSync(){let tg=tgInit(); if(!tg.id)return;
  // Regicide/Odin/LSD/Spots modes are started by their own scripts (loaded after this file).

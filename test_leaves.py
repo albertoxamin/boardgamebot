@@ -124,3 +124,25 @@ if __name__ == "__main__":
     test_pass_and_serialize()
     print("PASS test_pass_and_serialize")
     print("all leaves tests passed")
+
+
+def test_lobby_has_how_to_play_button():
+    # FB-0074: the 13 Leaves lobby has a "🎥 How to play" button that opens the
+    # how-to-play video, both on the Telegram board and in the Mini App lobby.
+    import bot as BOT
+
+    g = L.new_game(-1004393094474, 1, "Alice")
+    kb = BOT.leaves_keyboard(g)
+    flat = [b for row in kb for b in row]
+    howto = [b for b in flat if b.get("text") == "🎥 How to play"]
+    assert len(howto) == 1
+    assert howto[0].get("url") == BOT.LEAVES_HOW_TO_PLAY_URL
+    assert "youtu.be/s_pJ2p1Zjew" in howto[0]["url"]
+    js = open(os.path.dirname(__file__) + "/web/leaves.js").read()
+    assert "LV_HOW_TO_PLAY_URL" in js
+    assert "youtu.be/s_pJ2p1Zjew" in js
+    assert "openLink" in js
+    assert "lvHowTo" in js
+    html = open(os.path.dirname(__file__) + "/web/flip7.html").read()
+    assert 'id="lvHowTo"' in html
+    assert "🎥 How to play" in html

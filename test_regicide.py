@@ -151,3 +151,25 @@ if __name__ == "__main__":
             fn()
             print(f"PASS {name}")
     print("all regicide tests passed")
+
+
+def test_lobby_has_how_to_play_button():
+    # FB-0073: the Regicide lobby has a "🎥 How to play" button that opens the
+    # how-to-play video, both on the Telegram board and in the Mini App lobby.
+    import bot as BOT
+
+    g = R.new_game(-1004393094474, 1, "Alice")
+    kb = BOT.rg_keyboard(g)
+    flat = [b for row in kb for b in row]
+    howto = [b for b in flat if b.get("text") == "🎥 How to play"]
+    assert len(howto) == 1
+    assert howto[0].get("url") == BOT.RG_HOW_TO_PLAY_URL
+    assert "youtu.be/l2MhBVsfxr0" in howto[0]["url"]
+    js = open(os.path.dirname(__file__) + "/web/regicide.js").read()
+    assert "RG_HOW_TO_PLAY_URL" in js
+    assert "youtu.be/l2MhBVsfxr0" in js
+    assert "openLink" in js
+    assert "rgHowTo" in js
+    html = open(os.path.dirname(__file__) + "/web/flip7.html").read()
+    assert 'id="rgHowTo"' in html
+    assert "🎥 How to play" in html

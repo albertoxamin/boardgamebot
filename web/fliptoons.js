@@ -1,4 +1,6 @@
 // Fliptoons Mini App (synced, initData auto-login). Loaded by flip7.html router.
+
+const FT_HOW_TO_PLAY_URL = 'https://youtu.be/BP-DW0KpinA?si=1nrdo7uzt6ANssLd';
 const FLP={user_id:0,chat_id:null,board:null,timer:null,init:'',err:'',prevAll:null};
 function ftCounts(b){let c={};(b.players||[]).forEach((p,i)=>{c['t:'+i+':fame']=p.fame;c['t:'+i+':deck']=p.deck;c['t:'+i+':discarded']=p.discarded;});return c;}
 function ftLog(s){let e=document.getElementById('ftLog');if(e)e.textContent+=s+'\n';}
@@ -257,6 +259,7 @@ function ftRender(){
  ftFit(board);
  document.getElementById('ftJoin').classList.toggle('hidden',!(b.phase==='lobby'&&!b.is_player));
  document.getElementById('ftStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.is_player));
+ document.getElementById('ftHowTo').classList.toggle('hidden', b.phase !== 'lobby');
  document.getElementById('ftSkip').classList.toggle('hidden',!myMarket);
  document.getElementById('ftRematch').classList.toggle('hidden',!(b.phase==='game_end'&&b.is_player));
  board.querySelectorAll('[data-hire]').forEach(el=>el.addEventListener('click',()=>ftMove('hire',{slot:parseInt(el.dataset.hire)})));
@@ -268,6 +271,13 @@ function ftRender(){
 }
 document.getElementById('ftJoin').addEventListener('click',()=>ftMove('join'));
 document.getElementById('ftStart').addEventListener('click',()=>ftMove('start'));
+document.getElementById('ftHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(FT_HOW_TO_PLAY_URL);
+    else window.open(FT_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(FT_HOW_TO_PLAY_URL, '_blank'); }
+});
 document.getElementById('ftSkip').addEventListener('click',()=>ftMove('skip'));
 document.getElementById('ftZoom').addEventListener('click',ftZoomClose);
 document.getElementById('ftRematch').addEventListener('click',()=>ftMove('rematch'));

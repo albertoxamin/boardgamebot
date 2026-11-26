@@ -123,3 +123,25 @@ if __name__ == "__main__":
             fn()
             print(f"PASS {name}")
     print("all odin tests passed")
+
+
+def test_lobby_has_how_to_play_button():
+    # FB-0072: the Odin lobby has a "🎥 How to play" button that opens the
+    # how-to-play video, both on the Telegram board and in the Mini App lobby.
+    import bot as BOT
+
+    g = O.new_game(-1004393094474, 1, "Alice")
+    kb = BOT.odin_keyboard(g)
+    flat = [b for row in kb for b in row]
+    howto = [b for b in flat if b.get("text") == "🎥 How to play"]
+    assert len(howto) == 1
+    assert howto[0].get("url") == BOT.ODIN_HOW_TO_PLAY_URL
+    assert "youtu.be/c4Mufd5xY3Q" in howto[0]["url"]
+    js = open(os.path.dirname(__file__) + "/web/odin.js").read()
+    assert "ODIN_HOW_TO_PLAY_URL" in js
+    assert "youtu.be/c4Mufd5xY3Q" in js
+    assert "openLink" in js
+    assert "odHowTo" in js
+    html = open(os.path.dirname(__file__) + "/web/flip7.html").read()
+    assert 'id="odHowTo"' in html
+    assert "🎥 How to play" in html

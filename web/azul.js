@@ -1,4 +1,6 @@
 // Azul Mini App (synced). Loaded by flip7.html router after leaves.js helpers.
+
+const AZ_HOW_TO_PLAY_URL = 'https://youtu.be/byHjDCxF5WU?si=aTYP9yfTQMTcqRXY';
 const AZ = {user_id: 0, chat_id: null, board: null, timer: null, init: '',
             pick: null, pickKey: ''};
 const AZ_TILE_SRC = {
@@ -137,9 +139,10 @@ function azRender() {
   const join = document.getElementById('azJoin');
   const start = document.getElementById('azStart');
   const rematch = document.getElementById('azRematch');
+  const howto = document.getElementById('azHowTo');
   const pickKey = [b.phase, b.round, b.current, b.pending ? 'p' : 'd', b.can_act].join(':');
   if (AZ.pickKey !== pickKey) { AZ.pick = null; AZ.pickKey = pickKey; }
-  [join, start, rematch].forEach(el => el.classList.add('hidden'));
+  [join, start, howto, rematch].forEach(el => el.classList.add('hidden'));
   opts.innerHTML = '';
   actions.innerHTML = '';
   if (b.phase === 'lobby') {
@@ -148,6 +151,7 @@ function azRender() {
       b.players.map(p => '<div class="azplayer"><div class="azhead">' + escapeHtml(p.name) + '</div></div>').join('');
     if (!b.is_player) join.classList.remove('hidden');
     start.classList.remove('hidden');
+    howto.classList.remove('hidden');
     return;
   }
   const head = '🔷 Round ' + b.round + ' · bag ' + b.bag + ' · lid ' + b.lid +
@@ -224,6 +228,13 @@ function azRender() {
   });
   document.getElementById('azJoin').addEventListener('click', () => azMove('join'));
   document.getElementById('azStart').addEventListener('click', () => azMove('start'));
+document.getElementById('azHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(AZ_HOW_TO_PLAY_URL);
+    else window.open(AZ_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(AZ_HOW_TO_PLAY_URL, '_blank'); }
+});
   document.getElementById('azRematch').addEventListener('click', () => azMove('rematch'));
   if (!document.getElementById('azul').classList.contains('hidden')) azLoad();
 })();

@@ -1,4 +1,6 @@
 // Spots Mini App (synced, initData auto-login). Loaded by flip7.html router.
+
+const SPOTS_HOW_TO_PLAY_URL = 'https://youtu.be/I5c3HI46qpM?si=JeiYy8wfRDMUBAPG';
 const SP={user_id:0,chat_id:null,board:null,timer:null,init:'',dieSel:null,rerollSel:new Set(),prev:null,flyInfo:null};
 function spCounts(b){let c={};(b.players||[]).forEach((p,i)=>{c['s:'+i+':score']=p.scored.length;c['s:'+i+':treats']=p.treats;});return c;}
 function spOldRects(){let dice={},yards={},spots={};
@@ -140,6 +142,7 @@ function spRender(){let b=SP.board; if(!b)return;
   SP.flyInfo=null; SP.prev={counts:fresh};
   document.getElementById('spotsScore').classList.add('hidden'); // score action lives in the top strip now
  document.getElementById('spotsStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.players.some(p=>p.user_id===SP.user_id)));
+ document.getElementById('spotsHowTo').classList.toggle('hidden', b.phase !== 'lobby');
  document.getElementById('spotsRematch').classList.toggle('hidden',!(b.phase==='game_end'&&b.is_player));
  let t=document.getElementById('spotsTurn');
  if(b.phase==='playing') t.textContent=pend? '👉 '+nameOf(b,pend.player)+' to choose' : (myTurn?'👉 Your turn - choose a trick or Score':'👉 '+b.players[b.current_index].name+"'s turn");
@@ -150,6 +153,13 @@ function spRender(){let b=SP.board; if(!b)return;
 function nameOf(b,uid){let p=b.players.find(p=>p.user_id===uid);return p?p.name:'?';}
 document.getElementById('spotsScore').addEventListener('click',()=>spMove('score'));
 document.getElementById('spotsStart').addEventListener('click',()=>spMove('start'));
+document.getElementById('spotsHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(SPOTS_HOW_TO_PLAY_URL);
+    else window.open(SPOTS_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(SPOTS_HOW_TO_PLAY_URL, '_blank'); }
+});
 document.getElementById('spotsRematch').addEventListener('click',()=>spMove('rematch'));
 // Self-start when router (flip7.js) selected Spots mode.
 if(!document.getElementById('spots').classList.contains('hidden')) spLoad();

@@ -1,4 +1,6 @@
 // Let's Summon Demons Mini App (synced, initData auto-login). Loaded by flip7.html router.
+
+const LSD_HOW_TO_PLAY_URL = 'https://youtu.be/RFJhMRZ3lpE?si=nKoy2Yg4Rzqep-8Y';
 const SD={user_id:0,chat_id:null,board:null,timer:null,init:'',sacSel:[],demonSel:null,summonMode:false,replaceSel:[],prevMarket:[],prev:null};
 function sdCounts(b){let c={};(b.players||[]).forEach((p,i)=>{c['d:'+i+':souls']=p.souls;c['d:'+i+':demons']=p.demons.length;});return c;}
 function sdPublic(b){let z={};(b.players||[]).forEach((p,i)=>{
@@ -101,6 +103,7 @@ function sdRender(){let b=SD.board; if(!b)return;
  document.getElementById('lsdSummon').textContent=SD.summonMode?'✖ Cancel summon':'😈 Summon (select cards)';
  document.getElementById('lsdEnd').classList.toggle('hidden',!(myTurn&&b.turn&&b.turn.rolled));
  document.getElementById('lsdStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.players.some(p=>p.user_id===SD.user_id)));
+ document.getElementById('lsdHowTo').classList.toggle('hidden', b.phase !== 'lobby');
  document.getElementById('lsdRematch').classList.toggle('hidden',!(b.phase==='game_end'&&b.is_player));
  // Summon confirm (in Actions, appended after demon hand)
  if(SD.summonMode && myTurn){
@@ -158,6 +161,13 @@ function nameOf(b,uid){let p=b.players.find(p=>p.user_id===uid);return p?p.name:
 document.getElementById('lsdRoll').addEventListener('click',()=>sdMove('roll'));
 document.getElementById('lsdEnd').addEventListener('click',()=>sdMove('end'));
 document.getElementById('lsdStart').addEventListener('click',()=>sdMove('start'));
+document.getElementById('lsdHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(LSD_HOW_TO_PLAY_URL);
+    else window.open(LSD_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(LSD_HOW_TO_PLAY_URL, '_blank'); }
+});
 document.getElementById('lsdRematch').addEventListener('click',()=>sdMove('rematch'));
 document.getElementById('lsdSummon').addEventListener('click',()=>{SD.summonMode=!SD.summonMode; SD.sacSel=[]; SD.demonSel=null; sdRender();});
 // Self-start when router (flip7.js) selected LSD mode.

@@ -253,3 +253,25 @@ def test_autobury_single_die_only():
     g2["trick"]["placed_roll"] = 1
     assert S._autobury(g2, []) is True
     assert g2["trick"]["dice"] == [] and 6 in i2p["yard"]
+
+
+def test_lobby_has_how_to_play_button():
+    # FB-0070: the Spots lobby has a "🎥 How to play" button that opens the
+    # how-to-play video, both on the Telegram board and in the Mini App lobby.
+    import bot as BOT
+
+    g = S.new_game(-1004393094474, 1, "Alice")
+    kb = BOT.spots_keyboard(g)
+    flat = [b for row in kb for b in row]
+    howto = [b for b in flat if b.get("text") == "🎥 How to play"]
+    assert len(howto) == 1
+    assert howto[0].get("url") == BOT.SPOTS_HOW_TO_PLAY_URL
+    assert "youtu.be/I5c3HI46qpM" in howto[0]["url"]
+    js = open(os.path.dirname(__file__) + "/web/spots.js").read()
+    assert "SPOTS_HOW_TO_PLAY_URL" in js
+    assert "youtu.be/I5c3HI46qpM" in js
+    assert "openLink" in js
+    assert "spotsHowTo" in js
+    html = open(os.path.dirname(__file__) + "/web/flip7.html").read()
+    assert 'id="spotsHowTo"' in html
+    assert "🎥 How to play" in html

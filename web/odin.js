@@ -1,4 +1,6 @@
 // Odin Mini App (synced, initData auto-login). Loaded by flip7.html router.
+
+const ODIN_HOW_TO_PLAY_URL = 'https://youtu.be/c4Mufd5xY3Q?si=KmjD-GRMoGB2_Wve';
 const OD={user_id:0,chat_id:null,board:null,timer:null,init:'',selected:[],pickupSel:null,prevTable:[],prevHand:[],prev:null,flyCards:null};
 function odCounts(b){let c={};(b.players||[]).forEach((p,i)=>{c['o:'+i+':score']=p.score;c['o:'+i+':hand']=p.hand_count;});return c;}
 function odOldRects(){let cards={},seats={},table=null;
@@ -80,6 +82,7 @@ function odRender(){let b=OD.board; if(!b)return;
  document.getElementById('odPass').classList.toggle('hidden',!(myTurn&&b.table&&b.table.length));
  document.getElementById('odPickup').classList.toggle('hidden',!myPickup);
  document.getElementById('odStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.players.some(p=>p.user_id===OD.user_id)));
+ document.getElementById('odHowTo').classList.toggle('hidden', b.phase !== 'lobby');
  document.getElementById('odRematch').classList.toggle('hidden',!(b.phase==='game_end'&&b.is_player));
  // Pickup selection: table set cards are tappable only for the picker
  let tb=document.getElementById('odBoard');
@@ -136,6 +139,13 @@ document.getElementById('odPlay').addEventListener('click',()=>{
   OD.flyCards=cards.map(c=>c.rank+c.suit); odMove('play',{cards:cards});});
 document.getElementById('odPass').addEventListener('click',()=>odMove('pass'));
 document.getElementById('odStart').addEventListener('click',()=>odMove('start'));
+document.getElementById('odHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(ODIN_HOW_TO_PLAY_URL);
+    else window.open(ODIN_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(ODIN_HOW_TO_PLAY_URL, '_blank'); }
+});
 document.getElementById('odRematch').addEventListener('click',()=>odMove('rematch'));
 document.getElementById('odPickup').addEventListener('click',()=>{
  if(!OD.pickupSel){odLog('Tap 1 card from the previous set first');return;}

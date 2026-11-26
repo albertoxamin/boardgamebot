@@ -1,4 +1,6 @@
 // Leaves Mini App (synced). Loaded by flip7.html router.
+
+const LV_HOW_TO_PLAY_URL = 'https://youtu.be/s_pJ2p1Zjew?si=nIVNTKu1QTiW4j6S';
 const LV={user_id:0,chat_id:null,board:null,timer:null,init:'',sel:[]};
 const LV_COLS=7, LV_ROWS=2;
 const LV_TILE_W=330, LV_TILE_H=518;
@@ -92,6 +94,7 @@ function lvRender(){
   else if(b.phase==='game_end') t.textContent='🏆 Winner: '+(b.winner_name||'?');
   else t.textContent='';
   document.getElementById('lvStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.is_player));
+ document.getElementById('lvHowTo').classList.toggle('hidden', b.phase !== 'lobby');
   document.getElementById('lvPlay').classList.toggle('hidden',!(isMyTurn&&b.phase==='playing'));
   document.getElementById('lvPass').classList.toggle('hidden',!(isMyTurn&&b.phase==='playing'&&b.row&&b.row.length>0));
 }
@@ -116,4 +119,11 @@ document.getElementById('lvPlay').addEventListener('click',()=>{
 });
 document.getElementById('lvPass').addEventListener('click',()=>{ if(!confirm('Pass and take from leftmost stack (pos 1)?')) return; lvMove('pass',{take_index:0}); });
 document.getElementById('lvStart').addEventListener('click',()=>lvMove('start'));
+document.getElementById('lvHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(LV_HOW_TO_PLAY_URL);
+    else window.open(LV_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(LV_HOW_TO_PLAY_URL, '_blank'); }
+});
 if(!document.getElementById('leaves').classList.contains('hidden')) lvLoad();

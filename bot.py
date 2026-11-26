@@ -40,7 +40,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 94
+WEB_VER = 95
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 # Mini App assets: per-game scripts in assets/<game>/scripts/, per-game
@@ -4820,6 +4820,17 @@ def rumblenation_actor_idx(g, uid):
     return _actor_idx(g, uid, g["current"])
 
 
+def rumblenation_may_act(g, uid):
+    """True if uid may act now: the current player, or anyone when the
+    current player is the NPC (anyone may play for it). FB-0105: the
+    tactic-card picker (rn:t) and Back (rn:back) changed the shared
+    sel_card with no turn check at all, so another player could re-render
+    the shared board during your turn; roll/deploy/tactic were already
+    protected by the engine, but the picker was not."""
+    actor = rumblenation_actor_idx(g, uid)
+    return actor is not None and actor == g["current"]
+
+
 def rumblenation_board_text(g):
     lines = list(RN.board_lines(g))
     if g["phase"] == "select":
@@ -6825,7 +6836,7 @@ def handle_callback(state, cb):
                 save_state(state)
             return
         actor = rumblenation_actor_idx(g, uid)
-        if actor is None:
+        if not rumblenation_may_act(g, uid):
             return answer_cb(cb["id"], "Not your turn.")
         if action == "back":
             g["sel_card"] = None

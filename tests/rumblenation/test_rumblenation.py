@@ -537,6 +537,42 @@ class ViewTests(unittest.TestCase):
         self.assertIn("rnsharednote", js)
         self.assertIn("One shared map", js)
 
+    def test_only_current_player_may_act(self):
+        # FB-0105: "when it's my turn, only I should place the soldiers
+        # — not all players at the same time in my turn". The engine
+        # already rejects off-turn rolls and deploys; the Telegram
+        # callback handler additionally gates every gameplay button
+        # (including the tactic-card picker and Back, which used to
+        # change the shared sel_card with no turn check at all) through
+        # rumblenation_may_act. The NPC stays playable by anyone.
+        import bot as BOT
+        g, _ = game([3, 4, 5])
+        self.assertTrue(BOT.rumblenation_may_act(g, 1))   # Alice, turn player
+        self.assertFalse(BOT.rumblenation_may_act(g, 2))  # Bob, not his turn
+        self.assertFalse(BOT.rumblenation_may_act(g, 99))  # not in the game
+        self.assertIsNotNone(RN.roll(g, 1))
+        self.assertIsNotNone(RN.deploy(g, 1, 3, 9, []))
+        # After Alice deploys, it is Bob's turn and the gate flips.
+        setup_castles(g, {9: 0, 8: 1, 7: 2})
+        RN.roll(g, 0)
+        self.assertIsNone(RN.deploy(g, 0, 5, 7, []))
+        self.assertFalse(BOT.rumblenation_may_act(g, 1))
+        self.assertTrue(BOT.rumblenation_may_act(g, 2))
+        # NPC game: once the turn passes to the NPC, anyone may act for it.
+        g2 = RN.new_game(7, 1, "Alice", rng=FixedRng([3, 4, 5]))
+        g2["players"].append({**RN.new_player(-1, "NPC"), "npc": True})
+        ev = []
+        assert RN.start_game(g2, ev) is None
+        RN.roll(g2, 0)
+        RN.deploy(g2, 0, 5, 7, ev)
+        self.assertEqual(g2["current"], 1)
+        self.assertTrue(BOT.rumblenation_may_act(g2, 1))
+        self.assertTrue(BOT.rumblenation_may_act(g2, 99))
+        # And in the Mini App the tactic cards are only selectable on
+        # your own turn — off-turn tapping no longer highlights a card.
+        js = open(os.path.join(ROOT, "assets", "rumblenation", "scripts", "rumblenation.js")).read()
+        self.assertIn("if (g.can_act) board.querySelectorAll('[data-card]')", js)
+
     def test_castle_token_sprites_match_their_numbers(self):
         # FB-0061: castle 7 and 11 were swapped in assets/rumblenation/scripts/rumblenation.js, so
         # the token face did not match the castle value in the rules.

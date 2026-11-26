@@ -224,7 +224,9 @@ function rnRender() {
   html += '<div class="rnlegend">🎲 The single die decides the soldiers: ' +
     '1–2 → 1 soldier · 3–4 → 2 soldiers · 5–6 → 3 soldiers</div>';
   board.innerHTML = html;
-  board.querySelectorAll('[data-card]').forEach(el => el.addEventListener('click', () => {
+  // FB-0105: tactic cards are only selectable on your own turn — off-turn
+  // tapping used to highlight a card even though no action buttons follow.
+  if (g.can_act) board.querySelectorAll('[data-card]').forEach(el => el.addEventListener('click', () => {
     RNG.card = Number(el.dataset.card);
     rnRender();
   }));

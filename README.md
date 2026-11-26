@@ -1,38 +1,8 @@
-# Flip 7 Telegram Bot
+# Board games Telegram Bot
 
-Play Flip 7 (The Op, 2024) with friends in a Telegram group. Pure Python 3
+Play Board games with friends in a Telegram group. Pure Python 3
 stdlib (bot + engine), game state in a local JSON file. No npm/pip needed
 to run the bot itself.
-
-## Rules used (researched online)
-
-Sources: official rulebook (bghub.org/r/flip7.pdf), Asmodee "How to Play
-Flip 7", The Ludarium academy guide.
-
-- **Deck (94):** numbers `0×1, 1×1, 2×2 … 12×12` (79) · modifiers
-  `+2 +4 +6 +8 +10 x2` (6) · actions `3× Freeze, Flip Three, Second Chance` (9).
-- **Round:** dealer deals 1 face-up card to each player (actions are
-  resolved as they are dealt). Then players in turn order choose
-  **Hit** (flip another card) or **Stay** (bank points, sit out; needs ≥1 card).
-- **Bust:** a second number card matching one you already have → out, **0 pts**.
-  Modifiers/actions can never bust and don't count toward 7.
-- **Flip 7:** 7 unique numbers → round ends immediately, **+15 bonus**.
-- **Scoring:** sum numbers → `x2` doubles the *numbers only* → add `+` modifiers → +15 if Flip 7.
-- **Actions** (the player who flips it picks any *active* player):
-  - *Freeze* – that player banks and leaves the round.
-  - *Flip Three* – that player flips the next 3 cards; stops on bust/Flip 7.
-    A Second Chance works during it; Freeze/Flip Three drawn during it are
-    deferred until after the 3 cards (and only used if not busted).
-  - *Second Chance* – keep 1 max; on a later duplicate, discard both and stay in.
-- **Between rounds:** round cards are set aside (not reshuffled), dealer
-  rotates; discards are only reshuffled when the deck runs out. **First to
-  200** wins; a tie at 200+ plays extra rounds until one unique winner.
-
-*Bot adaptations:* cards are public/face-up (as in the physical game, so the
-group sees every flip); minimum 2 players to start (official game is 3+ —
-`/startgame` warns you); deferred Freeze/Flip Three are chosen by the
-Flip-Three player; a Freeze during the initial deal removes that player
-from the rest of the initial deal.
 
 ## 1. Create the bot (BotFather — the "new" API)
 
@@ -170,6 +140,36 @@ Rocket-Loader-transformed scripts. Three ways to offer it:
    `sendGame`; tapping Play triggers a callback that the bot answers with
    `answerCallbackQuery(url=FLIP7_GAME_URL)`. Scores can be posted
    server-side with `setGameScore` (not from the page).
+
+## Rules used (researched online)
+
+Sources: official rulebook (bghub.org/r/flip7.pdf), Asmodee "How to Play
+Flip 7", The Ludarium academy guide.
+
+- **Deck (94):** numbers `0×1, 1×1, 2×2 … 12×12` (79) · modifiers
+  `+2 +4 +6 +8 +10 x2` (6) · actions `3× Freeze, Flip Three, Second Chance` (9).
+- **Round:** dealer deals 1 face-up card to each player (actions are
+  resolved as they are dealt). Then players in turn order choose
+  **Hit** (flip another card) or **Stay** (bank points, sit out; needs ≥1 card).
+- **Bust:** a second number card matching one you already have → out, **0 pts**.
+  Modifiers/actions can never bust and don't count toward 7.
+- **Flip 7:** 7 unique numbers → round ends immediately, **+15 bonus**.
+- **Scoring:** sum numbers → `x2` doubles the *numbers only* → add `+` modifiers → +15 if Flip 7.
+- **Actions** (the player who flips it picks any *active* player):
+  - *Freeze* – that player banks and leaves the round.
+  - *Flip Three* – that player flips the next 3 cards; stops on bust/Flip 7.
+    A Second Chance works during it; Freeze/Flip Three drawn during it are
+    deferred until after the 3 cards (and only used if not busted).
+  - *Second Chance* – keep 1 max; on a later duplicate, discard both and stay in.
+- **Between rounds:** round cards are set aside (not reshuffled), dealer
+  rotates; discards are only reshuffled when the deck runs out. **First to
+  200** wins; a tie at 200+ plays extra rounds until one unique winner.
+
+*Bot adaptations:* cards are public/face-up (as in the physical game, so the
+group sees every flip); minimum 2 players to start (official game is 3+ —
+`/startgame` warns you); deferred Freeze/Flip Three are chosen by the
+Flip-Three player; a Freeze during the initial deal removes that player
+from the rest of the initial deal.
 
 ## Regicide (same bot, second game)
 

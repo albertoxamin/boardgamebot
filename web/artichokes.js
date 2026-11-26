@@ -7,10 +7,16 @@ const AT_COLOR={beet:'#9f2645',broccoli:'#33762f',carrot:'#ef9131',corn:'#f3d80d
  eggplant:'#7c3883',leek:'#6e8d51',onion:'#b66d36',peas:'#72b146',pepper:'#f3b637',
    potato:'#a27c3e',artichoke:'#c9d336',rhubarb:'#cb4f6b'};
 function atCardName(v){return String(v||'').replace(/^./,c=>c.toUpperCase());}
-function atChoiceCard(label){let s=String(label||'').toLowerCase();
+function atChoiceVeg(label){let s=String(label||'').toLowerCase();
  let v=Object.keys(AT_SPRITE).find(k=>k!=='back'&&s.indexOf(k)>=0);
+ return v||'';}
+function atChoiceCard(label){let v=atChoiceVeg(label);
  if(!v)return '';
  return '<img class="atchoiceimg" src="/artichokes_cards/'+AT_SPRITE[v]+'.jpg?v='+AT_VER+'" alt="'+escapeHtml(atCardName(v))+'">';}
+function atChoiceDesc(label){
+ let v=atChoiceVeg(label);
+ if(!v)return '';
+ return (ATAPP.board&&ATAPP.board.descriptions&&ATAPP.board.descriptions[v])||'';}
 function atCardDesc(c){
  let fromBoard=(ATAPP.board&&ATAPP.board.descriptions&&ATAPP.board.descriptions[c.v])||'';
  return fromBoard||String(c.desc||'');}
@@ -182,8 +188,21 @@ function atRender(){
       return '<button class="atchoice'+(on?' atsel':'')+'" data-at-pass="'+escapeHtml(String(o.v))+'">'+atChoiceCard(o.label)+'<span>'+escapeHtml(o.label)+'</span></button>';
     }).join('')+'</div>'+(b.can_act?'<button class="hit" id="atPassGo"'+(n!==need?' disabled':'')+'>✅ Pass selected ('+n+'/'+need+')</button>':'')+'</div>';
   }else{
-   choice.innerHTML='<div class="table"><b>'+escapeHtml(pend.prompt)+'</b><div class="atchoices">'+
-     opts.map(o=>'<button class="atchoice" data-at-ch="'+escapeHtml(String(o.v))+'">'+atChoiceCard(o.label)+'<span>'+escapeHtml(o.label)+'</span></button>').join('')+'</div></div>';
+   // FB-0088: show the cards revealed by Peas (name + description) above
+   // the choice, so the chooser can see both cards while picking who
+   // receives the other one. pending.revealed comes from the board JSON.
+   let revealed='';
+   if(pend.revealed){
+    let cards=Array.isArray(pend.revealed)?pend.revealed:[pend.revealed];
+    if(cards.length)revealed='<div class="atrowcards">'+cards.map(c=>atCard(c,'atrowcard')).join('')+'</div>';
+   }
+   choice.innerHTML='<div class="table"><b>'+escapeHtml(pend.prompt)+'</b>'+revealed+'<div class="atchoices">'+
+     opts.map(o=>{
+      let d=atChoiceDesc(o.label);
+      return '<button class="atchoice" data-at-ch="'+escapeHtml(String(o.v))+'">'+atChoiceCard(o.label)+
+       '<span style="display:flex;flex-direction:column;align-items:flex-start;text-align:left;gap:1px"><span>'+escapeHtml(o.label)+'</span>'+
+       (d?'<span style="font-weight:400;font-size:11px;line-height:1.25;opacity:.85">'+escapeHtml(d)+'</span>':'')+'</span></button>';
+     }).join('')+'</div></div>';
   }
  }
   let a='';

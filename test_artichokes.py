@@ -296,6 +296,51 @@ def test_peas():
     assert g["garden_stack"] == []
 
 
+def test_peas_pending_revealed_cards_have_names_and_descriptions():
+    # FB-0088: the Peas pending choice must carry both revealed cards, each
+    # with a name and a description from the engine's card definitions, so
+    # the chooser can see what both cards do before picking a recipient.
+    g, ev = mk()
+    idx = g["current_index"]
+    g["phase"] = "play"
+    set_hand(g, idx, ["peas"])
+    g["garden_stack"] = [card("beet", 601), card("corn", 602)]
+    ps = g["players"][idx]["hand"][0]["id"]
+    assert A.do_play(g, idx, ps, ev) is None
+    pend = g["pending"]
+    assert pend["kind"] == "peas"
+    assert [c["v"] for c in pend["revealed"]] == ["corn", "beet"]
+    for c in pend["revealed"]:
+        assert A.card_name(c)
+        assert A.card_desc(c)
+    assert "Reveal two cards" in A.card_desc({"v": "peas"})
+
+
+def test_peas_pending_board_json_includes_revealed_cards():
+    # FB-0088: the Mini App board JSON must expose the revealed cards (with
+    # name and description) in the pending object, for both Peas stages.
+    import bot
+    g, ev = mk()
+    idx = g["current_index"]
+    target = (idx + 1) % 3
+    g["phase"] = "play"
+    set_hand(g, idx, ["peas"])
+    g["garden_stack"] = [card("beet", 601), card("corn", 602)]
+    ps = g["players"][idx]["hand"][0]["id"]
+    assert A.do_play(g, idx, ps, ev) is None
+    viewer = g["players"][idx]["user_id"]
+    board = bot.artichokes_board_json(g, viewer)
+    revealed = board["pending"].get("revealed") or []
+    assert [c["v"] for c in revealed] == ["corn", "beet"]
+    for c in revealed:
+        assert c["name"] == A.card_name(c)
+        assert c["desc"] == A.card_desc(c) and c["desc"]
+    # Second stage (choose which card you keep): revealed cards still shown.
+    assert A.apply_choice(g, idx, target, ev) is None
+    board = bot.artichokes_board_json(g, viewer)
+    assert [c["v"] for c in board["pending"].get("revealed") or []] == ["corn", "beet"]
+
+
 def test_potato():
     g, ev = mk()
     idx = g["current_index"]

@@ -40,7 +40,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 83
+WEB_VER = 84
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -3851,6 +3851,9 @@ def artichokes_board_text(g):
     pend = g.get("pending")
     if pend:
         lines.append(f"❓ {html.escape(pend['prompt'])}")
+        if pend.get("kind") == "peas" and pend.get("revealed"):
+            for c in pend["revealed"]:
+                lines.append(f"   🫛 {AT.card_label(c)}: {html.escape(AT.card_desc(c))}")
         if pend.get("kind") == "eggplant":
             lines.append("   Pass privately via the Mini App or /artichokes_pass &lt;card ids&gt;.")
         elif pend.get("options"):
@@ -4094,6 +4097,8 @@ def artichokes_board_json(g, viewer_id=None):
         pending = {"kind": pend["kind"], "by": pend.get("by"),
                    "prompt": pend["prompt"], "options": opts,
                    "chosen": pend.get("answers", {}).get(viewer_idx, []) if pend["kind"] == "eggplant" else []}
+        if isinstance(pend.get("revealed"), list):
+            pending["revealed"] = [_at_card_json(c) for c in pend["revealed"]]
     return {"chat_id": g["chat_id"], "phase": g["phase"], "round": g["round"],
             "descriptions": AT.DESCRIPTIONS,
             "garden_row": [{"pos": i, **_at_card_json(c)} for i, c in enumerate(g["garden_row"])],

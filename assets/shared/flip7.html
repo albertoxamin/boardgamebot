@@ -306,6 +306,12 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .lvrow-item{text-align:center;cursor:pointer}
 .lvstack{position:relative;flex:none}
 .guide-btn{position:fixed;top:8px;right:8px;z-index:900;width:34px;height:34px;border-radius:50%;padding:0;font-size:18px;background:#1e293b;color:#e2e8f0;border:2px solid #475569;box-shadow:0 2px 8px #0008}
+/* FB-0154: rulebook button, fixed bottom-right and always visible during
+   the game (lobby, play, game end — it lives in the shared shell, not in
+   a per-game panel). Links to the game's rulebook PDF in the repo; the
+   href is set per game by the router in flip7.js. */
+.rulebook-btn{position:fixed;bottom:12px;right:12px;z-index:900;width:44px;height:44px;border-radius:50%;padding:0;font-size:20px;background:#1e293b;color:#e2e8f0;border:2px solid #475569;box-shadow:0 2px 8px #0008;display:flex;align-items:center;justify-content:center;text-decoration:none}
+.rulebook-btn.hidden{display:none}
 .guide-overlay{position:fixed;inset:0;z-index:1100;background:#000c;display:flex;align-items:center;justify-content:center;padding:12px}
 .guide-overlay.hidden{display:none}
 .guide-card{position:relative;width:min(100%,520px);max-height:82vh;overflow:auto;background:#1e293b;border:1px solid #475569;border-radius:14px;padding:20px 14px 14px;box-shadow:0 12px 32px #000a}
@@ -548,6 +554,7 @@ button:disabled{opacity:.45;cursor:not-allowed}
 </style></head><body>
 <h1>🎴 Flip 7</h1>
 <button id="guideBtn" class="guide-btn hidden" type="button" aria-label="How to play">?</button>
+<a id="rulebookBtn" class="rulebook-btn hidden" href="#" target="_blank" rel="noopener" aria-label="Rulebook">📖</a>
 <div id="regicide" class="hidden">
 <div id="rgBoard"></div>
 <div id="rgTurn" style="font-size:18px;font-weight:700"></div>
@@ -836,7 +843,7 @@ window.PXSCROLL={
  }
 };
 </script>
-  <script data-cfasync="false" src="/assets/shared/scripts/flip7.js?v=31"></script>
+  <script data-cfasync="false" src="/assets/shared/scripts/flip7.js?v=32"></script>
   <script data-cfasync="false" src="/assets/regicide/scripts/regicide.js?v=19"></script>
 
  <script data-cfasync="false" src="/assets/odin/scripts/odin.js?v=10"></script>

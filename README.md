@@ -152,7 +152,8 @@ the game URL — but nothing sends a game message any more (there is no
 BGG: https://boardgamegeek.com/boardgame/420087/flip-7
 
 Sources: official rulebook (bghub.org/r/flip7.pdf), Asmodee "How to Play
-Flip 7", The Ludarium academy guide.
+Flip 7", The Ludarium academy guide. The official rulebook is stored in
+`assets/flip7/rulebook.pdf`.
 
 - **Deck (94):** numbers `0×1, 1×1, 2×2 … 12×12` (79) · modifiers
   `+2 +4 +6 +8 +10 x2` (6) · actions `3× Freeze, Flip Three, Second Chance` (9).
@@ -248,6 +249,7 @@ BGG: https://boardgamegeek.com/boardgame/325829/lets-summon-demons
 Let's Summon Demons (Cryptozoic, 2021), 2–5 players. Roll 2d6 to activate
 everyone's matching cards, buy Block cards for souls, and summon demons by
 discarding Block cards — first to 3 summoned demons AND 10 souls wins.
+The official rulebook is stored in `assets/lsd/rulebook.pdf`.
 Text commands: `/lsd` (create), `/lsd_join`, `/lsd_join_npc`, `/lsd_start`,
 `/lsd_roll`, `/lsd_buy <1-5>`, `/lsd_summon <demon> <sacrifices...>`,
 `/lsd_end`, `/lsd_score`, `/lsd_cancel` (creator), `/lsd_rules`. Mini App:
@@ -279,7 +281,8 @@ BGG: https://boardgamegeek.com/boardgame/2243/yahtzee
 Classic Yahtzee, 2–6 players: roll 5 dice up to 3 times (keep any dice
 between rolls), then fill one of 13 boxes. Upper section 63+ earns a +35
 bonus; Yahtzee is 50 and each extra Yahtzee after that is +100. Game ends
-when everyone has filled all 13 boxes; highest total wins.
+when everyone has filled all 13 boxes; highest total wins. The official
+rulebook is stored in `assets/yahtzee/rulebook.pdf`.
 Text commands: `/yahtzee` (create), `/yahtzee_join`, `/yahtzee_start`,
 `/yahtzee_roll [positions to keep]` (e.g. `/yahtzee_roll 1 3 5`),
 `/yahtzee_score <category>` (or tap the buttons), `/yahtzee_rules`,
@@ -296,7 +299,8 @@ Fliptoons Season 1, 2–4 players. Each round you flip cards into a 3×2
 grid, score its fame, then take 2 market actions (hire a market card, or
 dismiss one of your own face-up cards). Hired cards go on top of your deck
 for the next round. Reaching 30 fame triggers the Final Flip; most fame at
-the end wins (Critic's Choice gives +3 to the leader).
+the end wins (Critic's Choice gives +3 to the leader). The official
+rulebook is stored in `assets/fliptoons/rulebook.pdf`.
 Text commands: `/fliptoons` (create), `/fliptoons_join`,
 `/fliptoons_start`, `/fliptoons_hire <1-5>`, `/fliptoons_dismiss <card>`,
 `/fliptoons_skip`, `/fliptoons_choose <option>` (for pending abilities),
@@ -472,7 +476,8 @@ come from Seashore / Hot Spring stations.
 Dice, Culture table, Boutique set (Pottery-3/4, Fan-3/2, Doll-3 x2,
 Kimono-4 x2), ring order and zone adjacency were verified from a live BGA
 table (spectated, no login) and the BGA sprite sheets, release 261120-2009;
-the sprites are kept in `sources/tokaidoduo/bga/`. Text commands:
+the sprites are kept in `sources/tokaidoduo/bga/`. The official rulebook
+is stored in `assets/tokaidoduo/rulebook.pdf`. Text commands:
 `/tokaidoduo` (create), `/tokaidoduo_join`, `/tokaidoduo_join_npc`,
 `/tokaidoduo_start`, `/tokaidoduo_pick <pilgrim|merchant|artist>`,
 `/tokaidoduo_choose <value>`, `/tokaidoduo_rules`, `/tokaidoduo_cancel`

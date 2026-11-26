@@ -33,6 +33,15 @@ let guideKey='games';
   for(let panel in panelKeys){let el=document.getElementById(panel);
     if(el&&!el.classList.contains('hidden')){guideKey=panelKeys[panel];break;}}
   let btn=document.getElementById('guideBtn');if(btn)btn.classList.remove('hidden');
+  // FB-0154: bottom-right rulebook button, always visible during the
+  // game, linking to this game's rulebook PDF in the repo. guideKey is
+  // 'games' for Flip 7; every other key is its assets/ directory.
+  // Leaves has no rulebook stored yet, so the button stays hidden there
+  // until assets/leaves/rulebook.pdf exists.
+  let rb=document.getElementById('rulebookBtn');
+  if(rb){let dir=guideKey==='games'?'flip7':guideKey;
+   rb.href='https://github.com/albertoxamin/boardgamebot/blob/main/assets/'+dir+'/rulebook.pdf';
+   rb.classList.toggle('hidden',dir==='leaves');}
  })();
 (function guide(){
  let btn=document.getElementById('guideBtn'),box=document.getElementById('guideOverlay'),

@@ -3002,6 +3002,10 @@ def fliptoons_keyboard(g):
         kb = [[{"text": "🙋 Join Fliptoons", "callback_data": "ft:join"}]]
         if can_add_npc("fliptoons", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "ft:npc"}])
+        # FB-0102: the lobby had no Start button — only the /fliptoons_start
+        # slash command. Every other game has a "▶️ Start game" button
+        # (the ft:start callback handler already existed).
+        kb.append([{"text": "▶️ Start game", "callback_data": "ft:start"}])
         kb.append([{"text": "🎥 How to play", "url": FT_HOW_TO_PLAY_URL}])
         return kb + (wk or [])
     kb = []

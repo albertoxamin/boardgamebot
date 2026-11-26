@@ -472,14 +472,6 @@ def test_full_random_games():
             assert g["phase"] == "game_end", (npl, seed, g["round"], g["stage"])
 
 
-if __name__ == "__main__":
-    for name, fn in sorted(globals().items()):
-        if name.startswith("test_") and callable(fn):
-            fn()
-            print("ok", name)
-    print("all ok")
-
-
 def test_lobby_has_how_to_play_button():
     # FB-0076: the Fliptoons lobby has a "🎥 How to play" button that opens the
     # how-to-play video, both on the Telegram board and in the Mini App lobby.
@@ -500,6 +492,25 @@ def test_lobby_has_how_to_play_button():
     html = open(os.path.dirname(__file__) + "/web/flip7.html").read()
     assert 'id="ftHowTo"' in html
     assert "🎥 How to play" in html
+
+
+def test_lobby_has_start_button():
+    # FB-0102: the Fliptoons lobby message had no Start button — only the
+    # /fliptoons_start command. Every other game has a "▶️ Start game"
+    # button, and the ft:start callback handler already existed.
+    import bot as BOT
+
+    g = F.new_game(-1004393094474, 1, "Alice")
+    g["players"].append(BOT._ft_player(2, "Bob"))
+    kb = BOT.fliptoons_keyboard(g)
+    flat = [b for row in kb for b in row]
+    start = [b for b in flat if b.get("text") == "▶️ Start game"]
+    assert len(start) == 1
+    assert start[0].get("callback_data") == "ft:start"
+    # The callback target works: starting from the lobby deals the game.
+    ev = []
+    assert F.start_game(g, ev) is None
+    assert g["phase"] == "playing"
 
 
 def test_reference_icons_card():
@@ -543,3 +554,11 @@ def test_reference_card_both_sides():
     # Tapping the card flips to the other side instead of dismissing it.
     assert "stopPropagation" in js
     assert "Tap the card to see the other side" in js
+
+
+if __name__ == "__main__":
+    for name, fn in sorted(globals().items()):
+        if name.startswith("test_") and callable(fn):
+            fn()
+            print("ok", name)
+    print("all ok")

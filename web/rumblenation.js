@@ -1,4 +1,4 @@
-const RNG = {chat_id: null, init: '', board: null, timer: null, card: null};
+const RNG = {chat_id: null, init: '', board: null, timer: null, card: null, me: 0};
 
 const RN_HOW_TO_PLAY_URL = 'https://youtu.be/l89gewMT6uQ?si=W345viv6T7_pu5rg';
 
@@ -33,6 +33,7 @@ async function rnLoad() {
     return;
   }
   RNG.init = tg.init;
+  RNG.me = tg.id;
   const qp = new URLSearchParams(location.search);
   const pref = rnChatId(tg.start) || rnChatId(qp.get('app')) ||
                parseInt(qp.get('chat_id'), 10) || rnChatId(tg.chat_instance);
@@ -89,13 +90,45 @@ function rnCard(c) {
     '<div class="rncardcap"><b>' + escapeHtml(c.name) + '</b><br>' +
     escapeHtml(c.text) + '</div></div>';
 }
+// FB-0094: the header line alone did not make it clear whose turn it
+// is (one dense line, and the player rows carry no turn marker). A big
+// banner with the current player's name in their colour sits above the
+// header, and the current player's reserve row gets an amber border +
+// glow + a turn badge. flip7.html is shared, so this CSS is injected
+// by rumblenation.js itself.
+function rnTurnStyle() {
+  if (document.getElementById('rnTurnStyle')) return;
+  const s = document.createElement('style');
+  s.id = 'rnTurnStyle';
+  s.textContent = '.rnturnbanner{display:flex;align-items:center;justify-content:center;' +
+    'gap:6px;background:#1e293b;border:2px solid #f59e0b;border-radius:10px;' +
+    'padding:8px 12px;margin:6px 0;font-size:18px;font-weight:900;text-align:center;' +
+    'box-shadow:0 0 0 2px #f59e0b33,0 2px 10px #0008}' +
+    '.rnturnbanner .rnturnname{font-size:20px}' +
+    '.rnreserve.rnturn{border:2px solid #f59e0b;' +
+    'box-shadow:0 0 0 2px #f59e0b55,0 0 12px #f59e0b66;background:#1e293b}' +
+    '.rnturnbadge{display:inline-block;background:#f59e0b;color:#111;' +
+    'border-radius:999px;padding:1px 8px;font-size:11px;font-weight:900}';
+  if (document.head) document.head.appendChild(s);
+}
+function rnTurnBanner(g) {
+  if (g.actor === null || g.actor === undefined) return '';
+  const p = g.players[g.actor];
+  if (!p) return '';
+  const mine = p.user_id === RNG.me;
+  return '<div class="rnturnbanner">👉 <span class="rnturnname rn' + RN_COLORS[g.actor] +
+    '">' + escapeHtml(p.name) + '</span>' + (mine ? ' — your move' : '') + '</div>';
+}
 function rnReserve(g) {
   return '<div class="rnreserves">' + g.players.map((p, i) => {
     const pos = [RN_SOLDIER_POS[i * 2], RN_SOLDIER_POS[i * 2 + 1]];
-    return '<span class="rnreserve"><span class="rnmeeple" style="' +
+    const active = g.actor === i;
+    return '<span class="rnreserve' + (active ? ' rnturn' : '') + '"><span class="rnmeeple" style="' +
       rnSprite('token', pos, 22, 22, 687, 593) + '"></span> <span class="rn' +
       RN_COLORS[i] + '">' + escapeHtml(p.name) + '</span>: <b>' + p.stock +
-      '</b> soldier' + (p.stock === 1 ? '' : 's') + ' in reserve</span>';
+      '</b> soldier' + (p.stock === 1 ? '' : 's') + ' in reserve' +
+      (active ? ' <span class="rnturnbadge">▶ ' +
+        (p.user_id === RNG.me ? 'your turn' : 'turn') + '</span>' : '') + '</span>';
   }).join('') + '</div>';
 }
 // FB-0061 follow-up: the castle number tokens were fixed 44px while the
@@ -136,6 +169,7 @@ function rnRegion(r, g) {
 function rnRender() {
   const g = RNG.board;
   if (!g) return;
+  rnTurnStyle();
   const turn = document.getElementById('rnTurn');
   const board = document.getElementById('rnBoard');
   const actions = document.getElementById('rnActions');
@@ -150,10 +184,10 @@ function rnRender() {
   document.getElementById('rnLog').textContent = (g.log || []).join('\n');
   const names = g.players.map((p, i) => '<span class="rn' + RN_COLORS[i] + '">' +
     escapeHtml(p.name) + '</span> ' + p.score + ' pts · ' + p.stock + ' left · ⚔️' + p.sword).join(' vs ');
-  turn.innerHTML = g.phase === 'lobby' ? '⚔️ Rumble Nation lobby — ' + g.players.length + '/4 · ' + names :
+  turn.innerHTML = rnTurnBanner(g) + (g.phase === 'lobby' ? '⚔️ Rumble Nation lobby — ' + g.players.length + '/4 · ' + names :
     g.phase === 'game_end' ? '🏆 ' + (g.winner === null ? 'Draw' :
       escapeHtml((g.players[g.winner] || {}).name || 'Winner')) + ' wins! · ' + names :
-    '⚔️ Turn ' + g.turn + ' · ' + names + (g.can_act ? ' · <b>your move</b>' : '');
+    '⚔️ Turn ' + g.turn + ' · ' + names + (g.can_act ? ' · <b>your move</b>' : ''));
   if (g.phase === 'lobby') {
     board.innerHTML = '<div class="rnlobby">Join, then anyone taps Start.</div>';
     if (!g.is_player) join.classList.remove('hidden');

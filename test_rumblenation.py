@@ -477,6 +477,29 @@ class ViewTests(unittest.TestCase):
         self.assertIn(".rnreserves{", css)
         self.assertIn(".rnreserve{", css)
 
+    def test_current_player_is_unmissable_in_mini_app(self):
+        # FB-0094: Annalisa could not tell whose turn it was from the
+        # Mini App — the header is one dense line and the player rows
+        # carry no turn marker. The Mini App now shows a big banner with
+        # the current player's name in their colour above the header,
+        # and the current player's reserve row gets an amber border +
+        # glow plus a turn badge. The board JSON already carries the
+        # actor index, so no bot change is needed.
+        g, _ = game([2, 2, 2])
+        RN.roll(g, 0)
+        board = RN.board_json(g, 1)
+        self.assertEqual(board["phase"], "select")
+        self.assertEqual(board["actor"], 0)
+        js = open(os.path.dirname(__file__) + "/web/rumblenation.js").read()
+        self.assertIn("rnTurnBanner", js)
+        self.assertIn("g.actor", js)
+        self.assertIn(".rnturnbanner{", js)
+        self.assertIn(".rnreserve.rnturn{", js)
+        self.assertIn("rnturnbadge", js)
+        self.assertIn("your turn", js)
+        self.assertIn("rnTurnBanner(g)", js)
+        self.assertIn("rnTurnStyle()", js)
+
     def test_castle_token_sprites_match_their_numbers(self):
         # FB-0061: castle 7 and 11 were swapped in web/rumblenation.js, so
         # the token face did not match the castle value in the rules.

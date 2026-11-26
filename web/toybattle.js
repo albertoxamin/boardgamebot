@@ -1,4 +1,5 @@
 const TBG = {user_id: 0, chat_id: null, board: null, timer: null, init: '', selected: null};
+const TB_HOW_TO_PLAY_URL = 'https://www.youtube.com/watch?v=O2HjOQUFAio';
 
 function tbLog(s) {
   const e = document.getElementById('tbLog');
@@ -107,9 +108,10 @@ function tbRender() {
   const actions = document.getElementById('tbActions');
   const join = document.getElementById('tbJoin');
   const start = document.getElementById('tbStart');
+  const howto = document.getElementById('tbHowTo');
   const rematch = document.getElementById('tbRematch');
   const draw = document.getElementById('tbDraw');
-  [join, start, rematch, draw].forEach(el => el.classList.add('hidden'));
+  [join, start, howto, rematch, draw].forEach(el => el.classList.add('hidden'));
   actions.innerHTML = '';
   document.getElementById('tbLog').textContent = (g.log || []).join('\n');
   const names = g.players.map(p => escapeHtml(p.name) + (p.npc ? ' 🤖' : '') +
@@ -122,6 +124,7 @@ function tbRender() {
     board.innerHTML = '<div class="tblobby">Join, then anyone taps Start.</div>';
     if (!g.is_player) join.classList.remove('hidden');
     start.classList.remove('hidden');
+    howto.classList.remove('hidden');
     return;
   }
   if (g.phase === 'game_end') rematch.classList.remove('hidden');
@@ -173,6 +176,13 @@ function tbRender() {
 }
 document.getElementById('tbJoin').addEventListener('click', () => tbMove('join'));
 document.getElementById('tbStart').addEventListener('click', () => tbMove('start'));
+document.getElementById('tbHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(TB_HOW_TO_PLAY_URL);
+    else window.open(TB_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(TB_HOW_TO_PLAY_URL, '_blank'); }
+});
 document.getElementById('tbRematch').addEventListener('click', () => tbMove('rematch'));
 document.getElementById('tbDraw').addEventListener('click', () => tbMove('draw'));
 tbLoad();

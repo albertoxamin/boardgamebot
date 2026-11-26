@@ -1,3 +1,4 @@
+import os
 import random
 import unittest
 
@@ -156,6 +157,28 @@ class EngineTests(unittest.TestCase):
         TB.check_medals(g, ev)
         self.assertEqual(g["players"][0]["medals"], 7)
         self.assertEqual(g["phase"], "game_end")
+
+    def test_lobby_has_how_to_play_button(self):
+        # FB-0082: the Toy Battle lobby has a "🎥 How to play" button that
+        # opens the how-to-play video, both on the Telegram board and in the
+        # Mini App lobby.
+        import bot as BOT
+
+        g = TB.new_game(-1004393094474, 1, "Alice")
+        kb = BOT.toybattle_keyboard(g)
+        flat = [b for row in kb for b in row]
+        howto = [b for b in flat if b.get("text") == "🎥 How to play"]
+        self.assertEqual(len(howto), 1)
+        self.assertEqual(howto[0].get("url"), BOT.TB_HOW_TO_PLAY_URL)
+        self.assertIn("youtube.com/watch?v=O2HjOQUFAio", howto[0]["url"])
+        js = open(os.path.dirname(__file__) + "/web/toybattle.js").read()
+        self.assertIn("TB_HOW_TO_PLAY_URL", js)
+        self.assertIn("youtube.com/watch?v=O2HjOQUFAio", js)
+        self.assertIn("openLink", js)
+        self.assertIn("tbHowTo", js)
+        html = open(os.path.dirname(__file__) + "/web/flip7.html").read()
+        self.assertIn('id="tbHowTo"', html)
+        self.assertIn("🎥 How to play", html)
 
     def test_stuck_player_loses(self):
         g = game()

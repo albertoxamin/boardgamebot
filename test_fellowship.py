@@ -3,6 +3,7 @@
 Run: python3 -m pytest test_fellowship.py  OR  python3 test_fellowship.py
 """
 import json
+import os
 import random
 
 import fellowship as F
@@ -253,6 +254,29 @@ def test_public_board_privacy():
     assert all(not p["hand"] for p in b["players"][1:])
     assert isinstance(b["goals"], list)
     assert set(b["my_legal"]) <= set(g["players"][0]["hand"])
+
+
+def test_lobby_has_how_to_play_button():
+    # FB-0081: the Fellowship lobby has a "🎥 How to play" button that opens
+    # the how-to-play video, both on the Telegram board and in the Mini App
+    # lobby.
+    import bot as BOT
+
+    g = F.new_game(-1004393094474, 1, "Alice")
+    kb = BOT.fotr_keyboard(g)
+    flat = [b for row in kb for b in row]
+    howto = [b for b in flat if b.get("text") == "🎥 How to play"]
+    assert len(howto) == 1
+    assert howto[0].get("url") == BOT.FTR_HOW_TO_PLAY_URL
+    assert "youtube.com/watch?v=0WdRKisfgH4" in howto[0]["url"]
+    js = open(os.path.dirname(__file__) + "/web/fellowship.js").read()
+    assert "FTR_HOW_TO_PLAY_URL" in js
+    assert "youtube.com/watch?v=0WdRKisfgH4" in js
+    assert "openLink" in js
+    assert "ftrHowTo" in js
+    html = open(os.path.dirname(__file__) + "/web/flip7.html").read()
+    assert 'id="ftrHowTo"' in html
+    assert "🎥 How to play" in html
 
 
 if __name__ == "__main__":

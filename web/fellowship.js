@@ -1,5 +1,6 @@
 // Fellowship Mini App (synced). Loaded by flip7.html router.
 const FTR = {user_id: 0, chat_id: null, board: null, timer: null, init: '', target: null, sig: ''};
+const FTR_HOW_TO_PLAY_URL = 'https://www.youtube.com/watch?v=0WdRKisfgH4';
 const FTR_CARD_SHEET = 'fellowship_cards/cards.jpg';
 const FTR_CHAR_SHEETS = {
   early: 'fellowship_cards/characters-early.jpg',
@@ -241,6 +242,7 @@ function ftrRender() {
   let show = (id, on) => { let e = document.getElementById(id); if (e) e.classList.toggle('hidden', !on); };
   show('ftrJoin', b.phase === 'lobby' && b.is_player === false);
   show('ftrStart', b.phase === 'lobby' && b.is_player);
+  show('ftrHowTo', b.phase === 'lobby');
   show('ftrRingYes', b.phase === 'playing' && b.pending && b.pending.kind === 'ring_choice' && isPendingMine);
   show('ftrRingNo', b.phase === 'playing' && b.pending && b.pending.kind === 'ring_choice' && isPendingMine);
   show('ftrRetry', b.phase === 'round_end' || b.phase === 'chapter_end');
@@ -279,6 +281,13 @@ window.ftrNpcExchange = function (c) {
 };
 document.getElementById('ftrJoin').addEventListener('click', () => ftrMove('join'));
 document.getElementById('ftrStart').addEventListener('click', () => ftrMove('start'));
+document.getElementById('ftrHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(FTR_HOW_TO_PLAY_URL);
+    else window.open(FTR_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(FTR_HOW_TO_PLAY_URL, '_blank'); }
+});
 document.getElementById('ftrRingYes').addEventListener('click', () => ftrMove('ring', {use: true}));
 document.getElementById('ftrRingNo').addEventListener('click', () => ftrMove('ring', {use: false}));
 document.getElementById('ftrRetry').addEventListener('click', () => ftrMove('retry'));

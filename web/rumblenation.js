@@ -82,6 +82,15 @@ function rnCard(c) {
     '<div class="rncardcap"><b>' + escapeHtml(c.name) + '</b><br>' +
     escapeHtml(c.text) + '</div></div>';
 }
+function rnReserve(g) {
+  return '<div class="rnreserves">' + g.players.map((p, i) => {
+    const pos = [RN_SOLDIER_POS[i * 2], RN_SOLDIER_POS[i * 2 + 1]];
+    return '<span class="rnreserve"><span class="rnmeeple" style="' +
+      rnSprite('token', pos, 22, 22, 687, 593) + '"></span> <span class="rn' +
+      (i ? 'blue' : 'red') + '">' + escapeHtml(p.name) + '</span>: <b>' + p.stock +
+      '</b> soldier' + (p.stock === 1 ? '' : 's') + ' in reserve</span>';
+  }).join('') + '</div>';
+}
 function rnRegion(r, g) {
   const castle = r.castle;
   const tok = castle && RN_CASTLE_POS[castle]
@@ -129,7 +138,9 @@ function rnRender() {
     return;
   }
   if (g.phase === 'game_end') rematch.classList.remove('hidden');
-  let html = '<div class="rnboard">';
+  let html = '';
+  if (g.phase === 'action' || g.phase === 'select') html += rnReserve(g);
+  html += '<div class="rnboard">';
   Object.values(g.regions).forEach(r => { html += rnRegion(r, g); });
   html += '</div>';
   if (g.dice.length) {

@@ -304,6 +304,27 @@ class ViewTests(unittest.TestCase):
         self.assertIn('id="rnHowTo"', html)
         self.assertIn("▶️ How to play", html)
 
+    def test_reserve_row_shows_soldiers_left(self):
+        # FB-0067: each player must see how many soldiers they still have
+        # in reserve, not just the small "N left" buried in the header
+        # line. The Mini App shows a reserve row with the soldier meeple,
+        # the player's name and the remaining count; the board JSON that
+        # feeds it carries each player's stock.
+        g, _ = game([2, 2, 2])
+        RN.roll(g, 0)
+        board = RN.board_json(g, 1)
+        self.assertEqual([p["stock"] for p in board["players"]],
+                         [RN.SOLDIERS, RN.SOLDIERS])
+        self.assertTrue(any("left" in line for line in RN.board_lines(g)))
+        js = open(os.path.dirname(__file__) + "/web/rumblenation.js").read()
+        self.assertIn("rnReserve", js)
+        self.assertIn("in reserve", js)
+        self.assertIn("p.stock", js)
+        self.assertIn("rnReserve(g)", js)
+        css = open(os.path.dirname(__file__) + "/web/flip7.html").read()
+        self.assertIn(".rnreserves{", css)
+        self.assertIn(".rnreserve{", css)
+
     def test_castle_token_sprites_match_their_numbers(self):
         # FB-0061: castle 7 and 11 were swapped in web/rumblenation.js, so
         # the token face did not match the castle value in the rules.

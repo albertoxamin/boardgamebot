@@ -40,7 +40,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 81
+WEB_VER = 82
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -5996,6 +5996,9 @@ def blackflag_board_text(g):
     return "\n".join(lines)
 
 
+BF_HOW_TO_PLAY_URL = "https://www.youtube.com/watch?v=hXee_G0-voc"
+
+
 def blackflag_keyboard(g):
     if g["phase"] == "game_end":
         return [[{"text": "🔄 Rematch!", "callback_data": "bf:rematch"}]]
@@ -6006,6 +6009,7 @@ def blackflag_keyboard(g):
         if can_add_npc("blackflag", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "bf:npc"}])
         kb.append([{"text": "▶️ Start game", "callback_data": "bf:start"}])
+        kb.append([{"text": "🎥 How to play", "url": BF_HOW_TO_PLAY_URL}])
         return kb + (wk or [])
     kb = []
     pending = g.get("pending")

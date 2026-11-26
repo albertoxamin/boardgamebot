@@ -1,4 +1,5 @@
 const BFG = {user_id: 0, chat_id: null, board: null, timer: null, init: '', mode: null};
+const BF_HOW_TO_PLAY_URL = 'https://www.youtube.com/watch?v=hXee_G0-voc';
 
 function bfLog(s) {
   const el = document.getElementById('bfLog');
@@ -96,8 +97,9 @@ function bfRender() {
   const join = document.getElementById('bfJoin');
   const npc = document.getElementById('bfNpc');
   const start = document.getElementById('bfStart');
+  const howto = document.getElementById('bfHowTo');
   const rematch = document.getElementById('bfRematch');
-  [join, npc, start, rematch].forEach(el => el.classList.add('hidden'));
+  [join, npc, start, howto, rematch].forEach(el => el.classList.add('hidden'));
   [board, hand, actions, players].forEach(el => { el.innerHTML = ''; });
   document.getElementById('bfLog').textContent = (g.log || []).join('\n');
   const names = g.players.map(p => escapeHtml(p.name) + (p.npc ? ' 🤖' : '') +
@@ -119,6 +121,7 @@ function bfRender() {
     if (!g.is_player) join.classList.remove('hidden');
     if (g.players.length < (g.max_players || 8)) npc.classList.remove('hidden');
     start.classList.remove('hidden');
+    howto.classList.remove('hidden');
     return;
   }
   if (g.phase === 'game_end') {
@@ -197,5 +200,12 @@ function bfRender() {
 document.getElementById('bfJoin').addEventListener('click', () => bfMove('join'));
 document.getElementById('bfNpc').addEventListener('click', () => bfMove('npc'));
 document.getElementById('bfStart').addEventListener('click', () => bfMove('start'));
+document.getElementById('bfHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(BF_HOW_TO_PLAY_URL);
+    else window.open(BF_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(BF_HOW_TO_PLAY_URL, '_blank'); }
+});
 document.getElementById('bfRematch').addEventListener('click', () => bfMove('rematch'));
 bfLoad();

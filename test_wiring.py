@@ -336,6 +336,26 @@ class RegistryTests(unittest.TestCase):
 
 
 class BlackFlagTests(unittest.TestCase):
+    def test_lobby_has_how_to_play_button(self):
+        # FB-0085: the Black Flag lobby has a "🎥 How to play" button that
+        # opens the how-to-play video, both on the Telegram board and in the
+        # Mini App lobby.
+        game = BF.new_game(-1004393094474, 1, "Alice")
+        kb = bot.blackflag_keyboard(game)
+        flat = [b for row in kb for b in row]
+        howto = [b for b in flat if b.get("text") == "🎥 How to play"]
+        self.assertEqual(len(howto), 1)
+        self.assertEqual(howto[0].get("url"), bot.BF_HOW_TO_PLAY_URL)
+        self.assertIn("youtube.com/watch?v=hXee_G0-voc", howto[0]["url"])
+        js = open(os.path.join(os.path.dirname(__file__), "web", "blackflag.js")).read()
+        self.assertIn("BF_HOW_TO_PLAY_URL", js)
+        self.assertIn("youtube.com/watch?v=hXee_G0-voc", js)
+        self.assertIn("openLink", js)
+        self.assertIn("bfHowTo", js)
+        html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html")).read()
+        self.assertIn('id="bfHowTo"', html)
+        self.assertIn("🎥 How to play", html)
+
     def test_deck_and_role_metadata_are_consistent(self):
         self.assertEqual(set(BF.CARD_DECK), set(BF.CARD_INFO))
         self.assertTrue(all(copies > 0 for copies in BF.CARD_DECK.values()))

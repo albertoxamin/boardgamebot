@@ -71,6 +71,19 @@ class SetupTests(unittest.TestCase):
         self.assertEqual(g["market"]["threads"], 4)
         self.assertTrue(any("Round 1 market" in e for e in ev))
 
+    def test_starting_rows_use_starting_card_art(self):
+        # Starting sheet: 4 columns (starting numbers 1-4) x 3 rows
+        # (white, yellow, purple); art = [column, sheet row].
+        g, _ = two_player_game()
+        for i, p in enumerate(g["players"]):
+            self.assertEqual(p["start_no"], i + 1)
+            for row, color in enumerate(("yellow", "white", "purple")):
+                halves = list(p["rows"][row].values())
+                self.assertEqual([h["c"] for h in halves], [color, color])
+                sheet_row = {"white": 0, "yellow": 1, "purple": 2}[color]
+                self.assertEqual([h["art"] for h in halves],
+                                 [[i, sheet_row], [i, sheet_row]])
+
     def test_start_rejects_bad_player_counts(self):
         g = FD.new_game(7, 1, "Alice")
         self.assertEqual(FD.start_game(g, []), "Fadenfroh needs 2-4 players")

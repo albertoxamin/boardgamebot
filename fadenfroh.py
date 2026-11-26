@@ -119,13 +119,17 @@ def new_player(user_id, name):
             "start_no": 0, "passed": False, "bonus": None}
 
 
-def _start_rows(player, start_no, player_count):
-    art_col = min(player_count, 4) - 1
+# Starting-card sheet (starting-cards.jpg): 4 columns (starting numbers
+# 1-4) x 3 rows (white, yellow, purple). art = [column, sheet row].
+_START_SHEET_ROW = {"white": 0, "yellow": 1, "purple": 2}
+
+
+def _start_rows(player, start_no):
     player["start_no"] = start_no
     player["rows"] = []
     for row, color in enumerate(("yellow", "white", "purple")):
         a = {"id": f"s{row}", "h": 0, "c": color, "s": [], "start": True,
-             "art": [art_col, row], "start_no": start_no}
+             "art": [start_no - 1, _START_SHEET_ROW[color]], "start_no": start_no}
         b = dict(a, h=1)
         player["rows"].append({"3": a, "4": b})
 
@@ -184,7 +188,7 @@ def start_game(g, events=None, rng=None, scoring="random"):
     for i, p in enumerate(g["players"]):
         p["score"] = 0
         p["bonus"] = None
-        _start_rows(p, i + 1, n)
+        _start_rows(p, i + 1)
     ev.append(f"🪡 Fadenfroh started! Goals: " + ", ".join(
         f"{k}={v}" for k, v in sorted(g["goals"].items())))
     _market_phase(g, ev, rnd)

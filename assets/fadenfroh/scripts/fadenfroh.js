@@ -79,6 +79,16 @@ function ffScoreStyle(n) {
   const id = Number(n) - 1;
   return 'background-position:' + (-(id % 4) * 78) + 'px ' + (-Math.floor(id / 4) * 56) + 'px';
 }
+// Starting-card sheet (fadenfroh-starting.webp): 4 columns (starting
+// numbers 1-4) x 3 rows (white, yellow, purple); each card is two 44px
+// halves. Column comes from the player's starting number, row from the
+// half's colour, so live games dealt before this fix render right too.
+const FF_START_ROW = {white: 0, yellow: 1, purple: 2};
+function ffStartStyle(h) {
+  const col = Math.max(0, Math.min(3, ((h.start_no || 1) - 1)));
+  const row = FF_START_ROW[h.c] || 0;
+  return 'background-position:' + (-(col * 88 + (h.h || 0) * 44)) + 'px ' + (-(row * 63)) + 'px';
+}
 function ffRowHtml(row) {
   if (!row.length) return '<div class="ffrow"></div>';
   const min = Math.min.apply(null, row.map(h => h.col));
@@ -89,13 +99,12 @@ function ffRowHtml(row) {
       cls = 'ffneedle'; label = 'needle';
     } else if (h.start) {
       cls = 'ffstart';
-      style = 'background:' + ({white: '#f8fafc', yellow: '#facc15', purple: '#a855f7'}[h.c] || '#ddd') +
-        ';color:#0f172a'; label = h.c;
+      style = ffStartStyle(h); label = 'starting card';
     } else {
       style = ffHalfStyle(h.id, h.h); label = ffCardTitle(h.id);
     }
     return '<span class="' + cls + '" style="left:' + ((h.col - min) * 46) + 'px;' + style +
-      '" title="' + escapeHtml(label + ' @ column ' + h.col) + '">' + escapeHtml(label) + '</span>';
+      '" title="' + escapeHtml(label + ' @ column ' + h.col) + '"></span>';
   });
   return '<div class="ffrow" style="width:' + ((max - min + 1) * 46) + 'px">' + items.join('') + '</div>';
 }

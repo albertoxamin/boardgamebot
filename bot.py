@@ -1281,6 +1281,7 @@ def leaves_keyboard(g):
         kb = [[{"text": "🙋 Join 13 Leaves", "callback_data": "lv:join"}]]
         if can_add_npc("leaves", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "lv:npc"}])
+        kb.append([{"text": "▶️ Start game", "callback_data": "lv:start"}])
         kb.append([{"text": "🎥 How to play", "url": LEAVES_HOW_TO_PLAY_URL}])
         return kb + (wk or [])
     kb = []
@@ -1365,6 +1366,7 @@ def handle_leaves(state, msg, cmd, text, uid, name):
             if err:
                 send(chat_id, f"⛔ {err}")
             else:
+                LEAVES_MODULE.autoplay_npcs(g, ev)
                 leaves_render(g, ev)
         return True
     if cmd == "/leaves_cancel":
@@ -1392,6 +1394,7 @@ def handle_leaves(state, msg, cmd, text, uid, name):
         if err:
             send(chat_id, f"⛔ {err}")
         else:
+            LEAVES_MODULE.autoplay_npcs(g, ev)
             leaves_render(g, ev)
         return True
     if cmd == "/leaves_play":
@@ -1413,6 +1416,7 @@ def handle_leaves(state, msg, cmd, text, uid, name):
         if err:
             send(chat_id, f"⛔ {err}")
         else:
+            LEAVES_MODULE.autoplay_npcs(g, ev)
             leaves_render(g, ev)
         return True
     return False
@@ -1445,6 +1449,7 @@ def handle_leaves_callback(state, cb, chat_id, uid):
         err = LEAVES_MODULE.start_game(g, ev)
         if err:
             return answer_cb(cb["id"], err)
+        LEAVES_MODULE.autoplay_npcs(g, ev)
         leaves_render(g, ev)
         save_state(state)
         return answer_cb(cb["id"], "Started!")
@@ -1462,6 +1467,7 @@ def handle_leaves_callback(state, cb, chat_id, uid):
         err = LEAVES_MODULE.apply_action(g, idx, "pass", {"take_index": take_index}, ev)
         if err:
             return answer_cb(cb["id"], err)
+        LEAVES_MODULE.autoplay_npcs(g, ev)
         leaves_render(g, ev)
         save_state(state)
         return answer_cb(cb["id"], "Passed.")
@@ -8057,6 +8063,7 @@ def leaves_api_move(state, chat_id, user_id, body):
         err = LEAVES_MODULE.start_game(g, ev)
         if err:
             return [], err
+        LEAVES_MODULE.autoplay_npcs(g, ev)
         leaves_render(g, ev)
         return ev, None
     idx = _actor_idx(g, user_id, g.get("current_index", 0))
@@ -8066,6 +8073,7 @@ def leaves_api_move(state, chat_id, user_id, body):
     err = LEAVES_MODULE.apply_action(g, idx, action, body, ev)
     if err:
         return [], err
+    LEAVES_MODULE.autoplay_npcs(g, ev)
     leaves_render(g, ev)
     return ev, None
 

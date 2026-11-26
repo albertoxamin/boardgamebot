@@ -45,6 +45,10 @@ class LeavesGame(GameModule):
         self.normalize(game)
         return rules.pass_turn(game, actor_index, events, take_index=take_index)
 
+    def autoplay_npcs(self, game, events):
+        self.normalize(game)
+        return rules.autoplay_npcs(game, events)
+
     def apply_action(self, game, actor_index, action, payload, events):
         self.normalize(game)
         if action == "play":

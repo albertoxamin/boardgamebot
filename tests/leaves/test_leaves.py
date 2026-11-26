@@ -147,3 +147,73 @@ def test_lobby_has_how_to_play_button():
     html = open(os.path.join(ROOT, "assets", "shared", "flip7.html")).read()
     assert 'id="lvHowTo"' in html
     assert "🎥 How to play" in html
+
+
+def _mk_npc_game():
+    # 3 players: human A, NPC, human C.
+    g = mk(3)
+    g["players"][1]["npc"] = True
+    g["players"][1]["name"] = "🤖 NPC"
+    return g
+
+
+def test_npc_autoplay_plays_its_own_cards():
+    # FB-0160: the NPC must play from ITS hand, never the human's.
+    g = _mk_npc_game()
+    human_hand = [5, 5, 9]
+    g["players"][0]["hand"] = list(human_hand)
+    g["players"][1]["hand"] = [6, 6, 6, 2]
+    g["players"][2]["hand"] = [1, 2, 3]
+    g["row"] = []
+    g["passed"] = []
+    g["current_index"] = 1
+    ev = []
+    assert L.autoplay_npcs(g, ev) is None
+    # NPC leads with its three 6s (sheds the most); the human hand is untouched.
+    assert g["players"][1]["hand"] == [2]
+    assert g["players"][0]["hand"] == human_hand
+    assert g["row"] == [{"value": 6, "count": 3}]
+    # Turn moved on to the next human.
+    assert g["current_index"] == 2
+
+
+def test_npc_autoplay_passes_when_stuck():
+    g = _mk_npc_game()
+    g["players"][0]["hand"] = [5, 5, 9]
+    g["players"][1]["hand"] = [13, 13]
+    g["players"][2]["hand"] = [1, 2, 3]
+    g["row"] = [{"value": 5, "count": 3}]
+    g["passed"] = []
+    g["current_index"] = 1
+    ev = []
+    assert L.autoplay_npcs(g, ev) is None
+    # NPC cannot play (needs 3 of a value, has only two 13s): passes,
+    # takes a 5 from the row, and is marked passed. Human hand untouched.
+    assert 5 in g["players"][1]["hand"]
+    assert g["players"][1]["user_id"] in g["passed"]
+    assert g["players"][0]["hand"] == [5, 5, 9]
+    assert g["current_index"] == 2
+
+
+def test_npc_autoplay_stops_at_human():
+    g = _mk_npc_game()
+    g["current_index"] = 0
+    before = [list(p["hand"]) for p in g["players"]]
+    ev = []
+    assert L.autoplay_npcs(g, ev) is None
+    assert [list(p["hand"]) for p in g["players"]] == before
+    assert g["current_index"] == 0
+    assert ev == []
+
+
+def test_lobby_has_start_button():
+    # FB-0159: the 13 Leaves lobby keyboard was missing the Start button
+    # (the lv:start callback existed, but no button ever sent it).
+    import bot as BOT
+
+    g = L.new_game(-1004393094474, 1, "Alice")
+    kb = BOT.leaves_keyboard(g)
+    flat = [b for row in kb for b in row]
+    start = [b for b in flat if b.get("callback_data") == "lv:start"]
+    assert len(start) == 1
+    assert start[0].get("text") == "▶️ Start game"

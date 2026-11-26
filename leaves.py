@@ -257,6 +257,38 @@ def pass_turn(g, idx, events, take_index=None):
     return None
 
 
+def npc_move(g, events):
+    """One NPC turn: play the set that sheds the most cards, else pass.
+
+    The NPC plays from its own hand. Before this existed, the Mini App
+    let the human viewer move for the NPC while showing the viewer's own
+    hand, so the NPC ended up "playing" the cards in the human's hand
+    (FB-0160).
+    """
+    idx = g["current_index"]
+    moves = legal_plays(g, idx)
+    if moves:
+        p = g["players"][idx]
+        _side, value, _min = max(moves, key=lambda m: (p["hand"].count(m[1]), -m[1]))
+        return play(g, idx, value, p["hand"].count(value), events)
+    return pass_turn(g, idx, events)
+
+
+def autoplay_npcs(g, events):
+    """Keep playing NPC turns until a human must act (or the game ends)."""
+    guard = 0
+    while g.get("phase") == "playing" and guard < 50:
+        guard += 1
+        cur = g["players"][g["current_index"]]
+        if not cur.get("npc"):
+            break
+        err = npc_move(g, events)
+        if err:
+            events.append(f"⛔ NPC error: {err}")
+            break
+    return None
+
+
 def _end_round(g, events, last_idx):
     # last active leads next round
     g["row"] = []

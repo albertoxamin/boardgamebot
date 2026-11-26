@@ -1,3 +1,4 @@
+import os
 import unittest
 
 import fadenfroh as FD
@@ -221,6 +222,28 @@ class FlowTests(unittest.TestCase):
         self.assertIn(g["winner"], (0, 1))
         self.assertTrue(all(p["bonus"] == "B" for p in g["players"]))
         self.assertTrue(all(p["score"] > 0 for p in g["players"]))
+
+    def test_lobby_has_how_to_play_button(self):
+        # FB-0086: the Fadenfroh lobby has a "🎥 How to play" button that
+        # opens the how-to-play video, both on the Telegram board and in the
+        # Mini App lobby.
+        import bot as BOT
+
+        g = FD.new_game(-1004393094474, 1, "Alice")
+        kb = BOT.fadenfroh_keyboard(g)
+        flat = [b for row in kb for b in row]
+        howto = [b for b in flat if b.get("text") == "🎥 How to play"]
+        self.assertEqual(len(howto), 1)
+        self.assertEqual(howto[0].get("url"), BOT.FF_HOW_TO_PLAY_URL)
+        self.assertIn("youtube.com/watch?v=ezMd-IwlTyA", howto[0]["url"])
+        js = open(os.path.join(os.path.dirname(__file__), "web", "fadenfroh.js")).read()
+        self.assertIn("FF_HOW_TO_PLAY_URL", js)
+        self.assertIn("youtube.com/watch?v=ezMd-IwlTyA", js)
+        self.assertIn("openLink", js)
+        self.assertIn("ffHowTo", js)
+        html = open(os.path.join(os.path.dirname(__file__), "web", "flip7.html")).read()
+        self.assertIn('id="ffHowTo"', html)
+        self.assertIn("🎥 How to play", html)
 
     def test_board_json_filters_opponent_hand(self):
         g, _ = two_player_game()

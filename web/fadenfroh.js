@@ -1,4 +1,5 @@
 const FF = {chat_id: null, init: '', board: null, timer: null};
+const FF_HOW_TO_PLAY_URL = 'https://www.youtube.com/watch?v=ezMd-IwlTyA';
 
 function ffLog(s) {
   const e = document.getElementById('ffLog');
@@ -115,8 +116,9 @@ function ffRender() {
   const join = document.getElementById('ffJoin');
   const npc = document.getElementById('ffNpc');
   const start = document.getElementById('ffStart');
+  const howto = document.getElementById('ffHowTo');
   const rematch = document.getElementById('ffRematch');
-  [join, npc, start, rematch].forEach(el => el.classList.add('hidden'));
+  [join, npc, start, howto, rematch].forEach(el => el.classList.add('hidden'));
   actions.innerHTML = '';
   document.getElementById('ffLog').textContent = (g.log || []).join('\n');
   const names = g.players.map((p, i) => escapeHtml(p.name) + ' <b>' + p.score + '</b> VP' +
@@ -140,6 +142,7 @@ function ffRender() {
   if (g.phase === 'lobby') {
     if (g.is_player) join.classList.remove('hidden');
     start.classList.remove('hidden');
+    howto.classList.remove('hidden');
     return;
   }
   if (g.phase === 'game_end') { rematch.classList.remove('hidden'); return; }
@@ -173,5 +176,12 @@ function ffRender() {
 document.getElementById('ffJoin').addEventListener('click', () => ffMove('join'));
 document.getElementById('ffNpc').addEventListener('click', () => ffMove('join_npc'));
 document.getElementById('ffStart').addEventListener('click', () => ffMove('start'));
+document.getElementById('ffHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(FF_HOW_TO_PLAY_URL);
+    else window.open(FF_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(FF_HOW_TO_PLAY_URL, '_blank'); }
+});
 document.getElementById('ffRematch').addEventListener('click', () => ffMove('rematch'));
 ffLoad();

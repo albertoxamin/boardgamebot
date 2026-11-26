@@ -343,7 +343,9 @@ def pending_options(g, idx):
     if not pend or pend.get("by") != idx:
         return []
     if pend["kind"] == "keep":
-        return [{"value": str(i), "label": f"Keep card {i + 1}"}
+        # FB-0125: name the card, not "Keep card 1/2/3" — the player
+        # cannot tell which card each option is.
+        return [{"value": str(i), "label": f"Keep {card_label(pend['cards'][i])}"}
                 for i in range(len(pend["cards"]))]
     if pend["kind"] == "place":
         out = []
@@ -351,11 +353,18 @@ def pending_options(g, idx):
             for row in range(3):
                 for option in placement_options(g, idx, cid, row):
                     side, cover, needle = option
+                    # FB-0125: plain language — the old "row 1 L 1" /
+                    # "row 1 R 2 +needle" shorthand was unreadable.
+                    if needle:
+                        how = "with a needle"
+                    elif cover == 1:
+                        how = "covers 1 half"
+                    else:
+                        how = "covers 2 halves"
                     out.append({"value": f"{i}:{row}:{side}:{cover}:{int(needle)}",
-                                "label": f"{card_label(cid)} → row {row + 1} "
-                                         f"{'L' if side == 'left' else 'R'} "
-                                         f"{'2' if cover == 2 else '1'}"
-                                         f"{' +needle' if needle else ''}",
+                                "label": f"{card_label(cid)} → row {row + 1} · "
+                                         f"{'left' if side == 'left' else 'right'} end · "
+                                         f"{how}",
                                 "card": cid, "row": row})
         return out
     if pend["kind"] == "bonus":

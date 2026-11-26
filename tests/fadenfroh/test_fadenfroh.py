@@ -160,6 +160,51 @@ class EmbroideryTests(unittest.TestCase):
         self.assertEqual(pend["kind"], "place")
         return g, pend["by"]
 
+    def test_place_option_labels_are_plain_language(self):
+        # FB-0125: Annalisa could not tell what the embroidery options
+        # meant — the old labels read "#69 ... -> row 1 L 1". Every
+        # placement option must say, in words, which row, which end and
+        # how it lands (covers 1/2 halves, or with a needle).
+        g, idx = self.begin_place()
+        opts = FD.pending_options(g, idx)
+        self.assertTrue(opts)
+        for o in opts:
+            self.assertRegex(o["label"], r"row [123] · (left|right) end · "
+                             r"(covers 1 half|covers 2 halves|with a needle)")
+            self.assertNotIn(" L ", o["label"])
+            self.assertNotIn(" R ", o["label"])
+            self.assertNotIn("+needle", o["label"])
+
+    def test_keep_option_labels_name_the_card(self):
+        # FB-0125: "Keep card 1/2/3" does not say which card is which.
+        g, _ = two_player_game()
+        g["players"][0]["threads"] = 3
+        FD.pass_offer(g, 0, 0)
+        FD.pass_offer(g, FD.current_index(g), 0)
+        self.assertEqual(g["pending"]["kind"], "keep")
+        idx = g["pending"]["by"]
+        opts = FD.pending_options(g, idx)
+        self.assertEqual(len(opts), len(g["pending"]["cards"]))
+        for i, o in enumerate(opts):
+            self.assertIn(FD.card_label(g["pending"]["cards"][i]), o["label"])
+
+    def test_mini_app_embroidery_picker_is_visual(self):
+        # FB-0125: the Mini App dumped up to ~45 placement options as
+        # cryptic text buttons. It now shows a two-step visual picker:
+        # pick the card (real BGA fabric art), then tap where it goes on
+        # a preview of the row with the card ghosted where it would land.
+        js = open(os.path.join(ROOT, "assets", "fadenfroh", "scripts",
+                               "fadenfroh.js")).read()
+        self.assertIn("ffRenderPlace", js)
+        self.assertIn("Choose a card to stitch", js)
+        self.assertIn("ffPlacePreview", js)
+        self.assertIn(".ffghost{", js)
+        self.assertIn("covers 1 half", js)
+        self.assertIn("covers 2 halves", js)
+        self.assertIn("with a needle", js)
+        self.assertIn("Keep this card", js)
+        self.assertIn("🗑 Discard", js)
+
     def test_cover_one_cover_two_and_needle_placements(self):
         g, idx = self.begin_place()
         cid = g["pending"]["cards"][0]

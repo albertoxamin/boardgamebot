@@ -213,7 +213,8 @@ Odin (Helvetiq), 2–6 players. A card-shedding game: lead with a set of
 same-colour or same-number cards whose digits, sorted high to low, form a
 number that beats the table — then take one card from the previous set.
 Everyone starts at 15 points and loses 1 per card left in hand at the end
-of each hand; first to 0 wins.
+of each hand; first to 0 wins. The official rulebook is stored in
+`assets/odin/rulebook.pdf`.
 Text commands: `/odin` (create), `/odin_join`, `/odin_join_npc`,
 `/odin_start`, `/odin_play <cards>`, `/odin_pickup <card>`, `/odin_pass`,
 `/odin_score`, `/odin_cancel` (creator), `/odin_rules`. Mini App: board
@@ -260,7 +261,8 @@ BGG: https://boardgamegeek.com/boardgame/372559/spots
 Spots (CMYK), 1–4 players. A push-your-luck dog dice game: do tricks to roll
 dice and fill the spots on your dog cards, then score completed dogs — first
 to 6 scored wins. Bury too many dice in your yard (over 7) and you bust,
-losing the dice on your unscored dogs.
+losing the dice on your unscored dogs. The official rulebook is stored in
+`assets/spots/rulebook.pdf`.
 Text commands: `/spots` (create), `/spots_join`, `/spots_join_npc`,
 `/spots_start`, `/spots_trick <tile>`, `/spots_place <die#> <dog> <spot#>`
 (or `/spots_place <die#> yard`), `/spots_reroll`, `/spots_score`,
@@ -334,7 +336,8 @@ per round, or 4 with the once-per-race boost. Passing a checkpoint requires
 a curve card that turn; stopping exactly on it is free. The first racer to
 reach or cross the finish wins, and the race runs until all but one are
 finished. An optional Grand Prix runs 3 races over 4 courses with 5/3/2/0
-points by finish.
+points by finish. The official rulebook is stored in
+`assets/tornado/rulebook.pdf`.
 Text commands: `/tornado` (create), `/tornado_join`, `/tornado_start [gp]`,
 `/tornado_pick <1-6>`, `/tornado_auto`, `/tornado_hand`, `/tornado_play
 <card#...> [b]`, `/tornado_wait [card#...]`, `/tornado_next` (next GP race),
@@ -407,7 +410,8 @@ row); overflow lands on the floor line, whose seven spaces cost
 -1,-1,-2,-2,-2,-3,-3 at the end of the round. Full lines tile the wall and
 score the connected row + column groups; the game ends after the round in
 which anyone completes a wall row, then +2/row, +7/column, +10/colour set
-decide the winner (ties break on completed rows).
+decide the winner (ties break on completed rows). The official rulebook is
+stored in `assets/azul/rulebook.pdf`.
 
 Text commands: `/azul` (create), `/azul_join`, `/azul_join_npc`,
 `/azul_start`, `/azul_take <factory N|center> <colour>`,
@@ -484,7 +488,9 @@ Markers or opponents, and invest in one achievement at a time. Final scoring
 counts achievements, VP cards, settlements, VP markers, captured settlements,
 and Conquest Markers (1 VP per three). Board, action-card, achievement-card,
 marker and token art is extracted from the BGA client at version
-`261121-1937`.
+`261121-1937`. The official rulebook and the Seafarers expansion rulebook
+are stored in `assets/altay/rulebook.pdf` and
+`assets/altay/seafarers-rulebook.pdf`.
 
 The lobby includes a simplified BGA-compatible **Seafarers** option: two sea
 zones and two island territories (conquest markers 3 and 2), 3 ships and 3
@@ -520,7 +526,8 @@ playable approximation, not a full rules conversion.
 
 Card, Captain, Ship and board art is extracted from the Tabletop Simulator
 component sheets into `assets/blackflag/images/blackflag-cards.webp`, `assets/blackflag/images/blackflag-ships.webp`,
-`assets/blackflag/images/blackflag-board.webp` and `assets/blackflag/images/blackflag-cardback.webp`. Text commands:
+`assets/blackflag/images/blackflag-board.webp` and `assets/blackflag/images/blackflag-cardback.webp`. The official rulebook is
+stored in `assets/blackflag/rulebook.pdf`. Text commands:
 `/blackflag`, `/blackflag_join`, `/blackflag_join_npc`, `/blackflag_start`,
 `/blackflag_ship <row|deck>`, `/blackflag_play <card#> [target#]`,
 `/blackflag_defend <card#>`, `/blackflag_pass`, `/blackflag_end`,

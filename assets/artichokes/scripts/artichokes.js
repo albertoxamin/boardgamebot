@@ -42,10 +42,13 @@ function atApi(path,opts){return fetch(path,opts).then(r=>r.json());}
 function atLog(s){
  let e=document.getElementById('atLog');if(e)e.textContent+=s+'\n';
  let cards=atRevealCards(s);if(cards.length)atPopup(cards,s);}
+function atLoadFail(){let board=document.getElementById('atBoard');
+ if(board)board.innerHTML='<div class="table lobby-note">⚠️ Could not load the game — connection error.</div><button class="primary" id="atRetry">🔄 Retry</button>';}
 async function atLoad(){
  let tg=tgInit(); let board=document.getElementById('atBoard');
  if(!tg.id){board.innerHTML='<div class="table lobby-note">Open as Telegram Mini App via the bot\'s Abandon All Artichokes link.</div>';return;}
  ATAPP.user_id=tg.id; ATAPP.init=tg.init;
+ try{
  let qp=new URLSearchParams(location.search);
  let pref=atChatId(tg.start)||atChatId(qp.get('app'))||parseInt(qp.get('chat_id'),10)||0;
  if(!pref&&tg.chat_instance)pref=parseInt(tg.chat_instance,10)||0;
@@ -65,11 +68,14 @@ async function atLoad(){
   ((b.players?b.players.length:0)-(a.players?a.players.length:0)));
  if(cands.length){atSelect(cands[0].chat_id);return;}
  board.innerHTML='<div class="table lobby-note">No Abandon All Artichokes game for you yet — send /artichokes in a chat, then open its Mini App link.</div>';
+ }catch(e){atLoadFail();}
 }
 async function atSelect(chat_id){ATAPP.chat_id=chat_id;ATAPP.err='';ATAPP.sel=[];ATAPP.pass.clear();ATAPP.sig='';await atRefresh();
  if(ATAPP.timer)clearInterval(ATAPP.timer);ATAPP.timer=setInterval(atRefresh,3000);}
 async function atRefresh(){if(!ATAPP.chat_id)return;
- let r=await atApi('/api/artichokes/game?chat_id='+encodeURIComponent(ATAPP.chat_id)+'&init_data='+encodeURIComponent(ATAPP.init));
+ let r;
+ try{r=await atApi('/api/artichokes/game?chat_id='+encodeURIComponent(ATAPP.chat_id)+'&init_data='+encodeURIComponent(ATAPP.init));}
+ catch(e){if(!ATAPP.board)atLoadFail();return;}
  if(r.ok){ATAPP.board=r.game;ATAPP.err='';atAutoLog();
   let sig=JSON.stringify(ATAPP.board);
   if(sig===ATAPP.sig)return;
@@ -247,7 +253,8 @@ function atRender(){
  });
  document.addEventListener('click',e=>{
    let id=e.target.id;
-   if(id==='atJoin')return atMove('join');
+   if(id==='atRetry')return atLoad();
+  if(id==='atJoin')return atMove('join');
   if(id==='atStart')return atMove('start');
   if(id==='atHowTo'){
    try {

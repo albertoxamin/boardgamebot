@@ -1,4 +1,5 @@
 // Yahtzee Mini App (synced, initData auto-login). Loaded by flip7.html router.
+const YZ_HOW_TO_PLAY_URL = 'https://www.youtube.com/watch?v=XeJdf0E3YTE';
 const YZ={user_id:0,chat_id:null,board:null,timer:null,init:'',reroll:[false,false,false,false,false],prevDice:[],prevAll:null};
 function yzCounts(b){let c={};(b.players||[]).forEach((p,i)=>{c['y:'+i+':total']=p.total;c['y:'+i+':filled']=p.filled;});return c;}
 const YZ_UPPER=['ones','twos','threes','fours','fives','sixes'];
@@ -54,6 +55,7 @@ function yzRender(){
  document.getElementById('yzBoard').innerHTML='<div class="table">'+specBar+cards+'</div>';
  // Action buttons
  let roll=document.getElementById('yzRoll'), start=document.getElementById('yzStart'), rem=document.getElementById('yzRematch');
+ document.getElementById('yzHowTo').classList.toggle('hidden', b.phase !== 'lobby');
  roll.classList.toggle('hidden',!(myTurn&&t&&t.rolls<3));
  if(t&&t.rolls>0){
   let n=YZ.reroll.filter(Boolean).length;
@@ -99,6 +101,13 @@ function yzScorecard(p,i,b){
 }
 document.getElementById('yzRoll').addEventListener('click',()=>yzMove('roll',{keep:YZ.reroll.map(x=>!x)}));
 document.getElementById('yzStart').addEventListener('click',()=>yzMove('start'));
+document.getElementById('yzHowTo').addEventListener('click', () => {
+  try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+      Telegram.WebApp.openLink(YZ_HOW_TO_PLAY_URL);
+    else window.open(YZ_HOW_TO_PLAY_URL, '_blank');
+  } catch (e) { window.open(YZ_HOW_TO_PLAY_URL, '_blank'); }
+});
 document.getElementById('yzRematch').addEventListener('click',()=>yzMove('rematch'));
 // Self-start when router (flip7.js) selected Yahtzee mode.
 if(!document.getElementById('yahtzee').classList.contains('hidden')) yzLoad();

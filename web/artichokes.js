@@ -1,4 +1,5 @@
 const ATAPP={user_id:0,chat_id:null,board:null,timer:null,init:'',err:'',sel:[],pass:new Set(),popupTimer:null,sig:''};
+const AT_HOW_TO_PLAY_URL = 'https://youtu.be/WP1hqBnqAiY';
 const AT_VER=4;
 const AT_SPRITE={beet:0,broccoli:1,carrot:2,corn:3,eggplant:4,leek:5,onion:6,peas:7,
  pepper:8,potato:9,artichoke:10,rhubarb:15,back:16};
@@ -189,6 +190,7 @@ function atRender(){
   if(b.phase==='lobby'){
   if(!b.is_player)a+='<button class="primary" id="atJoin">🙋 Join</button>';
   if(b.players.length>=2)a+='<button class="primary" id="atStart">🎮 Start game</button>';
+  a+='<button class="primary" id="atHowTo">🎥 How to play</button>';
  }else if(b.phase==='game_end'){
   a+='<button class="primary" id="atRematch">🔄 Rematch!</button>';
  }else if(b.can_act&&!b.pending){
@@ -228,6 +230,14 @@ function atRender(){
    let id=e.target.id;
    if(id==='atJoin')return atMove('join');
   if(id==='atStart')return atMove('start');
+  if(id==='atHowTo'){
+   try {
+    if (window.Telegram && Telegram.WebApp && Telegram.WebApp.openLink)
+     Telegram.WebApp.openLink(AT_HOW_TO_PLAY_URL);
+    else window.open(AT_HOW_TO_PLAY_URL, '_blank');
+   } catch (e) { window.open(AT_HOW_TO_PLAY_URL, '_blank'); }
+   return;
+  }
   if(id==='atRematch')return atMove('rematch');
   if(id==='atSkip')return atMove('skip');
   if(id==='atPlay'){if(!ATAPP.sel.length){ATAPP.err='Select a card first.';atRender();return;}

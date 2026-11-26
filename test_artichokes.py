@@ -447,6 +447,26 @@ def test_full_random_games():
             json.dumps(g)
 
 
+def test_lobby_has_how_to_play_button():
+    # FB-0080: the Abandon All Artichokes lobby has a "🎥 How to play" button
+    # that opens the how-to-play video, both on the Telegram board and in the
+    # Mini App lobby.
+    import bot as BOT
+
+    g = A.new_game(-1004393094474, 1, "Alice")
+    kb = BOT.artichokes_keyboard(g)
+    flat = [b for row in kb for b in row]
+    howto = [b for b in flat if b.get("text") == "🎥 How to play"]
+    assert len(howto) == 1
+    assert howto[0].get("url") == BOT.AT_HOW_TO_PLAY_URL
+    assert "youtu.be/WP1hqBnqAiY" in howto[0]["url"]
+    js = open(os.path.dirname(__file__) + "/web/artichokes.js").read()
+    assert "AT_HOW_TO_PLAY_URL" in js
+    assert "youtu.be/WP1hqBnqAiY" in js
+    assert "openLink" in js
+    assert "atHowTo" in js
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items()) if name.startswith("test_") and callable(fn)]
     for name, fn in tests:

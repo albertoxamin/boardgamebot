@@ -40,7 +40,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #  FLIP7_GAME_URL + FLIP7_GAME_SHORT_NAME (registered via @BotFather /newgame)
 #                     -> /play sends a Telegram HTML5 Game (sendGame)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 77
+WEB_VER = 78
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 HTML_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)),
@@ -2451,6 +2451,9 @@ def yahtzee_board_text(g):
     return "\n".join(lines)
 
 
+YZ_HOW_TO_PLAY_URL = "https://www.youtube.com/watch?v=XeJdf0E3YTE"
+
+
 def yahtzee_keyboard(g):
     if g["phase"] == "game_end":
         return [[{"text": "🔄 Rematch!", "callback_data": "yz:rematch"}]]
@@ -2460,6 +2463,7 @@ def yahtzee_keyboard(g):
         kb = [[{"text": "🙋 Join Yahtzee", "callback_data": "yz:join"}]]
         if can_add_npc("yahtzee", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "yz:npc"}])
+        kb.append([{"text": "🎥 How to play", "url": YZ_HOW_TO_PLAY_URL}])
         return kb + (wk or [])
     kb = []
     t = g.get("turn")
@@ -3870,6 +3874,9 @@ def artichokes_board_text(g):
     return "\n".join(lines)
 
 
+AT_HOW_TO_PLAY_URL = "https://youtu.be/WP1hqBnqAiY"
+
+
 def artichokes_keyboard(g):
     if g["phase"] == "game_end":
         return [[{"text": "🔄 Rematch!", "callback_data": "at:rematch"}]]
@@ -3880,6 +3887,7 @@ def artichokes_keyboard(g):
         if can_add_npc("artichokes", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "at:npc"}])
         kb.append([{"text": "▶️ Start game", "callback_data": "at:start"}])
+        kb.append([{"text": "🎥 How to play", "url": AT_HOW_TO_PLAY_URL}])
         return kb + (wk or [])
     kb = []
     pend = g.get("pending")

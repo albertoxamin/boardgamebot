@@ -124,6 +124,28 @@ def test_full_game_to_end():
     assert len(g["winners"]) == sum(1 for t in totals if t == totals[0])
 
 
+def test_lobby_has_how_to_play_button():
+    # FB-0079: the Yahtzee lobby has a "🎥 How to play" button that opens the
+    # how-to-play video, both on the Telegram board and in the Mini App lobby.
+    import bot as BOT
+
+    g = Y.new_game(-1004393094474, 1, "Alice")
+    kb = BOT.yahtzee_keyboard(g)
+    flat = [b for row in kb for b in row]
+    howto = [b for b in flat if b.get("text") == "🎥 How to play"]
+    assert len(howto) == 1
+    assert howto[0].get("url") == BOT.YZ_HOW_TO_PLAY_URL
+    assert "youtube.com/watch?v=XeJdf0E3YTE" in howto[0]["url"]
+    js = open(os.path.dirname(__file__) + "/web/yahtzee.js").read()
+    assert "YZ_HOW_TO_PLAY_URL" in js
+    assert "youtube.com/watch?v=XeJdf0E3YTE" in js
+    assert "openLink" in js
+    assert "yzHowTo" in js
+    html = open(os.path.dirname(__file__) + "/web/flip7.html").read()
+    assert 'id="yzHowTo"' in html
+    assert "🎥 How to play" in html
+
+
 if __name__ == "__main__":
     for name, fn in sorted(list(globals().items())):
         if name.startswith("test_"):

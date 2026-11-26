@@ -83,7 +83,7 @@ function rnCard(c) {
 function rnRegion(r, g) {
   const castle = r.castle;
   const tok = castle && RN_CASTLE_POS[castle]
-    ? '<span class="rncastle" style="' + rnSprite('token', RN_CASTLE_POS[castle], 52, 51, 687, 593) + '"></span>'
+    ? '<span class="rncastle" style="' + rnSprite('token', RN_CASTLE_POS[castle], 44, 43, 687, 593) + '"></span>'
     : '<span class="rncastle rnempty"></span>';
   let troops = '';
   for (let p = 0; p < 2; p++) {
@@ -134,6 +134,8 @@ function rnRender() {
     }).join('') + '</div>';
   }
   html += '<div class="rncards">' + g.tactics.map(rnCard).join('') + '</div>';
+  html += '<div class="rnlegend">🎲 The single die decides the soldiers: ' +
+    '1–2 → 1 soldier · 3–4 → 2 soldiers · 5–6 → 3 soldiers</div>';
   board.innerHTML = html;
   board.querySelectorAll('[data-card]').forEach(el => el.addEventListener('click', () => {
     RNG.card = Number(el.dataset.card);

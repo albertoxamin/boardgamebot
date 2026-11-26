@@ -257,6 +257,28 @@ class ViewTests(unittest.TestCase):
         self.assertGreaterEqual(float(zoom.group(1)), 1.5)
         self.assertIn(".rncard.rnselected", css)
 
+    def test_number_tokens_are_small(self):
+        # FB-0063: the castle number tokens were too big in the Mini App.
+        js = open(os.path.dirname(__file__) + "/web/rumblenation.js").read()
+        m = re.search(r"rnSprite\('token', RN_CASTLE_POS\[castle\], (\d+), (\d+),", js)
+        self.assertIsNotNone(m)
+        self.assertLessEqual(int(m.group(1)), 46)
+        css = open(os.path.dirname(__file__) + "/web/flip7.html").read()
+        m = re.search(r"\.rncastle\{[^}]*width:(\d+)px", css)
+        self.assertIsNotNone(m)
+        self.assertLessEqual(int(m.group(1)), 46)
+
+    def test_dice_legend_at_bottom(self):
+        # FB-0064: a legend under the board explains the dice -> soldiers
+        # symbols from the printed chart (1-2 = 1, 3-4 = 2, 5-6 = 3).
+        js = open(os.path.dirname(__file__) + "/web/rumblenation.js").read()
+        self.assertIn("rnlegend", js)
+        self.assertIn("1–2 → 1 soldier", js)
+        self.assertIn("3–4 → 2 soldiers", js)
+        self.assertIn("5–6 → 3 soldiers", js)
+        css = open(os.path.dirname(__file__) + "/web/flip7.html").read()
+        self.assertIn(".rnlegend{", css)
+
     def test_castle_token_sprites_match_their_numbers(self):
         # FB-0061: castle 7 and 11 were swapped in web/rumblenation.js, so
         # the token face did not match the castle value in the rules.

@@ -1,0 +1,385 @@
+[
+ {
+  "file": "deck17-face.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/10258627550002958595/F98427B3A66DD650B2EEA191838B590DF14CC8AE/",
+  "size": 1299014,
+  "sha256": "909bf6d72fe48762",
+  "roles": [
+   "deck17-face"
+  ],
+  "description": "First Player clapperboard card."
+ },
+ {
+  "file": "deck8-back.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/10344432836953048954/F65D57DFE26B9A53016C48F3DDD4F56E35D82E82/",
+  "size": 1080325,
+  "sha256": "69d55799c28e0a6f",
+  "roles": [
+   "deck8-back",
+   "deck8-face"
+  ],
+  "description": "Season 1 market price card 10 (face = back)."
+ },
+ {
+  "file": "deck17-back.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/10895184144276798499/EDAEFBAAAD04F037D49CAEE376D77AF35F1536C8/",
+  "size": 1441808,
+  "sha256": "9f0e629983514b00",
+  "roles": [
+   "deck17-back"
+  ],
+  "description": "First Player clapperboard card back (same art)."
+ },
+ {
+  "file": "deck11-back.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/10920445068073054760/9AA8D78BF96290B2EE5527ED3694FEE33654C29F/",
+  "size": 1248886,
+  "sha256": "e08509b693c23703",
+  "roles": [
+   "deck11-back",
+   "deck11-face"
+  ],
+  "description": "Season 2 market price table, ranks 21-40 (face = back)."
+ },
+ {
+  "file": "deck19-back.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/10960481919488969737/9E08A4E4EDE96011BFE374B0DA34EAB54754C3E5/",
+  "size": 1471947,
+  "sha256": "fe628d9b5d80d85b",
+  "roles": [
+   "deck19-back"
+  ],
+  "description": "RESET button card back (red button/cord art)."
+ },
+ {
+  "file": "deck19-face.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/11256826322671026145/C1961D1A26DA1031D51B5E14A1F79907CE1F4FC2/",
+  "size": 1286467,
+  "sha256": "d8e234e80324099c",
+  "roles": [
+   "deck19-face"
+  ],
+  "description": "Season 2 market price card 15, green (face = back; back file deck19-back-14582576.png)."
+ },
+ {
+  "file": "deck21-face.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/11469999825240399264/D5E70556079D4412BFC334A05B14CCAF3F31095F/",
+  "size": 1448299,
+  "sha256": "a720e2d9e5ff2b75",
+  "roles": [
+   "deck21-face"
+  ],
+  "description": "Platypus, rank 26 - Big Button 2 mini-expansion card (2 copies). Back is the shared card back (deck13-back.png)."
+ },
+ {
+  "file": "deck19-face-11640540.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/11640540143019023282/2FB6450BDC10F8B0AC17F1DCC8CFB9364AB4BD98/",
+  "size": 1244311,
+  "sha256": "6df933175fd7999a",
+  "roles": [
+   "deck19-face"
+  ],
+  "description": "RESET button card - Big Button mini-expansion (6 copies in the Big Button bag, 4 in Big Button 2). Back file deck19-back.png."
+ },
+ {
+  "file": "deck18-face.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/11642661357580997563/AB017F5ED0B8710BD39A3107C823E3AB12089F42/",
+  "size": 1467608,
+  "sha256": "a0c3e6dc9e1455a5",
+  "roles": [
+   "deck18-face"
+  ],
+  "description": "Axolotl, rank 26 - Big Button mini-expansion card (2 copies in the Big Button bag). Back is the shared card back (deck13-back.png)."
+ },
+ {
+  "file": "deck15-face.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/11898576578238565804/C37D280D472895BB054FEEB467849A5937158331/",
+  "size": 45555907,
+  "sha256": "1270fb7543e8efb6",
+  "roles": [
+   "deck15-face",
+   "deck20-face"
+  ],
+  "description": "Season 2 toon deck sheet, 5x5 (3750x5250), ranks 1-25 in reading order: Salamander, Groundhog, Rat, Goldfish, Mole, Hen, Starfish, Raccoon, Panther, Opossum, Mongoose, Capybara, Crow, Coyote, Clownfish, Fox, Crab, Swordfish, Gorilla, Vulture, Zebra, Shark, Rhinoceros, Hippopotamus, Sloth. 53 cards in the Season 2 toon deck (DeckIDs 2000-2024; stored as individual Card objects with deck 15 inside the Season 2 bag)."
+ },
+ {
+  "file": "deck25-back.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/12195367513563213606/A718FA2A453C202F280B4514C5E83730750F9853/",
+  "size": 1537368,
+  "sha256": "16082326a791db6c",
+  "roles": [
+   "deck25-back"
+  ],
+  "description": "MARKET RESET rules text card."
+ },
+ {
+  "file": "rulebook-1.pdf",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/12445997011621711637/721DB29BBD346D9FEE96FD6AD8EF78D50E407E09/",
+  "size": 2675339,
+  "sha256": "4eb194ddfa83539c",
+  "roles": [
+   "pdf"
+  ],
+  "description": "Fliptoons Season 1 rulebook, v.2, 16 pages (Adobe InDesign 20.4, Sep 2025)."
+ },
+ {
+  "file": "deck6-back.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/12907820193020333415/C329B94C9823DDA8F35EAE35B83F80BD6A8873CF/",
+  "size": 1288590,
+  "sha256": "d87e6bba697dfcd2",
+  "roles": [
+   "deck6-back",
+   "deck6-face"
+  ],
+  "description": "Season 1 market price card 4 (face = back)."
+ },
+ {
+  "file": "deck9-back.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/12910398813785068108/2A39FB4D2DFD4CF0FFCF8A5E0DDBE6E2637B509E/",
+  "size": 996123,
+  "sha256": "a0a77602e849d0e5",
+  "roles": [
+   "deck9-back",
+   "deck9-face"
+  ],
+  "description": "Season 1 market price card 15 (face = back)."
+ },
+ {
+  "file": "deck7-back.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/13073847542582130861/56BC7D5B8A9D2D3D49F3C39F85B8C4B5435FCFE1/",
+  "size": 987101,
+  "sha256": "f707e33bcb3a7b05",
+  "roles": [
+   "deck7-back",
+   "deck7-face"
+  ],
+  "description": "Season 1 market price card 7 (face = back)."
+ },
+ {
+  "file": "deck5-back.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/13278177951039362139/74FAB009E6A5686B5458B37A7E3C5B57F1B80787/",
+  "size": 869791,
+  "sha256": "576bdb1f7574f2e4",
+  "roles": [
+   "deck5-back",
+   "deck5-face"
+  ],
+  "description": "Season 1 market price card 3 (face = back, single card)."
+ },
+ {
+  "file": "deck12-back.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/13760544839168053734/9B6532E1FCEB58F7D118B1B7C4A1A62ACB669868/",
+  "size": 1241205,
+  "sha256": "946e2531a74d2157",
+  "roles": [
+   "deck12-back"
+  ],
+  "description": "ICONS reference card (explains the ability icons)."
+ },
+ {
+  "file": "deck20-back.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/13794124475783441173/3C899E156DD82C6A9D7082F8EEB9BAB238C06701/",
+  "size": 1241387,
+  "sha256": "0f6742c3a53a5e5b",
+  "roles": [
+   "deck20-back"
+  ],
+  "description": "Big Button mini-expansion rules card (Setup / During Play / Solo Play)."
+ },
+ {
+  "file": "deck10-back.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/13962710371866165911/76A64CD523F338C2620F8FA158F67309033ADB59/",
+  "size": 1185645,
+  "sha256": "81e0de0d31971830",
+  "roles": [
+   "deck10-back",
+   "deck10-face"
+  ],
+  "description": "Season 2 market price table, ranks 1-20 (face = back)."
+ },
+ {
+  "file": "deck24-back.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/14244850496516624621/A893EAB3BAE0FF94A51A7082ED6F6EA6A1C159F7/",
+  "size": 1544912,
+  "sha256": "3f64821979880273",
+  "roles": [
+   "deck24-back"
+  ],
+  "description": "GRID RESET rules text card."
+ },
+ {
+  "file": "deck19-back-14582576.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/14582576399891447821/0DD3E1F89960DFCDEFFBEF78FF78CF05764922EE/",
+  "size": 1287658,
+  "sha256": "1eaaf0ad0567e2cc",
+  "roles": [
+   "deck19-back"
+  ],
+  "description": "Season 2 market price card 15, green - back (same art as face)."
+ },
+ {
+  "file": "deck22-face.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/14684572333384410548/9994F4FCE19FC3E7723526BAE9BBCD8D6C11894E/",
+  "size": 1358274,
+  "sha256": "f4185901512381f1",
+  "roles": [
+   "deck22-face"
+  ],
+  "description": "Big Button 2 mini-expansion title/components card."
+ },
+ {
+  "file": "deck4-face.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/14887392944877698378/357CFCE9AEFC9AAEA910706825D3167CF283D87D/",
+  "size": 44120296,
+  "sha256": "6e136e625abda3cb",
+  "roles": [
+   "deck4-face"
+  ],
+  "description": "Season 1 toon deck sheet, 5x5 (3750x5250), ranks 1-25 in reading order: Ostrich, Eagle, Donkey, Butterfly, Dog, Goat, Sheep, Camel, Rabbit, Horse, Snake, Elephant, Rooster, Cat, Alligator, Lion, Monkey, Pig, Peacock, Turkey, Bull, Tiger, Deer, Bear, Cow. 53 cards in the Season 1 toon deck (DeckIDs 400-424)."
+ },
+ {
+  "file": "deck12-face.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/15011457141320790268/52D6A53E5867D087674263BD3F23E66BEED5DFD1/",
+  "size": 1313965,
+  "sha256": "53115597120909c0",
+  "roles": [
+   "deck12-face"
+  ],
+  "description": "HOW TO PLAY reference card (Flip / Check Fame / Market / Cleanup)."
+ },
+ {
+  "file": "deck18-face-15579305.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/15579305064224325177/18D00B27A9BF341004A450B55A0FEF65D5B918D9/",
+  "size": 8424780,
+  "sha256": "19f6da6dc34954b1",
+  "roles": [
+   "deck18-face"
+  ],
+  "description": "Season 2 starting deck sheet, 3x2 (2250x2100), reading order: Spider, Grasshopper, Ladybug, Firefly, Mosquito, Mosquito (CardIDs 1800-1805)."
+ },
+ {
+  "file": "deck20-face.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/15790410181307146759/CE4DF763D7B12E5E24A806197CA00CB73F5A56C3/",
+  "size": 1310637,
+  "sha256": "4a147307631649c1",
+  "roles": [
+   "deck20-face"
+  ],
+  "description": "Big Button mini-expansion title/components card."
+ },
+ {
+  "file": "deck16-face.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/15815379148950956716/A1BBF019DBD3E92ABF0D3CD451FAF44F7D2CC691/",
+  "size": 1271929,
+  "sha256": "0db2c089a65941f0",
+  "roles": [
+   "deck16-face"
+  ],
+  "description": "Critic's Choice +3 card (frog director)."
+ },
+ {
+  "file": "deck24-face.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/16202550213398636075/18BAFA6C08A60DB2EF451636718C88246B3E2F16/",
+  "size": 1169220,
+  "sha256": "af3ee9ac35fff610",
+  "roles": [
+   "deck24-face"
+  ],
+  "description": "GRID RESET card - Big Button 2. Back file deck24-back.png."
+ },
+ {
+  "file": "rulebook-2.pdf",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/16346395722639807515/64F05426828FBA927AF5EBC5C72E459126DF8721/",
+  "size": 4018270,
+  "sha256": "fda43e0f368ab000",
+  "roles": [
+   "pdf"
+  ],
+  "description": "Fliptoons Season 2 rulebook, 20 pages (Adobe InDesign 21.0, Dec 2025)."
+ },
+ {
+  "file": "deck13-back.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/16661222673857556724/EC7A48DD7FEB5720E78CC7422F2E7E44472883F3/",
+  "size": 1036458,
+  "sha256": "61bb895ab292f548",
+  "roles": [
+   "deck13-back",
+   "deck15-back",
+   "deck18-back",
+   "deck20-back",
+   "deck21-back",
+   "deck4-back",
+   "token"
+  ],
+  "description": "Shared card back (megaphone) - back of the Season 1 + Season 2 toon decks, both starting decks, Axolotl, Platypus, and the face of all Custom_Token objects on the table (10 tokens)."
+ },
+ {
+  "file": "deck13-face.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/17432155726620776372/750619700A909C2C46F5E770F1B6B3D722AEF74C/",
+  "size": 8096950,
+  "sha256": "a176418b0c32bb71",
+  "roles": [
+   "deck13-face"
+  ],
+  "description": "Season 1 starting deck sheet, 3x2 (2250x2100), reading order: Bee, Caterpillar, Caterpillar, Skunk, Snail, Dragonfly (CardIDs 1300-1305)."
+ },
+ {
+  "file": "deck18-face-17637095.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/17637095003635504997/ABA3FEA711096C6BBFCDB93EE808D468401810A8/",
+  "size": 1132949,
+  "sha256": "fcd23971c6535e6b",
+  "roles": [
+   "deck18-face"
+  ],
+  "description": "Season 2 market price card 3, green (face = back; back file deck18-back.png). In the Season 2 bag 2-card deck together with the green 15."
+ },
+ {
+  "file": "deck25-face.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/17964522701262345832/8D7F3DEA623149B80754004E2BEE8975FF7CB0B8/",
+  "size": 1260574,
+  "sha256": "9e15618bdac794d1",
+  "roles": [
+   "deck25-face"
+  ],
+  "description": "MARKET RESET card - Big Button 2. Back file deck25-back.png."
+ },
+ {
+  "file": "deck18-back.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/17982655562507990561/4FBDC831C9E7FE3F8EB87675E48057CCEF07D4A2/",
+  "size": 1147647,
+  "sha256": "2be12d867eba30f9",
+  "roles": [
+   "deck18-back"
+  ],
+  "description": "Season 2 market price card 3, green - back (same art as face)."
+ },
+ {
+  "file": "deck16-back.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/9634479045214170275/4801C3F2D992D5DC2B8C9AB4F52C76B71C63EAC1/",
+  "size": 1356662,
+  "sha256": "843da12496e5968d",
+  "roles": [
+   "deck16-back"
+  ],
+  "description": "Critic's Choice +3 card, blue back variant."
+ },
+ {
+  "file": "deck22-back.png",
+  "url": "https://steamusercontent-a.akamaihd.net/ugc/9666128159400646061/3FE64B63C9ACFFCDA47FE656B347C370986B66DB/",
+  "size": 1325859,
+  "sha256": "7f9da28f44d249ab",
+  "roles": [
+   "deck22-back"
+  ],
+  "description": "Big Button 2 mini-expansion rules card (Setup / During Play / Solo Play)."
+ },
+ {
+  "file": "preview.png",
+  "url": "https://images.steamusercontent.com/ugc/9805500630430967617/5F271DB2B3A6DF3021CF53589B1A2A9F4EF76E8C/",
+  "size": 836769,
+  "description": "Workshop preview/thumbnail image (832x600).",
+  "roles": [
+   "preview"
+  ]
+ }
+]

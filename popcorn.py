@@ -1020,7 +1020,7 @@ def board_json(g, viewer_id=None):
             } for t in p["theaters"]],
         })
     board = {
-        "key": "popcorn", "phase": g["phase"], "round": g["round"],
+        "key": "popcorn", "chat_id": g["chat_id"], "phase": g["phase"], "round": g["round"],
         "final": g.get("final_round") == g["round"],
         "actor": actor, "winner": g["winner"], "shared": g.get("shared", []),
         "players": players,

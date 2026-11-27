@@ -129,6 +129,14 @@ class ShowingTests(unittest.TestCase):
         self.assertEqual(theirs["players"][0]["bag_count"], 10)
         self.assertEqual(len(mine["options"]), len(PC.action_options(g, 1)))
 
+    def test_board_json_includes_chat_id(self):
+        # FB-0166: the Mini App picks the game with pick.chat_id, so the
+        # board JSON must carry it — without it the app fetched
+        # /api/popcorn/game?chat_id=undefined, got no game and rendered
+        # a blank board.
+        g, _ = two_player_game()
+        self.assertEqual(PC.board_json(g, 1)["chat_id"], g["chat_id"])
+
 
 class ScoringTests(unittest.TestCase):
     def test_final_scoring_awards_money_trophy_and_winner(self):

@@ -15,12 +15,15 @@ async function pcLoad(){
  catch(e){pcLoadFail('mygames');return;}
  const mine=r.games||[];
  const pick=mine.find(g=>g.chat_id===pref)||mine.find(g=>g.phase!=='game_end')||mine[0];
- if(pick)pcSelect(pick.chat_id);
+ // FB-0166: pick.chat_id must exist (the board JSON carries it since the
+ // server fix); fall back to pref so a missing id can never silently
+ // select an undefined game and leave a blank board.
+ if(pick)pcSelect(pick.chat_id||pref);
  else if(pref){
   let cr;
   try{cr=await pcApi('/api/popcorn/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init,chat_id:pref})});}
   catch(e){pcLoadFail('create');return;}
-  if(cr.game)pcSelect(cr.game.chat_id);else pcLog('⛔ '+(cr.error||'create failed'));
+  if(cr.game)pcSelect(cr.game.chat_id||pref);else pcLog('⛔ '+(cr.error||'create failed'));
  }else document.getElementById('pcTurn').textContent='No Popcorn game yet — send /popcorn in a chat.';
 }
 function pcLoadFail(what){
@@ -33,14 +36,24 @@ function pcLoadFail(what){
  PC.retry=setTimeout(pcLoad,5000);
 }
 async function pcSelect(chat_id){
- PC.chat_id=chat_id;await pcRefresh();
+ // FB-0166: without a chat id the refresh below used to ask the server
+ // for chat_id=undefined, get no game and render nothing — silently.
+ // Say so instead of installing a timer that can never show a board.
+ if(!chat_id){document.getElementById('pcTurn').textContent='⚠️ Couldn\'t open the Popcorn game — reopen it from the chat.';return;}
+ PC.chat_id=chat_id;
+ // Install the refresh timer before the first refresh, so a failed first
+ // load keeps retrying instead of dying silently with a blank board.
  if(PC.timer)clearInterval(PC.timer);PC.timer=setInterval(pcRefresh,3000);
+ await pcRefresh();
 }
 async function pcRefresh(){
  if(!PC.chat_id)return;
  const q='?chat_id='+encodeURIComponent(PC.chat_id)+'&init_data='+encodeURIComponent(PC.init);
- const r=await pcApi('/api/popcorn/game'+q);
+ let r;
+ try{r=await pcApi('/api/popcorn/game'+q);}
+ catch(e){pcLoadFail('game');return;}
  if(r.game){PC.board=r.game;pcRender();}
+ else pcLoadFail('game');
 }
 async function pcMove(action,extra){
  const body=Object.assign({chat_id:PC.chat_id,action:action,init_data:PC.init},extra||{});
@@ -90,7 +103,9 @@ function pcRender(){
   ' 🏆'+(p.awards||[]).map(escapeHtml).join(', ')+
   '<div>'+(p.theaters||[]).map(pcTheater).join('')+'</div></div>').join('');
  if(g.phase==='lobby'){
-  if(g.is_player)join.classList.remove('hidden');
+  // Join is for non-players (a player is already in); showing it only to
+  // players was inverted — same fix as Fadenfroh's Join button.
+  if(!g.is_player)join.classList.remove('hidden');
   npc.classList.remove('hidden');start.classList.remove('hidden');howto.classList.remove('hidden');return;
  }
  if(g.phase==='game_end'){rematch.classList.remove('hidden');return;}

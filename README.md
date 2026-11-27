@@ -610,6 +610,8 @@ stored in `assets/fadenfroh/rulebook.pdf` and
 
 ## Popcorn (2-4 players)
 
+BGG: https://boardgamegeek.com/boardgame/430563/popcorn
+
 A digital version of *Popcorn* (Iello, 2024) — a bag-building game where
 players buy movies, build theaters, advertise and seat Guests from a hidden
 bag for Popcorn, money, theater trophies and awards. Nine rounds end with the
@@ -622,19 +624,6 @@ and the [BGA rules summary](https://en.doc.boardgamearena.com/Gamehelppopcorn).
 Board/cover art was extracted from [the BGA table](https://boardgamearena.com/tableview?table=953855470)
 into `assets/popcorn/images/popcorn-board.webp`,
 `assets/shared/images/covers/popcorn.jpg` and `sources/popcorn/bga/`.
-All 13 BGA sprite sheets (BGA release 260810-1806) are stored in
-`sources/popcorn/bga/`: `POP_Movies.jpg` (48 movie cards, 6×9 cells),
-`POP_Awards.jpg`, `POP_Guests.png`, `POP_Theaters.png`,
-`POP_CinemaBoards.png` (four player-colour cinema boards),
-`POP_Lobbies.png`, `POP_AdvertisingBoard.png`,
-`POP_AdvertisingTokensMoney.png`, `POP_OtherResources.png` (guest bag,
-audience cube, first-player token), `POP_FeatureTiles.png`,
-`POP_Background.jpg`, `POP_Scorepad.jpg` and `POP_Help.png` — found from
-the running BGA table's own stylesheet (FB-0170). No TTS mod was needed:
-there is no separate popcorn-token image (popcorn is a scored resource)
-and seats are printed on the theater tiles.
-[🎥 How to play](https://www.youtube.com/watch?v=XxEKn0NgP8E&pp=ygUeaG93IHRvIHBsYXkgcG9wY29ybiBib2FyZCBnYW1l)
-is also linked by a button in the Mini App. [Board Game Geek page](https://boardgamegeek.com/boardgame/430563/popcorn).
 
 Text commands: `/popcorn`, `/popcorn_join`, `/popcorn_join_npc`,
 `/popcorn_start`, `/popcorn_move <button-code>`, `/popcorn_rules`,

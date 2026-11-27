@@ -43,7 +43,7 @@ STATE_FILE = os.environ.get("FLIP7_STATE") or os.path.join(
 #                     -> legacy Telegram HTML5 Game; currently unused (no
 #                     /play command sends a game message)
 WEB_URL = os.environ.get("FLIP7_WEB_URL", "")
-WEB_VER = 111
+WEB_VER = 112
 GAME_URL = os.environ.get("FLIP7_GAME_URL", "")
 GAME_SHORT_NAME = os.environ.get("FLIP7_GAME_SHORT_NAME", "")
 # Mini App assets: per-game scripts in assets/<game>/scripts/, per-game
@@ -5381,6 +5381,9 @@ def popcorn_board_text(g):
     return "\n".join(lines)
 
 
+PC_HOW_TO_PLAY_URL = "https://www.youtube.com/watch?v=XxEKn0NgP8E"
+
+
 def popcorn_keyboard(g):
     if g["phase"] == "game_end":
         return [[{"text": "🔄 Rematch!", "callback_data": "pc:rematch"}]]
@@ -5391,6 +5394,7 @@ def popcorn_keyboard(g):
         if can_add_npc("popcorn", g):
             kb.append([{"text": "🤖 Add NPC", "callback_data": "pc:npc"}])
         kb.append([{"text": "▶️ Start game", "callback_data": "pc:start"}])
+        kb.append([{"text": "🎥 How to play", "url": PC_HOW_TO_PLAY_URL}])
         return kb + (wk or [])
     actor = PC.current_index(g)
     if actor is None:

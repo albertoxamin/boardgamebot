@@ -1,4 +1,5 @@
 const PC={chat_id:null,init:'',board:null,timer:null};
+const PC_HOW_TO_PLAY_URL='https://www.youtube.com/watch?v=XxEKn0NgP8E';
 
 function pcLog(s){const e=document.getElementById('pcLog');if(e)e.textContent+=s+'\n';}
 function pcApi(path,opts){return fetch(path,opts).then(r=>r.json());}
@@ -54,8 +55,9 @@ function pcRender(){
  const turn=document.getElementById('pcTurn'),market=document.getElementById('pcMarket'),
   players=document.getElementById('pcPlayers'),actions=document.getElementById('pcActions'),
   join=document.getElementById('pcJoin'),npc=document.getElementById('pcNpc'),
-  start=document.getElementById('pcStart'),rematch=document.getElementById('pcRematch');
- [join,npc,start,rematch].forEach(el=>el.classList.add('hidden'));
+  start=document.getElementById('pcStart'),rematch=document.getElementById('pcRematch'),
+  howto=document.getElementById('pcHowTo');
+ [join,npc,start,rematch,howto].forEach(el=>el.classList.add('hidden'));
  actions.innerHTML='';
  document.getElementById('pcLog').textContent=(g.log||[]).join('\n');
  const names=g.players.map((p,i)=>escapeHtml(p.name)+' <b>'+p.popcorn+'🍿</b> $'+p.money+
@@ -74,7 +76,7 @@ function pcRender(){
   '<div>'+(p.theaters||[]).map(pcTheater).join('')+'</div></div>').join('');
  if(g.phase==='lobby'){
   if(g.is_player)join.classList.remove('hidden');
-  npc.classList.remove('hidden');start.classList.remove('hidden');return;
+  npc.classList.remove('hidden');start.classList.remove('hidden');howto.classList.remove('hidden');return;
  }
  if(g.phase==='game_end'){rematch.classList.remove('hidden');return;}
  if(!g.can_act)return;
@@ -83,5 +85,12 @@ function pcRender(){
 document.getElementById('pcJoin').addEventListener('click',()=>pcMove('join'));
 document.getElementById('pcNpc').addEventListener('click',()=>pcMove('join_npc'));
 document.getElementById('pcStart').addEventListener('click',()=>pcMove('start'));
+document.getElementById('pcHowTo').addEventListener('click',()=>{
+ try{
+  if(window.Telegram&&Telegram.WebApp&&Telegram.WebApp.openLink)
+   Telegram.WebApp.openLink(PC_HOW_TO_PLAY_URL);
+  else window.open(PC_HOW_TO_PLAY_URL,'_blank');
+ }catch(e){window.open(PC_HOW_TO_PLAY_URL,'_blank');}
+});
 document.getElementById('pcRematch').addEventListener('click',()=>pcMove('rematch'));
 pcLoad();

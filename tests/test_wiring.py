@@ -1,4 +1,3 @@
-import html as html_lib
 import json
 import os
 import re
@@ -13,6 +12,7 @@ import bot
 import blackflag as BF
 import fellowship as FTR
 import game_registry as GR
+import popcorn as PC
 import web_assets
 from game_modules.leaves import LEAVES_MODULE
 
@@ -104,14 +104,25 @@ class RegistryTests(unittest.TestCase):
         self.assertIn("/popcorn_move", GR.GAMES_BY_KEY["popcorn"].help_commands)
 
     def test_popcorn_tutorial_button_present(self):
+        # FB-0162: the Popcorn lobby has a "🎥 How to play" button that
+        # opens the how-to-play video, both on the Telegram board and in
+        # the Mini App lobby.
+        game = PC.new_game(-1004393094474, 1, "Alice")
+        kb = bot.popcorn_keyboard(game)
+        flat = [b for row in kb for b in row]
+        howto = [b for b in flat if b.get("text") == "🎥 How to play"]
+        self.assertEqual(len(howto), 1)
+        self.assertEqual(howto[0].get("url"), bot.PC_HOW_TO_PLAY_URL)
+        self.assertIn("youtube.com/watch?v=XxEKn0NgP8E", howto[0]["url"])
+        js = open(os.path.join(ROOT, "assets", "popcorn", "scripts", "popcorn.js")).read()
+        self.assertIn("PC_HOW_TO_PLAY_URL", js)
+        self.assertIn("youtube.com/watch?v=XxEKn0NgP8E", js)
+        self.assertIn("openLink", js)
+        self.assertIn("pcHowTo", js)
         with open(web_assets.HTML_PATH, encoding="utf-8") as handle:
             markup = handle.read()
+        self.assertIn('id="pcHowTo"', markup)
         self.assertIn("🎥 How to play", markup)
-        self.assertIn(
-            "https://www.youtube.com/watch?v=XxEKn0NgP8E"
-            "&pp=ygUeaG93IHRvIHBsYXkgcG9wY29ybiBib2FyZCBnYW1l",
-            html_lib.unescape(markup),
-        )
 
     def test_open_lobbies_filters_chat_and_phase(self):
         state = {key: {} for key in GR.GAME_KEYS}

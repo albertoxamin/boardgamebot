@@ -124,6 +124,24 @@ class RegistryTests(unittest.TestCase):
         self.assertIn('id="pcHowTo"', markup)
         self.assertIn("🎥 How to play", markup)
 
+    def test_popcorn_cover_is_display_photo(self):
+        # FB-0163/FB-0164: the lobby cover was the tall 280x580 box shot,
+        # which Telegram shrank; Annalisa picked display_0.jpg instead.
+        self.assertEqual(GR.GAMES_BY_KEY["popcorn"].cover, "popcorn.jpg")
+        path = os.path.join(ROOT, "assets", "shared", "images", "covers",
+                            "popcorn.jpg")
+        self.assertTrue(os.path.exists(path))
+        self.assertEqual(bot.cover_path("popcorn"), path)
+
+    def test_popcorn_minapp_load_failure_retries(self):
+        # FB-0165: a failed first load died silently and left a blank
+        # board. pcLoad must show the failure and retry instead.
+        js = open(os.path.join(ROOT, "assets", "popcorn", "scripts",
+                               "popcorn.js")).read()
+        self.assertIn("pcLoadFail", js)
+        self.assertIn("retrying", js)
+        self.assertIn("setTimeout(pcLoad,5000)", js)
+
     def test_open_lobbies_filters_chat_and_phase(self):
         state = {key: {} for key in GR.GAME_KEYS}
         state["leaves"]["7"] = {"phase": "lobby", "players": [{}, {}]}

@@ -266,7 +266,7 @@ GAME_SPECS = (
                        "/popcorn_move", "/popcorn_rules", "/popcorn_cancel", "/popcorn_rematch"),
         web_label="🎮 Play Popcorn (HTML)", callback_prefix="pc",
         min_players=2, max_players=4, npc_full="⛔ Popcorn is 2-4 players (full).",
-        rematch_phases=("game_end",), cover="popcorn.png",
+        rematch_phases=("game_end",), cover="popcorn.jpg",
         module="popcorn", web_module="popcorn",
         static_assets=("popcorn.js", "popcorn-board.webp"),
     ),

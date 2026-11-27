@@ -621,7 +621,7 @@ by archived movies. Rules were checked against the
 and the [BGA rules summary](https://en.doc.boardgamearena.com/Gamehelppopcorn).
 Board/cover art was extracted from [the BGA table](https://boardgamearena.com/tableview?table=953855470)
 into `assets/popcorn/images/popcorn-board.webp`,
-`assets/shared/images/covers/popcorn.png` and `sources/popcorn/bga/`.
+`assets/shared/images/covers/popcorn.jpg` and `sources/popcorn/bga/`.
 [🎥 How to play](https://www.youtube.com/watch?v=XxEKn0NgP8E&pp=ygUeaG93IHRvIHBsYXkgcG9wY29ybiBib2FyZCBnYW1l)
 is also linked by a button in the Mini App. [Board Game Geek page](https://boardgamegeek.com/boardgame/430563/popcorn).
 
@@ -704,7 +704,7 @@ Text commands: `/popcorn`, `/popcorn_join`, `/popcorn_join_npc`,
 - `assets/fadenfroh/scripts/fadenfroh.js` – Fadenfroh Mini App view (synced, viewer-filtered hands and BGA sprites)
 - `assets/fadenfroh/images/fadenfroh-*.webp` and `sources/fadenfroh/bga/` – BGA-extracted Fadenfroh fabric, scoring, starting-card and token art
 - `assets/popcorn/scripts/popcorn.js` – Popcorn Mini App view (synced, bot-driven board)
-- `assets/popcorn/images/popcorn-board.webp` and `assets/shared/images/covers/popcorn.png` – BGA-extracted Popcorn board and cover art
+- `assets/popcorn/images/popcorn-board.webp` and `assets/shared/images/covers/popcorn.jpg` – BGA-extracted Popcorn board and cover art
 - `sources/popcorn/bga/` – BGA Popcorn box/banner/display screenshots
 - `assets/popcorn/rulebook.pdf` and `sources/popcorn/rulebook.pdf` – official Popcorn rulebook
 - `sources/tokaidoduo/bga/` – BGA sprite sheets for Tokaido Duo (dice, wares, waves, paintings, boutiques, character boards)

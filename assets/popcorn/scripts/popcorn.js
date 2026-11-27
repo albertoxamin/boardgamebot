@@ -10,14 +10,27 @@ async function pcLoad(){
  PC.init=tg.init;
  const qp=new URLSearchParams(location.search);
  const pref=pcChatId(tg.start)||pcChatId(qp.get('app'))||parseInt(qp.get('chat_id'),10)||pcChatId(tg.chat_instance);
- const r=await pcApi('/api/popcorn/mygames?init_data='+encodeURIComponent(tg.init));
+ let r;
+ try{r=await pcApi('/api/popcorn/mygames?init_data='+encodeURIComponent(tg.init));}
+ catch(e){pcLoadFail('mygames');return;}
  const mine=r.games||[];
  const pick=mine.find(g=>g.chat_id===pref)||mine.find(g=>g.phase!=='game_end')||mine[0];
  if(pick)pcSelect(pick.chat_id);
  else if(pref){
-  const cr=await pcApi('/api/popcorn/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init,chat_id:pref})});
+  let cr;
+  try{cr=await pcApi('/api/popcorn/create',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({init_data:tg.init,chat_id:pref})});}
+  catch(e){pcLoadFail('create');return;}
   if(cr.game)pcSelect(cr.game.chat_id);else pcLog('⛔ '+(cr.error||'create failed'));
  }else document.getElementById('pcTurn').textContent='No Popcorn game yet — send /popcorn in a chat.';
+}
+function pcLoadFail(what){
+ // FB-0165: a failed first load used to die silently and leave a blank
+ // board. Say so on the board and retry — a transient server/tunnel
+ // hiccup must not look like a dead Mini App.
+ document.getElementById('pcTurn').textContent='⚠️ Couldn\'t load the Popcorn game — retrying…';
+ pcLog('⛔ load failed ('+what+'), retrying in 5s');
+ if(PC.retry)clearTimeout(PC.retry);
+ PC.retry=setTimeout(pcLoad,5000);
 }
 async function pcSelect(chat_id){
  PC.chat_id=chat_id;await pcRefresh();
@@ -31,7 +44,9 @@ async function pcRefresh(){
 }
 async function pcMove(action,extra){
  const body=Object.assign({chat_id:PC.chat_id,action:action,init_data:PC.init},extra||{});
- const r=await pcApi('/api/popcorn/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+ let r;
+ try{r=await pcApi('/api/popcorn/move',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});}
+ catch(e){pcLog('⛔ move failed — check your connection and try again');return;}
  if(r.events)r.events.forEach(e=>pcLog(e));
  if(r.error)pcLog('⛔ '+r.error);
  if(r.game){PC.board=r.game;pcRender();}

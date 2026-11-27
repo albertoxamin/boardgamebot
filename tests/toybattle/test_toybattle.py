@@ -218,6 +218,21 @@ class EngineTests(unittest.TestCase):
                 dist = ((top - bt) ** 2 + (left - bl) ** 2) ** 0.5
                 self.assertGreater(dist, 3, f"medal {m} on base {b}")
         self.assertEqual(per_region, {1: 3, 2: 1, 3: 1, 4: 2, 5: 2, 6: 1, 7: 1, 8: 3})
+        # FB-0167: 28px medal tokens still clear every base (token radius
+        # 14px + base half-height 29px) and never overlap each other
+        # (closest spots are 29px apart) — in real pixels, not mixed %.
+        spots = list(TB.MEDAL_SPOTS.items())
+        for m, (top, left, _r) in spots:
+            for b, (bt, bl, _a, _s) in TB.BASES.items():
+                dist = (((top - bt) / 100 * 1000) ** 2 +
+                        ((left - bl) / 100 * 600) ** 2) ** 0.5
+                self.assertGreaterEqual(dist, 14 + 29, f"medal {m} vs base {b}")
+        for i in range(len(spots)):
+            for j in range(i + 1, len(spots)):
+                (m1, (t1, l1, _)), (m2, (t2, l2, _)) = spots[i], spots[j]
+                dist = (((t1 - t2) / 100 * 1000) ** 2 +
+                        ((l1 - l2) / 100 * 600) ** 2) ** 0.5
+                self.assertGreaterEqual(dist, 28, f"medals {m1}/{m2} overlap")
 
     def test_troop_abilities_cover_all_troops(self):
         # FB-0091: ability descriptions come from the Toy Battle rules
@@ -256,6 +271,14 @@ class EngineTests(unittest.TestCase):
         self.assertIn(".tbtoyability", html)
         self.assertIn("scale(1.9)", html)
         self.assertIn(".tbmedal.tbclaimed", html)
+        # FB-0167: the 24px slots at 55% opacity were dark discs on green
+        # grass — at phone width Annalisa could not see them at all.
+        # 28px, full opacity, white ring on unclaimed slots; the script
+        # version is bumped so the live app fetches the new CSS.
+        self.assertIn(".tbmedal{position:absolute;width:28px;height:28px;", html)
+        self.assertIn(".tbmedal.tbunclaimed{box-shadow:0 0 0 2px #f8fafc", html)
+        self.assertNotIn(".tbmedal.tbunclaimed{opacity", html)
+        self.assertIn("toybattle.js?v=2", html)
 
 
     def test_miniapp_turn_banner_npc_log_rack_lock(self):

@@ -360,10 +360,13 @@ button:disabled{opacity:.45;cursor:not-allowed}
 .tblegal{box-shadow:0 0 0 2px #22c55e}
 .tbselected{box-shadow:0 0 0 3px #f59e0b}
 .tbbase.tbplaceable{cursor:pointer}
-.tbmedal{position:absolute;width:24px;height:24px;background:url(/assets/toybattle/images/toybattle-medals.webp) 0 0/200% 100%;transform:translate(-50%,-50%);z-index:3;border-radius:50%;box-shadow:0 1px 3px #000a}
+.tbmedal{position:absolute;width:28px;height:28px;background:url(/assets/toybattle/images/toybattle-medals.webp) 0 0/200% 100%;transform:translate(-50%,-50%);z-index:3;border-radius:50%;box-shadow:0 1px 3px #000a}
 .tbmedal.tbclaimed.tbblue{box-shadow:0 0 0 2px #38bdf8,0 1px 3px #000a}
 .tbmedal.tbclaimed.tbred{box-shadow:0 0 0 2px #f87171,0 1px 3px #000a}
-.tbmedal.tbunclaimed{opacity:.55}
+/* FB-0167: the 24px slots at 55% opacity were dark discs on green grass -
+   at phone width Annalisa could not see them at all. 28px, full opacity
+   and a white ring so every slot reads on the grass, claimed or not. */
+.tbmedal.tbunclaimed{box-shadow:0 0 0 2px #f8fafc,0 1px 3px #000a}
 .tbtile{display:inline-block;width:44px;height:58px;background:url(/assets/toybattle/images/toybattle-tiles.webp) 0 0/1200% 200%;border-radius:4px;box-shadow:inset 0 0 0 1px #0007,1px 2px 3px #0009;flex:none}
 .tbackrow{border:1px solid #334155;border-radius:10px;padding:7px;margin:6px 0;background:#0f172a99}
 .tbackrow.tbcurrent{border-color:#f59e0b;box-shadow:0 0 8px #f59e0b66}
@@ -893,7 +896,7 @@ window.PXSCROLL={
 <script data-cfasync="false" src="/assets/artichokes/scripts/artichokes.js?v=14"></script>
 <script data-cfasync="false" src="/assets/fellowship/scripts/fellowship.js?v=6"></script>
 <script data-cfasync="false" src="/assets/azul/scripts/azul.js?v=6"></script>
-<script data-cfasync="false" src="/assets/toybattle/scripts/toybattle.js?v=1"></script>
+<script data-cfasync="false" src="/assets/toybattle/scripts/toybattle.js?v=2"></script>
 <script data-cfasync="false" src="/assets/tokaidoduo/scripts/tokaidoduo.js?v=7"></script>
 <script data-cfasync="false" src="/assets/altay/scripts/altay.js?v=8"></script>
 <script data-cfasync="false" src="/assets/blackflag/scripts/blackflag.js?v=3"></script>

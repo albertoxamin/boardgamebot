@@ -194,5 +194,41 @@ class FlowTests(unittest.TestCase):
         self.assertEqual((action, params), ("place", {"color": "red", "slot": "2"}))
 
 
+class BgaAssetsTests(unittest.TestCase):
+    # FB-0170: the 13 BGA sprite sheets (release 260810-1806) stored in
+    # sources/popcorn/bga/ — movie cards, awards, guests, theater tiles
+    # and boards, lobby sliders, advertising, tokens, background,
+    # score pad and help sheet. Dimensions verified off the files.
+    SHEETS = {
+        "POP_Movies.jpg": (1644, 2466),
+        "POP_Awards.jpg": (741, 1548),
+        "POP_Guests.png": (1128, 200),
+        "POP_Theaters.png": (672, 1344),
+        "POP_CinemaBoards.png": (3776, 1296),
+        "POP_Lobbies.png": (420, 506),
+        "POP_AdvertisingBoard.png": (289, 745),
+        "POP_AdvertisingTokensMoney.png": (360, 71),
+        "POP_OtherResources.png": (600, 200),
+        "POP_FeatureTiles.png": (388, 272),
+        "POP_Background.jpg": (722, 1000),
+        "POP_Scorepad.jpg": (1294, 505),
+        "POP_Help.png": (1202, 1695),
+    }
+
+    def test_bga_sprite_sheets_present(self):
+        import os
+
+        from PIL import Image
+
+        base = os.path.join(os.path.dirname(os.path.dirname(
+            os.path.dirname(os.path.abspath(__file__)))),
+            "sources", "popcorn", "bga")
+        for name, size in self.SHEETS.items():
+            path = os.path.join(base, name)
+            self.assertTrue(os.path.isfile(path), name)
+            with Image.open(path) as im:
+                self.assertEqual(im.size, size, name)
+
+
 if __name__ == "__main__":
     unittest.main()

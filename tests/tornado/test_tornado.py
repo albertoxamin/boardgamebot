@@ -357,14 +357,6 @@ def test_state_json_serializable():
     json.dumps(g)  # must not raise
 
 
-if __name__ == "__main__":
-    fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
-    for fn in fns:
-        fn()
-        print(f"ok - {fn.__name__}")
-    print(f"All {len(fns)} tornado tests passed.")
-
-
 def test_lobby_has_how_to_play_button():
     # FB-0078: the Tornado Splash lobby has a "🎥 How to play" button that
     # opens the how-to-play video, both on the Telegram board and in the
@@ -386,3 +378,152 @@ def test_lobby_has_how_to_play_button():
     html = open(os.path.join(ROOT, "assets", "shared", "flip7.html")).read()
     assert 'id="tsHowTo"' in html
     assert "🎥 How to play" in html
+
+
+def _solo_game(seed=3):
+    """Annalisa + NPC, ready to pick boats."""
+    import bot as BOT
+
+    random.seed(seed)
+    g = TS.new_game(-1004393094474, 1, "Annalisa")
+    assert BOT.add_npc("tornado", g) is None
+    assert g["players"][1].get("npc")
+    return g
+
+
+def test_npc_autoplay_picks_boat():
+    # FB-0169: the NPC picks its own boat — nobody has to pick for it.
+    g = _solo_game()
+    ev = []
+    assert TS.start_picking(g, ev) is None
+    TS.autoplay_npcs(g, ev)
+    while g["phase"] == "picking":
+        idx = g["picking_order"][g["picking_index"]]
+        assert not g["players"][idx].get("npc"), "autoplay must pick for the NPC"
+        free = next(i for i in range(len(TS.BOATS))
+                    if not any(p["boat"] == i for p in g["players"]))
+        assert TS.pick_boat(g, idx, free, ev) is None
+        TS.autoplay_npcs(g, ev)
+    assert g["phase"] == "playing"
+    assert all(p["boat"] is not None for p in g["players"])
+    assert len({p["boat"] for p in g["players"]}) == 2
+
+
+def test_npc_best_play_prefers_finish_and_curve():
+    # A subset that finishes beats a longer one that does not; crossing a
+    # checkpoint needs a curve card in the subset.
+    g = mk(2, boats=[0, 1])
+    p = g["players"][1]
+    p["pos"] = 22  # Tornado Circuit is 24 long
+    p["hand"] = [TS._card("s", 1), TS._card("s", 2), TS._card("c", 2)]
+    assert TS._npc_best_play(g, 1) is not None
+    chosen = TS._npc_best_play(g, 1)
+    total = sum(p["hand"][i]["spaces"] for i in chosen)
+    assert p["pos"] + total >= TS.course(g)["length"]
+    p["pos"] = 8  # checkpoint at 9: s2 alone would cross it without a curve
+    p["hand"] = [TS._card("s", 2), TS._card("c", 1)]
+    assert TS._npc_best_play(g, 1) == [0, 1]
+    p["hand"] = [TS._card("s", 2)]
+    assert TS._npc_best_play(g, 1) is None
+
+
+def test_npc_autoplay_plays_its_turn():
+    # FB-0169: on the NPC's turn the race moves on by itself.
+    g = mk(2, boats=[0, 1])  # turn order [1, 0]: Bolt (w3) goes first
+    g["players"][1]["npc"] = True
+    assert g["turn_order"][g["current_index"]] == 1
+    ev = []
+    before = g["players"][1]["pos"]
+    TS.autoplay_npcs(g, ev)
+    assert g["players"][1]["pos"] > before
+    assert g["turn_order"][g["current_index"]] == 0
+    assert not any("NPC error" in e for e in ev)
+
+
+def test_npc_waits_when_no_legal_play():
+    # Hand of straights just before a checkpoint: every card would cross
+    # it without a curve, so the NPC waits and fresh cards come next round.
+    g = mk(2, boats=[0, 1])
+    g["players"][1]["npc"] = True
+    g["players"][1]["pos"] = 8
+    g["players"][1]["hand"] = [TS._card("s", 2)]
+    ev = []
+    TS.autoplay_npcs(g, ev)
+    assert g["players"][1]["pos"] == 8
+    assert g["turn_order"][g["current_index"]] == 0
+    assert any("waits" in e for e in ev)
+    # It discarded its hand to cycle fresh cards in — waiting alone
+    # would leave it stuck before the checkpoint forever.
+    assert g["players"][1]["hand"] == []
+
+
+def test_npc_autoplay_finishes_solo_race():
+    # FB-0169: a whole race, human waiting every turn, NPC driving itself.
+    g = _solo_game(seed=11)
+    ev = []
+    assert TS.start_picking(g, ev) is None
+    TS.autoplay_npcs(g, ev)
+    while g["phase"] == "picking":
+        idx = g["picking_order"][g["picking_index"]]
+        free = next(i for i in range(len(TS.BOATS))
+                    if not any(p["boat"] == i for p in g["players"]))
+        assert TS.pick_boat(g, idx, free, ev) is None
+        TS.autoplay_npcs(g, ev)
+    assert g["phase"] == "playing"
+    turns = 0
+    while g["phase"] == "playing" and turns < 500:
+        turns += 1
+        cur = g["turn_order"][g["current_index"]]
+        if g["players"][cur].get("npc"):
+            TS.autoplay_npcs(g, ev)
+        else:
+            assert TS.do_wait(g, cur, events=ev) is None
+            TS.autoplay_npcs(g, ev)
+    assert g["phase"] == "race_end", f"stuck in {g['phase']} after {turns} turns"
+    assert g["players"][1]["finished"]
+    assert not any("NPC error" in e for e in ev)
+
+
+def test_api_join_npc_and_miniapp_button():
+    # FB-0168: 🤖 Add NPC from the Mini App lobby (and the chat lobby
+    # button, which answered "Unknown button" — no ts:npc branch existed).
+    import bot as BOT
+    from unittest.mock import patch
+
+    state = {"tornado": {}}
+    g = TS.new_game(-1004393094474, 1, "Annalisa")
+    state["tornado"]["-1004393094474"] = g
+    with patch.object(BOT, "send_board", return_value={"ok": False}):
+        ev, err = BOT.tornado_api_move(state, -1004393094474, 1,
+                                       {"action": "join_npc"})
+    assert err is None
+    assert len(g["players"]) == 2 and g["players"][1].get("npc")
+    assert any("NPC joined" in e for e in ev)
+    assert BOT.tornado_board_json(g, 1)["can_add_npc"] is True
+    for _ in range(3):
+        assert BOT.add_npc("tornado", g) is None
+    assert BOT.tornado_board_json(g, 1)["can_add_npc"] is False
+    with patch.object(BOT, "send_board", return_value={"ok": False}):
+        _, err = BOT.tornado_api_move(state, -1004393094474, 1,
+                                      {"action": "join_npc"})
+    assert err is not None
+    js = open(os.path.join(ROOT, "assets", "tornado", "scripts", "tornado.js")).read()
+    assert "tsNpc" in js
+    assert "join_npc" in js
+    assert "can_add_npc" in js
+    html = open(os.path.join(ROOT, "assets", "shared", "flip7.html")).read()
+    assert 'id="tsNpc"' in html
+    assert "🤖 Add NPC" in html
+    assert "tornado.js?v=4" in html
+    bot_src = open(os.path.join(ROOT, "bot.py")).read()
+    assert '["ts", "npc"]' in bot_src
+    assert "TS.autoplay_npcs(g, ev)" in bot_src
+    assert "TS.autoplay_npcs(ts, ev)" in bot_src
+
+
+if __name__ == "__main__":
+    fns = [v for k, v in sorted(globals().items()) if k.startswith("test_")]
+    for fn in fns:
+        fn()
+        print(f"ok - {fn.__name__}")
+    print(f"All {len(fns)} tornado tests passed.")

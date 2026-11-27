@@ -2829,7 +2829,7 @@ def handle_tornado(state, msg, cmd, text, uid, name):
         if err:
             send(chat_id, err)
         else:
-            send(chat_id, "🤖 NPC joined - anyone can play for it!")
+            send(chat_id, "🤖 NPC joined — it plays by itself!")
             tornado_render(g)
         return True
     if cmd == "/tornado_join":
@@ -2857,6 +2857,7 @@ def handle_tornado(state, msg, cmd, text, uid, name):
             if err:
                 send(chat_id, f"⛔ {err}")
             else:
+                TS.autoplay_npcs(g, ev)
                 tornado_render(g, ev)
         return True
     if cmd == "/tornado_cancel":
@@ -2882,6 +2883,7 @@ def handle_tornado(state, msg, cmd, text, uid, name):
         if err:
             send(chat_id, f"⛔ {err}")
         else:
+            TS.autoplay_npcs(g, ev)
             tornado_render(g, ev)
         return True
     if cmd == "/tornado_auto":
@@ -2893,6 +2895,7 @@ def handle_tornado(state, msg, cmd, text, uid, name):
         if err:
             send(chat_id, f"⛔ {err}")
         else:
+            TS.autoplay_npcs(g, ev)
             tornado_render(g, ev)
         return True
     if cmd == "/tornado_hand":
@@ -2922,6 +2925,7 @@ def handle_tornado(state, msg, cmd, text, uid, name):
         if err:
             send(chat_id, f"⛔ {err}")
         else:
+            TS.autoplay_npcs(g, ev)
             tornado_render(g, ev)
         return True
     if cmd == "/tornado_next":
@@ -2930,6 +2934,7 @@ def handle_tornado(state, msg, cmd, text, uid, name):
         if err:
             send(chat_id, f"⛔ {err}")
         else:
+            TS.autoplay_npcs(g, ev)
             tornado_render(g, ev)
         return True
     return False
@@ -7652,11 +7657,19 @@ def handle_callback(state, cb):
             ts["players"].append(TS.new_player(uid, cb["from"].get("first_name") or "Player"))
             answer_cb(cb["id"], "Joined!")
             tornado_render(ts, [f"🙋 {cb['from'].get('first_name')} joined Tornado Splash."])
+        elif parts == ["ts", "npc"]:
+            # FB-0168: the lobby keyboard offered 🤖 Add NPC but no branch
+            # handled it, so the tap answered "Unknown button."
+            err = add_npc("tornado", ts)
+            answer_cb(cb["id"], err or "🤖 NPC joined — it plays by itself!")
+            if not err:
+                tornado_render(ts, ["🤖 NPC joined Tornado Splash."])
         elif parts in (["ts", "start"], ["ts", "gp"]):
             err = (TS.start_picking(ts, ev, gp=(parts[1] == "gp"))
                    if ts["phase"] == "lobby" else "already started")
             answer_cb(cb["id"], err or "Started")
             if not err:
+                TS.autoplay_npcs(ts, ev)
                 tornado_render(ts, ev)
         elif len(parts) == 3 and parts[1] == "pick":
             if idx is None:
@@ -7664,6 +7677,7 @@ def handle_callback(state, cb):
             err = TS.pick_boat(ts, idx, int(parts[2]), ev)
             answer_cb(cb["id"], err or "Boat locked in")
             if not err:
+                TS.autoplay_npcs(ts, ev)
                 tornado_render(ts, ev)
         elif parts == ["ts", "auto"]:
             if idx is None:
@@ -7671,6 +7685,7 @@ def handle_callback(state, cb):
             err = TS.auto_assign_boats(ts, ev)
             answer_cb(cb["id"], err or "Boats assigned")
             if not err:
+                TS.autoplay_npcs(ts, ev)
                 tornado_render(ts, ev)
         elif parts == ["ts", "hand"]:
             mine = next((i for i, p in enumerate(ts["players"])
@@ -7694,11 +7709,13 @@ def handle_callback(state, cb):
             err = TS.do_wait(ts, idx, events=ev)
             answer_cb(cb["id"], err or "Waited")
             if not err:
+                TS.autoplay_npcs(ts, ev)
                 tornado_render(ts, ev)
         elif parts == ["ts", "next"]:
             err = TS.next_race(ts, uid, ev)
             answer_cb(cb["id"], err or "Next race!")
             if not err:
+                TS.autoplay_npcs(ts, ev)
                 tornado_render(ts, ev)
         elif parts == ["ts", "rematch"]:
             ev, err = rematch_game(state, "tornado", chat_id, uid)
@@ -8665,6 +8682,8 @@ def tornado_board_json(g, viewer_id=None):
         "my_boost_available": bool(my_idx is not None
                                    and not g["players"][my_idx]["boost_used"]),
         "max_players": TS.MAX_PLAYERS,
+        # FB-0168: the Mini App lobby shows its own 🤖 Add NPC button.
+        "can_add_npc": can_add_npc("tornado", g),
     }
 
 
@@ -8695,6 +8714,14 @@ def tornado_api_move(state, chat_id, user_id, body):
         iu_name = (init_user(body.get("init_data", "")) or (None, "Player"))[1]
         g["players"].append(TS.new_player(user_id, iu_name))
         ev.append("🙋 joined Tornado Splash.")
+    elif action == "join_npc":
+        # FB-0168: add an NPC from the Mini App lobby, like the chat lobby.
+        if g["phase"] != "lobby":
+            return [], "game already started"
+        err = add_npc("tornado", g)
+        if err:
+            return [], err
+        ev.append("🤖 NPC joined — it plays by itself!")
     elif action == "start":
         if g["phase"] != "lobby":
             return [], "already started"
@@ -8744,6 +8771,9 @@ def tornado_api_move(state, chat_id, user_id, body):
         return ev, err
     else:
         return [], "unknown action"
+    # FB-0169: the NPC plays by itself — resolve its turns now so the
+    # Mini App (and the chat board) only ever waits on a human.
+    TS.autoplay_npcs(g, ev)
     tornado_render(g, ev)
     return ev, None
 

@@ -373,6 +373,84 @@ def do_wait(g, idx, discard=None, events=None):
     return None
 
 
+def _npc_best_play(g, idx):
+    """Best card subset for the NPC: the most spaces within the move cap
+    that can legally cross any checkpoint it passes (a curve card is
+    needed for that). Prefers a subset that finishes the race, then the
+    most spaces, then the fewest cards. None when no subset is legal —
+    e.g. a hand of straights that would all cross a checkpoint."""
+    p = g["players"][idx]
+    cap = max_move(g, idx)
+    c = course(g)
+    best = None
+    hand = p["hand"]
+    for mask in range(1, 1 << len(hand)):
+        subset = [i for i in range(len(hand)) if mask & (1 << i)]
+        total = sum(hand[i]["spaces"] for i in subset)
+        if total == 0 or total > cap:
+            continue
+        new_pos = min(p["pos"] + total, c["length"])
+        crossed = _crossed_checkpoints(g, p["pos"], new_pos)
+        if crossed and not any(hand[i]["kind"] == "c" for i in subset):
+            continue
+        key = (1 if new_pos >= c["length"] else 0, total, -len(subset))
+        if best is None or key > best[0]:
+            best = (key, subset)
+    return best[1] if best else None
+
+
+def npc_move(g, events):
+    """Play one NPC turn: pick a free boat in the picking phase, else the
+    best legal card play — or wait (fresh cards come next round) when no
+    legal play exists. Returns an error string, or None."""
+    if g["phase"] == "picking":
+        idx = g["picking_order"][g["picking_index"]]
+        free = [i for i in range(len(BOATS))
+                if not any(p["boat"] == i for p in g["players"])]
+        if not free:
+            return "no boat left for the NPC"
+        random.shuffle(free)
+        return pick_boat(g, idx, free[0], events)
+    if g["phase"] != "playing":
+        return "NPC has nothing to do"
+    idx = g["turn_order"][g["current_index"]]
+    subset = _npc_best_play(g, idx)
+    if subset is None:
+        # No legal play: the hand holds no curve card for the checkpoint
+        # ahead (any single curve card would be a legal play). Wait and
+        # discard the whole hand so fresh cards cycle in next round —
+        # waiting without discarding would sit on this spot forever.
+        p = g["players"][idx]
+        return do_wait(g, idx, discard=list(range(len(p["hand"]))),
+                       events=events)
+    return do_play(g, idx, subset, events=events)
+
+
+def autoplay_npcs(g, events):
+    """Keep playing NPC turns until a human must act (or the game ends) —
+    the same pattern as leaves.autoplay_npcs."""
+    guard = 0
+    while guard < 50:
+        guard += 1
+        if g.get("phase") == "picking":
+            idx = g["picking_order"][g["picking_index"]]
+            if not g["players"][idx].get("npc"):
+                break
+        elif g.get("phase") == "playing":
+            if not g["turn_order"]:
+                break
+            idx = g["turn_order"][g["current_index"]]
+            if not g["players"][idx].get("npc"):
+                break
+        else:
+            break
+        err = npc_move(g, events)
+        if err:
+            events.append(f"⛔ NPC error: {err}")
+            break
+    return None
+
+
 def _ord(n):
     return {1: "st", 2: "nd", 3: "rd"}.get(n % 10 if n % 100 < 11 or n % 100 > 13 else 0, "th")
 

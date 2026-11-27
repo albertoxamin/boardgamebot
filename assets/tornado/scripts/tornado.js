@@ -118,6 +118,8 @@ function tsRender(){
  // ---- buttons ----
  let $=id=>document.getElementById(id);
  $('tsJoin').classList.toggle('hidden',!(b.phase==='lobby'&&!b.is_player));
+ // FB-0168: add an NPC from the Mini App lobby, like the chat lobby does.
+ $('tsNpc').classList.toggle('hidden',!(b.phase==='lobby'&&b.is_player&&b.can_add_npc));
  $('tsStart').classList.toggle('hidden',!(b.phase==='lobby'&&b.is_player&&b.players.length>=2));
  $('tsHowTo').classList.toggle('hidden', b.phase !== 'lobby');
  $('tsGp').classList.toggle('hidden',!(b.phase==='lobby'&&b.is_player&&b.players.length>=2));
@@ -145,6 +147,7 @@ function tsRender(){
   TSV.prevAll={counts:tsCounts(b)};
 }
 document.getElementById('tsJoin').addEventListener('click',()=>tsMove('join'));
+document.getElementById('tsNpc').addEventListener('click',()=>tsMove('join_npc'));
 document.getElementById('tsStart').addEventListener('click',()=>tsMove('start',{gp:false}));
 document.getElementById('tsHowTo').addEventListener('click', () => {
   try {

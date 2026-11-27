@@ -514,7 +514,7 @@ def test_api_join_npc_and_miniapp_button():
     html = open(os.path.join(ROOT, "assets", "shared", "flip7.html")).read()
     assert 'id="tsNpc"' in html
     assert "🤖 Add NPC" in html
-    assert "tornado.js?v=4" in html
+    assert "tornado.js?v=5" in html
     bot_src = open(os.path.join(ROOT, "bot.py")).read()
     assert '["ts", "npc"]' in bot_src
     assert "TS.autoplay_npcs(g, ev)" in bot_src
@@ -527,3 +527,17 @@ if __name__ == "__main__":
         fn()
         print(f"ok - {fn.__name__}")
     print(f"All {len(fns)} tornado tests passed.")
+
+
+def test_hand_cards_show_description():
+    # FB-0171: the description of each card sits under it in the hand —
+    # the badge only says curve/straight + spaces, not what a curve is for.
+    js = open(os.path.join(ROOT, "assets", "tornado", "scripts", "tornado.js")).read()
+    assert "tsCardDesc" in js
+    assert "turns at checkpoints" in js
+    assert "tscarddesc" in js
+    assert "tscardwrap" in js
+    html = open(os.path.join(ROOT, "assets", "shared", "flip7.html")).read()
+    assert ".tscarddesc{" in html
+    assert ".tscardwrap{" in html
+    assert "tornado.js?v=5" in html

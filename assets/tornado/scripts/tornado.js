@@ -14,6 +14,12 @@ function tsCard(c){
  let src='/assets/tornado/images/tornado_cards/'+(TS_CARD_ART[key]||'running_5_wide.png');
  return '<img src="'+src+'" alt=""><span class="tscardbadge">'+(c.kind==='c'?'🌊':'➡️')+c.spaces+'</span>';
 }
+// FB-0171: what the card does, shown under it in the hand — the badge
+// only says curve/straight + spaces, not what a curve is for.
+function tsCardDesc(c){
+ let n=c.spaces===1?'1 space':c.spaces+' spaces';
+ return c.kind==='c' ? 'Curve · '+n+' — turns at checkpoints' : 'Straight · '+n;
+}
 function tsBoatStars(n){let s='';for(let i=0;i<n;i++)s+='⭐';return s;}
 async function tsLoad(){
  let tg=tgInit();
@@ -96,7 +102,7 @@ function tsRender(){
  let handHtml='';
  if(b.phase==='playing'&&me){
   handHtml='<div class="tshand">'+(b.my_hand.length?b.my_hand.map((c,i)=>
-   '<div class="tscard'+(TSV.sel.has(i)?' sel':'')+'" data-i="'+i+'">'+tsCard(c)+'</div>').join(''):'<span class="small">Empty hand</span>')+'</div>'
+   '<div class="tscardwrap"><div class="tscard'+(TSV.sel.has(i)?' sel':'')+'" data-i="'+i+'">'+tsCard(c)+'</div><span class="tscarddesc">'+tsCardDesc(c)+'</span></div>').join(''):'<span class="small">Empty hand</span>')+'</div>'
    +'<div class="small" style="text-align:center">Selected '+total+' / max '+cap+' spaces'+(TSV.boost?' · ⚡ boost':'')+' · tap cards to choose</div>';
  }
  document.getElementById('tsHand').innerHTML=handHtml;
